@@ -1,5 +1,13 @@
 import { apiClient, getAuthOptions } from "./client";
 
+// Paginated response type
+interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
 // Types matching backend models
 
 export interface DataLakeFile {
@@ -144,10 +152,11 @@ export const dataLakeApi = {
     if (params?.folder) queryParams.append("folder", params.folder);
 
     const query = queryParams.toString();
-    return apiClient.get(
+    const response = await apiClient.get<PaginatedResponse<DataLakeFile>>(
       `/api/data-lake/files/${query ? `?${query}` : ""}`,
       getAuthOptions()
     );
+    return response.results;
   },
 
   async getFile(id: string): Promise<DataLakeFile> {
@@ -209,7 +218,8 @@ export const dataLakeApi = {
 
   // Folders
   async getFolders(): Promise<Folder[]> {
-    return apiClient.get("/api/data-lake/folders/", getAuthOptions());
+    const response = await apiClient.get<PaginatedResponse<Folder>>("/api/data-lake/folders/", getAuthOptions());
+    return response.results;
   },
 
   async getFolder(id: string): Promise<Folder> {
@@ -242,7 +252,8 @@ export const dataLakeApi = {
   // Schemas
   async getSchemas(params?: { search?: string }): Promise<Schema[]> {
     const query = params?.search ? `?search=${params.search}` : "";
-    return apiClient.get(`/api/data-lake/schemas/${query}`, getAuthOptions());
+    const response = await apiClient.get<PaginatedResponse<Schema>>(`/api/data-lake/schemas/${query}`, getAuthOptions());
+    return response.results;
   },
 
   async getSchema(id: string): Promise<Schema> {
@@ -285,7 +296,8 @@ export const dataLakeApi = {
 
   // Storage Zones
   async getStorageZones(): Promise<StorageZone[]> {
-    return apiClient.get("/api/data-lake/storage-zones/", getAuthOptions());
+    const response = await apiClient.get<PaginatedResponse<StorageZone>>("/api/data-lake/storage-zones/", getAuthOptions());
+    return response.results;
   },
 
   async getStorageZone(id: string): Promise<StorageZone> {

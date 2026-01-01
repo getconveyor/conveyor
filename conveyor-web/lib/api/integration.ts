@@ -1,5 +1,13 @@
 import { apiClient } from './client'
 
+// Paginated response type
+interface PaginatedResponse<T> {
+  count: number
+  next: string | null
+  previous: string | null
+  results: T[]
+}
+
 // Types
 
 export interface Connection {
@@ -134,7 +142,8 @@ export interface Schedule {
 export const integrationApi = {
     // Connections
     async getConnections(): Promise<Connection[]> {
-        return apiClient.get('/api/integration/connections/')
+        const response = await apiClient.get<PaginatedResponse<Connection>>('/api/integration/connections/')
+        return response.results
     },
 
     async getConnection(id: string): Promise<Connection> {
@@ -159,7 +168,8 @@ export const integrationApi = {
 
     // Data Sources
     async getDataSources(): Promise<DataSource[]> {
-        return apiClient.get('/api/integration/data-sources/')
+        const response = await apiClient.get<PaginatedResponse<DataSource>>('/api/integration/data-sources/')
+        return response.results
     },
 
     async getDataSource(id: string): Promise<DataSource> {
@@ -172,7 +182,8 @@ export const integrationApi = {
 
     // Pipelines
     async getPipelines(): Promise<Pipeline[]> {
-        return apiClient.get('/api/integration/pipelines/')
+        const response = await apiClient.get<PaginatedResponse<Pipeline>>('/api/integration/pipelines/')
+        return response.results
     },
 
     async getPipeline(id: string): Promise<Pipeline> {
@@ -198,7 +209,8 @@ export const integrationApi = {
     // Pipeline Runs
     async getPipelineRuns(pipelineId?: string): Promise<PipelineRun[]> {
         const query = pipelineId ? `?pipeline=${pipelineId}` : ''
-        return apiClient.get(`/api/integration/pipeline-runs/${query}`)
+        const response = await apiClient.get<PaginatedResponse<PipelineRun>>(`/api/integration/pipeline-runs/${query}`)
+        return response.results
     },
 
     async getPipelineRun(id: string): Promise<PipelineRun> {
@@ -211,7 +223,8 @@ export const integrationApi = {
 
     // Schedules
     async getSchedules(): Promise<Schedule[]> {
-        return apiClient.get('/api/integration/schedules/')
+        const response = await apiClient.get<PaginatedResponse<Schedule>>('/api/integration/schedules/')
+        return response.results
     },
 
     async createSchedule(data: { pipeline: string; cron_expression: string; name?: string }): Promise<Schedule> {

@@ -1,5 +1,13 @@
 import { apiClient } from './client'
 
+// Paginated response type
+interface PaginatedResponse<T> {
+  count: number
+  next: string | null
+  previous: string | null
+  results: T[]
+}
+
 // Types
 export interface ApiKey {
   id: string
@@ -29,7 +37,8 @@ export interface UpdateApiKeyData {
 // API Client
 export const apiKeyApi = {
   async getApiKeys(): Promise<ApiKey[]> {
-    return apiClient.get('/api/auth/api-keys/')
+    const response = await apiClient.get<PaginatedResponse<ApiKey>>('/api/auth/api-keys/')
+    return response.results
   },
 
   async getApiKey(keyId: string): Promise<ApiKey> {

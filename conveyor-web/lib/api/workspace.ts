@@ -1,5 +1,13 @@
 import { apiClient, getAuthOptions } from "./client";
 
+// Paginated response type
+interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
 // Types
 export interface Plan {
   id: string;
@@ -110,7 +118,8 @@ export interface MemberActionResponse {
 export const workspaceApi = {
   // Plans
   async getPlans(): Promise<Plan[]> {
-    return apiClient.get("/api/plans/");
+    const response = await apiClient.get<PaginatedResponse<Plan>>("/api/plans/");
+    return response.results;
   },
 
   async getPlan(planId: string): Promise<Plan> {
@@ -119,7 +128,8 @@ export const workspaceApi = {
 
   // Workspaces
   async getWorkspaces(): Promise<Workspace[]> {
-    return apiClient.get("/api/workspaces/", getAuthOptions());
+    const response = await apiClient.get<PaginatedResponse<Workspace>>("/api/workspaces/", getAuthOptions());
+    return response.results;
   },
 
   async getWorkspace(workspaceId: string): Promise<Workspace> {
@@ -158,7 +168,8 @@ export const workspaceApi = {
 
   // Members
   async getMembers(workspaceId: string): Promise<WorkspaceMember[]> {
-    return apiClient.get(`/api/workspaces/${workspaceId}/members/`);
+    const response = await apiClient.get<PaginatedResponse<WorkspaceMember>>(`/api/workspaces/${workspaceId}/members/`);
+    return response.results;
   },
 
   async inviteMember(
