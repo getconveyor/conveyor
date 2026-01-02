@@ -336,27 +336,38 @@ export default function SourcesPage() {
     setIsConfigureDialogOpen(true);
   };
 
-  const handleEditSource = (source: Source) => {
-    const sourceType = sourceTypesCatalog.find(
-      (st) =>
-        st.id === source.type ||
-        st.name.toLowerCase() === source.type.toLowerCase()
-    );
-    setSelectedSourceType(sourceType || null);
-    setEditingSource(source);
-    setFormData({
-      name: source.name,
-      description: "",
-      type: source.type,
-      host: source.host || "",
-      port: source.port?.toString() || "",
-      database: source.database || "",
-      username: source.username || "",
-      password: "",
-      ssl: source.ssl || false,
-      config: source.config || {},
-    });
-    setIsConfigureDialogOpen(true);
+  const handleEditSource = async (source: Source) => {
+    try {
+      setIsLoading(true);
+      // Fetch full source details including all configuration
+      const fullSource = await integrationApi.getSource(source.id);
+
+      const sourceType = sourceTypesCatalog.find(
+        (st) =>
+          st.id === fullSource.type ||
+          st.name.toLowerCase() === fullSource.type.toLowerCase()
+      );
+      setSelectedSourceType(sourceType || null);
+      setEditingSource(fullSource);
+      setFormData({
+        name: fullSource.name,
+        description: "",
+        type: fullSource.type,
+        host: fullSource.host || "",
+        port: fullSource.port?.toString() || "",
+        database: fullSource.database || "",
+        username: fullSource.username || "",
+        password: "",
+        ssl: fullSource.ssl || false,
+        config: fullSource.config || {},
+      });
+      setIsConfigureDialogOpen(true);
+    } catch (error: any) {
+      console.error("Failed to load source details:", error);
+      toast.error(error.message || "Failed to load source details");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCreateOrUpdateSource = async () => {
@@ -906,11 +917,18 @@ export default function SourcesPage() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="db-password">Password</Label>
+                    <Label htmlFor="db-password">
+                      Password{" "}
+                      {editingSource && "(leave empty to keep existing)"}
+                    </Label>
                     <Input
                       id="db-password"
                       type="password"
-                      placeholder="••••••••"
+                      placeholder={
+                        editingSource
+                          ? "Leave empty to keep existing"
+                          : "••••••••"
+                      }
                       value={formData.password}
                       onChange={(e) =>
                         setFormData({ ...formData, password: e.target.value })
@@ -936,11 +954,18 @@ export default function SourcesPage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="api-key">API Key / Token</Label>
+                  <Label htmlFor="api-key">
+                    API Key / Token{" "}
+                    {editingSource && "(leave empty to keep existing)"}
+                  </Label>
                   <Input
                     id="api-key"
                     type="password"
-                    placeholder="Enter your API key or token"
+                    placeholder={
+                      editingSource
+                        ? "Leave empty to keep existing"
+                        : "Enter your API key or token"
+                    }
                     value={formData.password}
                     onChange={(e) =>
                       setFormData({ ...formData, password: e.target.value })
@@ -990,11 +1015,18 @@ export default function SourcesPage() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="secret-key">Secret Key *</Label>
+                    <Label htmlFor="secret-key">
+                      Secret Key{" "}
+                      {editingSource && "(leave empty to keep existing)"} *
+                    </Label>
                     <Input
                       id="secret-key"
                       type="password"
-                      placeholder="••••••••"
+                      placeholder={
+                        editingSource
+                          ? "Leave empty to keep existing"
+                          : "••••••••"
+                      }
                       value={formData.password}
                       onChange={(e) =>
                         setFormData({ ...formData, password: e.target.value })
@@ -1055,11 +1087,18 @@ export default function SourcesPage() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="file-password">Password</Label>
+                    <Label htmlFor="file-password">
+                      Password{" "}
+                      {editingSource && "(leave empty to keep existing)"}
+                    </Label>
                     <Input
                       id="file-password"
                       type="password"
-                      placeholder="••••••••"
+                      placeholder={
+                        editingSource
+                          ? "Leave empty to keep existing"
+                          : "••••••••"
+                      }
                       value={formData.password}
                       onChange={(e) =>
                         setFormData({ ...formData, password: e.target.value })

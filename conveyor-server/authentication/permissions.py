@@ -53,10 +53,15 @@ class IsWorkspaceMember(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
         """Check if user is an active member of the workspace"""
-        # obj is the workspace
+        # obj could be a Workspace or a workspace-scoped object (Source, Pipeline, etc.)
+        workspace = obj if hasattr(obj, '__class__') and obj.__class__.__name__ == 'Workspace' else getattr(obj, 'workspace', None)
+        
+        if not workspace:
+            return False
+            
         try:
             membership = WorkspaceMember.objects.get(
-                workspace=obj,
+                workspace=workspace,
                 user=request.user,
                 status='active'
             )

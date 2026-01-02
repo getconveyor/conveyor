@@ -28,8 +28,8 @@ class SourceListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Source
         fields = [
-            'id', 'name', 'type', 'status', 'last_tested',
-            'created_at', 'updated_at'
+            'id', 'name', 'type', 'host', 'port', 'database', 'username',
+            'ssl', 'config', 'status', 'last_tested', 'created_at', 'updated_at'
         ]
         read_only_fields = fields
 
