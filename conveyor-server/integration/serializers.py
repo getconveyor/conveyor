@@ -16,7 +16,7 @@ class SourceSerializer(serializers.ModelSerializer):
             'status', 'last_tested', 'config', 'created_by',
             'created_by_details', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by_details']
+        read_only_fields = ['id', 'workspace', 'created_at', 'updated_at', 'created_by_details', 'created_by', 'status', 'last_tested']
         extra_kwargs = {
             'password_encrypted': {'write_only': True}
         }
@@ -83,10 +83,10 @@ class PipelineSerializer(serializers.ModelSerializer):
             'is_scheduled'
         ]
         read_only_fields = [
-            'id', 'created_at', 'updated_at', 'created_by_details',
+            'id', 'workspace', 'created_at', 'updated_at', 'created_by_details', 'created_by',
             'source_details', 'destination_details',
             'is_scheduled', 'run_count', 'success_rate', 'records_processed',
-            'last_run', 'next_run'
+            'last_run', 'next_run', 'status'
         ]
 
 
