@@ -22,6 +22,7 @@ class SourceViewSet(viewsets.ModelViewSet):
     Provides CRUD operations and source testing.
     """
     permission_classes = [IsAuthenticated, IsWorkspaceMember]
+    queryset = Source.objects.all()
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -213,6 +214,7 @@ class PipelineViewSet(viewsets.ModelViewSet):
     Provides CRUD operations and pipeline execution.
     """
     permission_classes = [IsAuthenticated, IsWorkspaceMember]
+    queryset = Pipeline.objects.all()
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -371,6 +373,7 @@ class PipelineRunViewSet(viewsets.ReadOnlyModelViewSet):
     Read-only access to pipeline execution history.
     """
     permission_classes = [IsAuthenticated, IsWorkspaceMember]
+    queryset = PipelineRun.objects.all()
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -433,6 +436,7 @@ class ScheduleViewSet(viewsets.ModelViewSet):
     Provides CRUD operations for scheduling pipelines.
     """
     permission_classes = [IsAuthenticated, IsWorkspaceOwnerOrAdmin]
+    queryset = Schedule.objects.all()
 
     def get_serializer_class(self):
         if self.action == 'list':
