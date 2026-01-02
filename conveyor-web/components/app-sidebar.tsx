@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   IconActivity,
   IconArrowsExchange,
@@ -14,10 +14,10 @@ import {
   IconTransform,
   IconWaveSine,
   IconSchool,
-} from "@tabler/icons-react"
+} from "@tabler/icons-react";
 
-import { NavPlatform } from "@/components/nav-platform"
-import { NavSecondary } from "@/components/nav-secondary"
+import { NavPlatform } from "@/components/nav-platform";
+import { NavSecondary } from "@/components/nav-secondary";
 import {
   Sidebar,
   SidebarContent,
@@ -25,7 +25,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 const data = {
   navMain: [
@@ -44,16 +44,12 @@ const data = {
           url: "/data-integration/pipelines",
         },
         {
-          title: "Connections",
-          url: "/data-integration/connections",
+          title: "Sources",
+          url: "/data-integration/sources",
         },
         {
           title: "Schedules",
           url: "/data-integration/schedules",
-        },
-        {
-          title: "Data Sources",
-          url: "/data-integration/sources",
         },
       ],
     },
@@ -286,7 +282,7 @@ const data = {
       ],
     },
   ],
-}
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -311,5 +307,5 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
     </Sidebar>
-  )
+  );
 }

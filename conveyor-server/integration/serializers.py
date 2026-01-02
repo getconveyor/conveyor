@@ -1,15 +1,15 @@
 from rest_framework import serializers
-from .models import Connection, DataSource, Pipeline, PipelineRun, Schedule
+from .models import Source, Pipeline, PipelineRun, Schedule
 from authentication.serializers import UserSerializer
 
 
-class ConnectionSerializer(serializers.ModelSerializer):
-    """Serializer for Connection model"""
+class SourceSerializer(serializers.ModelSerializer):
+    """Serializer for Source model"""
 
     created_by_details = UserSerializer(source='created_by', read_only=True)
 
     class Meta:
-        model = Connection
+        model = Source
         fields = [
             'id', 'workspace', 'name', 'type', 'host', 'port',
             'database', 'username', 'password_encrypted', 'ssl',
@@ -22,11 +22,11 @@ class ConnectionSerializer(serializers.ModelSerializer):
         }
 
 
-class ConnectionListSerializer(serializers.ModelSerializer):
-    """Lightweight serializer for listing connections"""
+class SourceListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for listing sources"""
 
     class Meta:
-        model = Connection
+        model = Source
         fields = [
             'id', 'name', 'type', 'status', 'last_tested',
             'created_at', 'updated_at'
@@ -34,49 +34,49 @@ class ConnectionListSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class DataSourceSerializer(serializers.ModelSerializer):
-    """Serializer for DataSource model"""
+# class DataSourceSerializer(serializers.ModelSerializer):
+#     """Serializer for DataSource model"""
 
-    connection_details = ConnectionListSerializer(source='connection', read_only=True)
+#     source_details = SourceListSerializer(source='source', read_only=True)
 
-    class Meta:
-        model = DataSource
-        fields = [
-            'id', 'workspace', 'connection', 'connection_details',
-            'name', 'type', 'tables', 'status', 'last_sync',
-            'record_count', 'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'connection_details']
+#     class Meta:
+#         model = DataSource
+#         fields = [
+#             'id', 'workspace', 'source', 'source_details',
+#             'name', 'type', 'tables', 'status', 'last_sync',
+#             'record_count', 'created_at', 'updated_at'
+#         ]
+#         read_only_fields = ['id', 'created_at', 'updated_at', 'source_details']
 
 
-class DataSourceListSerializer(serializers.ModelSerializer):
-    """Lightweight serializer for listing data sources"""
+# class DataSourceListSerializer(serializers.ModelSerializer):
+#     """Lightweight serializer for listing data sources"""
 
-    connection_name = serializers.CharField(source='connection.name', read_only=True)
-    connection_type = serializers.CharField(source='connection.type', read_only=True)
+#     source_name = serializers.CharField(source='source.name', read_only=True)
+#     source_type = serializers.CharField(source='source.type', read_only=True)
 
-    class Meta:
-        model = DataSource
-        fields = [
-            'id', 'name', 'type', 'connection_name', 'connection_type',
-            'status', 'last_sync', 'record_count', 'created_at'
-        ]
-        read_only_fields = fields
+#     class Meta:
+#         model = DataSource
+#         fields = [
+#             'id', 'name', 'type', 'source_name', 'source_type',
+#             'status', 'last_sync', 'record_count', 'created_at'
+#         ]
+#         read_only_fields = fields
 
 
 class PipelineSerializer(serializers.ModelSerializer):
     """Serializer for Pipeline model"""
 
     created_by_details = UserSerializer(source='created_by', read_only=True)
-    source_connection_details = ConnectionListSerializer(source='source_connection', read_only=True)
-    destination_connection_details = ConnectionListSerializer(source='destination_connection', read_only=True)
+    source_details = SourceListSerializer(source='source', read_only=True)
+    destination_details = SourceListSerializer(source='destination', read_only=True)
 
     class Meta:
         model = Pipeline
         fields = [
             'id', 'workspace', 'name', 'description', 'status',
-            'source_connection', 'source_connection_details',
-            'destination_connection', 'destination_connection_details',
+            'source', 'source_details',
+            'destination', 'destination_details',
             'schedule', 'last_run', 'next_run', 'run_count',
             'success_rate', 'records_processed', 'config',
             'created_by', 'created_by_details', 'created_at', 'updated_at',
@@ -84,7 +84,7 @@ class PipelineSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'created_at', 'updated_at', 'created_by_details',
-            'source_connection_details', 'destination_connection_details',
+            'source_details', 'destination_details',
             'is_scheduled', 'run_count', 'success_rate', 'records_processed',
             'last_run', 'next_run'
         ]
@@ -93,8 +93,8 @@ class PipelineSerializer(serializers.ModelSerializer):
 class PipelineListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for listing pipelines"""
 
-    source_name = serializers.CharField(source='source_connection.name', read_only=True)
-    destination_name = serializers.CharField(source='destination_connection.name', read_only=True)
+    source_name = serializers.CharField(source='source.name', read_only=True)
+    destination_name = serializers.CharField(source='destination.name', read_only=True)
 
     class Meta:
         model = Pipeline

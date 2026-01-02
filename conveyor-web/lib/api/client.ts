@@ -34,10 +34,16 @@ class ApiClient {
         const originalRequest = error.config as any;
 
         // Don't retry token refresh endpoint or if already retried
-        const isRefreshEndpoint = originalRequest.url?.includes('/auth/token/refresh');
+        const isRefreshEndpoint = originalRequest.url?.includes(
+          "/auth/token/refresh"
+        );
 
         // If error is 401 and we haven't tried to refresh yet
-        if (error.response?.status === 401 && !originalRequest._retry && !isRefreshEndpoint) {
+        if (
+          error.response?.status === 401 &&
+          !originalRequest._retry &&
+          !isRefreshEndpoint
+        ) {
           if (this.isRefreshing) {
             // If already refreshing, queue this request
             return new Promise((resolve, reject) => {
@@ -80,7 +86,9 @@ class ApiClient {
             localStorage.setItem("auth_tokens", JSON.stringify(updatedTokens));
 
             // Update the failed request with new token
-            originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
+            originalRequest.headers[
+              "Authorization"
+            ] = `Bearer ${newAccessToken}`;
 
             // Process the queued requests
             this.failedQueue.forEach((promise) => {
@@ -107,7 +115,10 @@ class ApiClient {
             localStorage.removeItem("currentWorkspaceId");
 
             // Redirect to login if we're in the browser (only once)
-            if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
+            if (
+              typeof window !== "undefined" &&
+              !window.location.pathname.includes("/login")
+            ) {
               window.location.href = "/login";
             }
 
@@ -145,6 +156,7 @@ class ApiClient {
 
   async get<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
     const config = this.getConfig(options);
+
     const response = await this.axiosInstance.get<T>(endpoint, config);
     return response.data;
   }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   IconPlus,
   IconSearch,
@@ -18,6 +18,9 @@ import {
   IconLoader2,
 } from "@tabler/icons-react"
 import Link from "next/link"
+import { useWorkspace } from "@/contexts/WorkspaceContext"
+import { integrationApi, Pipeline, CreatePipelineData, Source } from "@/lib/api/integration"
+import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -57,125 +60,26 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
-type PipelineStatus = "running" | "paused" | "failed" | "success" | "idle"
-
-interface Pipeline {
-  id: string
-  name: string
-  description: string
-  status: PipelineStatus
-  source: string
-  destination: string
-  lastRun: string
-  nextRun: string
-  runCount: number
-  successRate: number
-  recordsProcessed: string
-  schedule: string
-}
-
-const initialPipelines: Pipeline[] = [
-  {
-    id: "1",
-    name: "Customer Data Sync",
-    description: "Sync customer data to Warehouse",
-    status: "running",
-    source: "Production MySQL",
-    destination: "Warehouse",
-    lastRun: "2 minutes ago",
-    nextRun: "in 58 minutes",
-    runCount: 1247,
-    successRate: 99.8,
-    recordsProcessed: "2.4M",
-    schedule: "Hourly",
-  },
-  {
-    id: "2",
-    name: "Order Processing Pipeline",
-    description: "Process order data from eCommerce",
-    status: "success",
-    source: "Stripe Payments",
-    destination: "Lakehouse",
-    lastRun: "15 minutes ago",
-    nextRun: "in 45 minutes",
-    runCount: 892,
-    successRate: 98.5,
-    recordsProcessed: "1.8M",
-    schedule: "Hourly",
-  },
-  {
-    id: "3",
-    name: "Analytics Events Stream",
-    description: "Stream user analytics events to lakehouse",
-    status: "running",
-    source: "Google Analytics Web",
-    destination: "Lakehouse",
-    lastRun: "1 minute ago",
-    nextRun: "Continuous",
-    runCount: 5623,
-    successRate: 99.9,
-    recordsProcessed: "12.5M",
-    schedule: "Real-time",
-  },
-  {
-    id: "4",
-    name: "Inventory Sync",
-    description: "Daily inventory synchronization",
-    status: "failed",
-    source: "Staging MySQL",
-    destination: "Warehouse",
-    lastRun: "3 hours ago",
-    nextRun: "in 21 hours",
-    runCount: 156,
-    successRate: 94.2,
-    recordsProcessed: "856K",
-    schedule: "Daily",
-  },
-  {
-    id: "5",
-    name: "Cloud Storage Sync",
-    description: "Import files from cloud storage",
-    status: "paused",
-    source: "AWS S3 Data Lake",
-    destination: "Lakehouse",
-    lastRun: "2 days ago",
-    nextRun: "Paused",
-    runCount: 423,
-    successRate: 97.8,
-    recordsProcessed: "645K",
-    schedule: "Daily",
-  },
-  {
-    id: "6",
-    name: "PostgreSQL Analytics Sync",
-    description: "Sync analytics database to warehouse",
-    status: "success",
-    source: "PostgreSQL Analytics",
-    destination: "Warehouse",
-    lastRun: "30 minutes ago",
-    nextRun: "in 30 minutes",
-    runCount: 734,
-    successRate: 99.1,
-    recordsProcessed: "425K",
-    schedule: "Hourly",
-  },
-]
+type PipelineStatus = "active" | "paused" | "error" | "running" | "idle"
 
 const statusConfig: Record<PipelineStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; color: string }> = {
+  active: { label: "Active", variant: "default", color: "text-green-500" },
   running: { label: "Running", variant: "default", color: "text-blue-500" },
-  success: { label: "Success", variant: "outline", color: "text-green-500" },
-  failed: { label: "Failed", variant: "destructive", color: "text-red-500" },
+  error: { label: "Error", variant: "destructive", color: "text-red-500" },
   paused: { label: "Paused", variant: "secondary", color: "text-gray-500" },
   idle: { label: "Idle", variant: "outline", color: "text-gray-500" },
 }
 
 export default function PipelinesPage() {
-  const [pipelines, setPipelines] = useState<Pipeline[]>(initialPipelines)
+  const { currentWorkspace } = useWorkspace()
+  const [pipelines, setPipelines] = useState<Pipeline[]>([])
+  const [sources, setSources] = useState<Source[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingPipeline, setEditingPipeline] = useState<Pipeline | null>(null)
   const [pipelineToDelete, setPipelineToDelete] = useState<string | null>(null)
+  const [isFetching, setIsFetching] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -183,13 +87,12 @@ export default function PipelinesPage() {
     description: "",
     source: "",
     destination: "",
-    scheduleType: "",
-    scheduleValue: "",
+    schedule: "",
   })
 
   const filteredPipelines = pipelines.filter((pipeline) => {
     const matchesSearch = pipeline.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pipeline.description.toLowerCase().includes(searchQuery.toLowerCase())
+      (pipeline.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
     const matchesStatus = statusFilter === "all" || pipeline.status === statusFilter
     return matchesSearch && matchesStatus
   })
@@ -197,68 +100,96 @@ export default function PipelinesPage() {
   const stats = {
     total: pipelines.length,
     running: pipelines.filter(p => p.status === "running").length,
-    failed: pipelines.filter(p => p.status === "failed").length,
+    failed: pipelines.filter(p => p.status === "error").length,
     paused: pipelines.filter(p => p.status === "paused").length,
   }
 
+  // Load pipelines from API
+  useEffect(() => {
+    if (currentWorkspace) {
+      loadPipelines()
+      loadSources()
+    }
+  }, [currentWorkspace])
+
+  async function loadPipelines() {
+    if (!currentWorkspace) return
+
+    try {
+      setIsFetching(true)
+      const data = await integrationApi.getPipelines()
+      setPipelines(data)
+    } catch (error: any) {
+      console.error('Failed to load pipelines:', error)
+      toast.error(error.message || 'Failed to load pipelines')
+    } finally {
+      setIsFetching(false)
+    }
+  }
+
+  async function loadSources() {
+    if (!currentWorkspace) return
+
+    try {
+      const data = await integrationApi.getSources()
+      setSources(data)
+    } catch (error: any) {
+      console.error('Failed to load sources:', error)
+      toast.error(error.message || 'Failed to load sources')
+    }
+  }
+
   const handleCreateOrUpdatePipeline = async () => {
-    if (!formData.name.trim() || !formData.source || !formData.destination) return
-
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    if (editingPipeline) {
-      // Update existing pipeline
-      setPipelines(pipelines =>
-        pipelines.map(p =>
-          p.id === editingPipeline.id
-            ? {
-                ...p,
-                name: formData.name,
-                description: formData.description,
-                source: formData.source,
-                destination: formData.destination,
-                schedule: formData.scheduleValue || formData.scheduleType,
-                lastRun: "Just now",
-              }
-            : p
-        )
-      )
-    } else {
-      // Create new pipeline
-      const newPipeline: Pipeline = {
-        id: Date.now().toString(),
-        name: formData.name,
-        description: formData.description,
-        status: "idle",
-        source: formData.source,
-        destination: formData.destination,
-        lastRun: "Never",
-        nextRun: "Not scheduled",
-        runCount: 0,
-        successRate: 0,
-        recordsProcessed: "0",
-        schedule: formData.scheduleValue || formData.scheduleType,
-      }
-      setPipelines([...pipelines, newPipeline])
+    if (!formData.name.trim() || !formData.source || !formData.destination) {
+      toast.error('Please fill in all required fields')
+      return
     }
 
-    setIsLoading(false)
-    setIsCreateDialogOpen(false)
-    setFormData({ name: "", description: "", source: "", destination: "", scheduleType: "", scheduleValue: "" })
-    setEditingPipeline(null)
+    setIsLoading(true)
+    try {
+      if (editingPipeline) {
+        // Update existing pipeline
+        await integrationApi.updatePipeline(editingPipeline.id, {
+          name: formData.name,
+          description: formData.description,
+          schedule: formData.schedule || undefined,
+        })
+        toast.success('Pipeline updated successfully')
+      } else {
+        // Create new pipeline
+        const createData: CreatePipelineData = {
+          name: formData.name,
+          description: formData.description,
+          source: formData.source,
+          destination: formData.destination,
+          schedule: formData.schedule || undefined,
+        }
+        await integrationApi.createPipeline(createData)
+        toast.success('Pipeline created successfully')
+      }
+
+      // Reload pipelines after successful operation
+      await loadPipelines()
+
+      // Close dialog and reset form
+      setIsCreateDialogOpen(false)
+      resetForm()
+    } catch (error: any) {
+      console.error('Failed to save pipeline:', error)
+      toast.error(error.message || 'Failed to save pipeline')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleEditPipeline = (pipeline: Pipeline) => {
     setEditingPipeline(pipeline)
     setFormData({
       name: pipeline.name,
-      description: pipeline.description,
-      source: pipeline.source,
-      destination: pipeline.destination,
-      scheduleType: pipeline.schedule,
-      scheduleValue: pipeline.schedule,
+      description: pipeline.description || "",
+      source: "", // Source IDs not directly available from pipeline
+      destination: "", // Will need to be selected again
+      schedule: pipeline.schedule || "",
     })
     setIsCreateDialogOpen(true)
   }
@@ -267,54 +198,75 @@ export default function PipelinesPage() {
     if (!pipelineToDelete) return
 
     setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
+    try {
+      await integrationApi.deletePipeline(pipelineToDelete)
+      toast.success('Pipeline deleted successfully')
 
-    setPipelines(pipelines => pipelines.filter(p => p.id !== pipelineToDelete))
-    setIsLoading(false)
-    setPipelineToDelete(null)
+      // Reload pipelines after deletion
+      await loadPipelines()
+
+      setPipelineToDelete(null)
+    } catch (error: any) {
+      console.error('Failed to delete pipeline:', error)
+      toast.error(error.message || 'Failed to delete pipeline')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleTogglePlayPause = async (id: string) => {
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 600))
+    const pipeline = pipelines.find(p => p.id === id)
+    if (!pipeline) return
 
-    setPipelines(pipelines =>
-      pipelines.map(p =>
-        p.id === id
-          ? {
-              ...p,
-              status: p.status === "paused" ? "running" : p.status === "running" ? "paused" : "running",
-              lastRun: p.status === "paused" ? "Just now" : p.lastRun,
-              nextRun: p.status === "paused" ? "Continuous" : "Paused",
-            }
-          : p
-      )
-    )
-    setIsLoading(false)
+    // Determine new status
+    const newStatus: PipelineStatus =
+      pipeline.status === "paused" ? "active" :
+      pipeline.status === "running" || pipeline.status === "active" ? "paused" :
+      "active"
+
+    setIsLoading(true)
+    try {
+      await integrationApi.updatePipeline(id, { status: newStatus })
+      toast.success(`Pipeline ${newStatus === "paused" ? "paused" : "resumed"} successfully`)
+
+      // Reload pipelines after status change
+      await loadPipelines()
+    } catch (error: any) {
+      console.error('Failed to update pipeline status:', error)
+      toast.error(error.message || 'Failed to update pipeline status')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleDuplicatePipeline = async (pipeline: Pipeline) => {
     setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    const duplicatedPipeline: Pipeline = {
-      ...pipeline,
-      id: Date.now().toString(),
-      name: `${pipeline.name} (Copy)`,
-      status: "idle",
-      lastRun: "Never",
-      nextRun: "Not scheduled",
-      runCount: 0,
+    try {
+      // Note: We don't have source and destination IDs
+      // from the pipeline object, so duplication may require backend support
+      // or fetching the full pipeline details first
+      toast.error('Pipeline duplication requires source IDs - feature coming soon')
+      // TODO: Implement when pipeline object includes source IDs
+      // const createData: CreatePipelineData = {
+      //   name: `${pipeline.name} (Copy)`,
+      //   description: pipeline.description,
+      //   source: pipeline.source,
+      //   destination: pipeline.destination,
+      //   schedule: pipeline.schedule,
+      // }
+      // await integrationApi.createPipeline(createData)
+      // toast.success('Pipeline duplicated successfully')
+      // await loadPipelines()
+    } catch (error: any) {
+      console.error('Failed to duplicate pipeline:', error)
+      toast.error(error.message || 'Failed to duplicate pipeline')
+    } finally {
+      setIsLoading(false)
     }
-    setPipelines([...pipelines, duplicatedPipeline])
-    setIsLoading(false)
   }
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", source: "", destination: "", scheduleType: "", scheduleValue: "" })
+    setFormData({ name: "", description: "", source: "", destination: "", schedule: "" })
     setEditingPipeline(null)
   }
 
@@ -383,21 +335,33 @@ export default function PipelinesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="running">Running</SelectItem>
-                  <SelectItem value="success">Success</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="error">Error</SelectItem>
                   <SelectItem value="paused">Paused</SelectItem>
+                  <SelectItem value="idle">Idle</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="icon">
-                <IconRefresh className="h-4 w-4" />
+              <Button variant="outline" size="icon" onClick={loadPipelines} disabled={isFetching}>
+                <IconRefresh className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent className="pt-2">
-          <div className="space-y-2">
-            {filteredPipelines.map((pipeline) => (
+          {isFetching && pipelines.length === 0 ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <IconLoader2 className="h-6 w-6 animate-spin mr-2" />
+              Loading pipelines...
+            </div>
+          ) : filteredPipelines.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <p className="text-sm">No pipelines found</p>
+              <p className="text-xs mt-1">Create your first pipeline to get started</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredPipelines.map((pipeline) => (
               <Card key={pipeline.id}>
                 <CardContent className="p-2">
                   <div className="flex items-start justify-between gap-3">
@@ -414,35 +378,35 @@ export default function PipelinesPage() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-2">
                         <div>
                           <p className="text-muted-foreground">Source</p>
-                          <p className="font-medium">{pipeline.source}</p>
+                          <p className="font-medium">{pipeline.source_name || 'N/A'}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Destination</p>
-                          <p className="font-medium">{pipeline.destination}</p>
+                          <p className="font-medium">{pipeline.destination_name || 'N/A'}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Schedule</p>
-                          <p className="font-medium">{pipeline.schedule}</p>
+                          <p className="font-medium">{pipeline.schedule || 'Manual'}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Success Rate</p>
-                          <p className="font-medium">{pipeline.successRate}%</p>
+                          <p className="font-medium">{pipeline.success_rate}%</p>
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <IconClock className="h-3 w-3" />
-                          Last: {pipeline.lastRun}
+                          Last: {pipeline.last_run || 'Never'}
                         </span>
                         <span className="flex items-center gap-1">
                           <IconRefresh className="h-3 w-3" />
-                          Next: {pipeline.nextRun}
+                          Next: {pipeline.next_run || 'Not scheduled'}
                         </span>
                         <span>
-                          {pipeline.recordsProcessed} records
+                          {pipeline.records_processed || 0} records
                         </span>
                         <span>
-                          {pipeline.runCount} runs
+                          {pipeline.run_count} runs
                         </span>
                       </div>
                     </div>
@@ -523,8 +487,9 @@ export default function PipelinesPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -576,16 +541,19 @@ export default function PipelinesPage() {
                     <SelectValue placeholder="Select source" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Production MySQL">Production MySQL</SelectItem>
-                    <SelectItem value="Staging MySQL">Staging MySQL</SelectItem>
-                    <SelectItem value="PostgreSQL Analytics">PostgreSQL Analytics</SelectItem>
-                    <SelectItem value="AWS S3 Data Lake">AWS S3 Data Lake</SelectItem>
-                    <SelectItem value="Google Analytics Web">Google Analytics Web</SelectItem>
-                    <SelectItem value="Stripe Payments">Stripe Payments</SelectItem>
+                    {sources.length === 0 ? (
+                      <SelectItem value="none" disabled>No sources available</SelectItem>
+                    ) : (
+                      sources.map((source) => (
+                        <SelectItem key={source.id} value={source.id}>
+                          {source.name} ({source.type})
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Configure sources in the Data Sources page
+                  Configure sources in the Sources page
                 </p>
               </div>
               <div className="grid gap-2">
@@ -595,39 +563,33 @@ export default function PipelinesPage() {
                     <SelectValue placeholder="Select destination" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Lakehouse">Lakehouse</SelectItem>
-                    <SelectItem value="Warehouse">Warehouse</SelectItem>
+                    {sources.length === 0 ? (
+                      <SelectItem value="none" disabled>No sources available</SelectItem>
+                    ) : (
+                      sources.map((source) => (
+                        <SelectItem key={source.id} value={source.id}>
+                          {source.name} ({source.type})
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Data syncs to your platform storage
+                  Select where the data will be synced to
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="schedule">Schedule Type</Label>
-                <Select value={formData.scheduleType} onValueChange={(value) => setFormData({ ...formData, scheduleType: value })}>
-                  <SelectTrigger id="schedule">
-                    <SelectValue placeholder="Select schedule" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Hourly">Hourly</SelectItem>
-                    <SelectItem value="Daily">Daily</SelectItem>
-                    <SelectItem value="Real-time">Real-time</SelectItem>
-                    <SelectItem value="Manual">Manual Only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="schedule-value">Schedule Value (Optional)</Label>
-                <Input
-                  id="schedule-value"
-                  placeholder="e.g., 0 * * * * or 1h"
-                  value={formData.scheduleValue}
-                  onChange={(e) => setFormData({ ...formData, scheduleValue: e.target.value })}
-                />
-              </div>
+            <div className="grid gap-2">
+              <Label htmlFor="schedule">Schedule (Optional)</Label>
+              <Input
+                id="schedule"
+                placeholder="e.g., 0 * * * * (cron expression) or @hourly"
+                value={formData.schedule}
+                onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave empty for manual-only execution
+              </p>
             </div>
           </div>
           <DialogFooter>

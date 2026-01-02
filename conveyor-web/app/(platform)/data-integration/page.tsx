@@ -106,7 +106,7 @@ export default function DataIntegrationPage() {
       title: "Manage Connections",
       description: "Configure data source connections",
       icon: IconDatabase,
-      href: "/data-integration/connections",
+      href: "/data-integration/sources",
       color: "text-purple-500",
     },
     {
@@ -115,13 +115,6 @@ export default function DataIntegrationPage() {
       icon: IconClock,
       href: "/data-integration/schedules",
       color: "text-green-500",
-    },
-    {
-      title: "Data Sources",
-      description: "Browse available data sources",
-      icon: IconSettings,
-      href: "/data-integration/sources",
-      color: "text-orange-500",
     },
   ]
 
@@ -252,7 +245,7 @@ export default function DataIntegrationPage() {
                       <div>
                         <p className="font-medium text-sm">{pipeline.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {pipeline.destination_name || pipeline.destination_connection_details?.name || 'Unknown'} • {pipeline.last_run ? formatDistanceToNow(new Date(pipeline.last_run), { addSuffix: true }) : 'Never ran'}
+                          {pipeline.destination_name || pipeline.destination_details?.name || 'Unknown'} • {pipeline.last_run ? formatDistanceToNow(new Date(pipeline.last_run), { addSuffix: true }) : 'Never ran'}
                         </p>
                       </div>
                     </div>

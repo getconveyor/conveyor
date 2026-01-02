@@ -43,9 +43,9 @@ urlpatterns = [
 
     # API Endpoints
     path('api/', include('authentication.urls')),
-    path('api/', include('integration.urls')),
-    path('api/', include('transformation.urls')),
-    path('api/', include('data_lake.urls')),
+    path('api/integration/', include('integration.urls')),
+    path('api/transformation/', include('transformation.urls')),
+    path('api/data-lake/', include('data_lake.urls')),
     # path('api/', include('warehouse.urls')),
     # path('api/', include('streaming.urls')),
     # path('api/', include('analytics.urls')),

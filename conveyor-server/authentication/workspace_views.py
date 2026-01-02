@@ -10,6 +10,7 @@ from .workspace_serializers import (
     WorkspaceMemberSerializer,
     InviteMemberSerializer,
     UpdateMemberRoleSerializer,
+    WorkspaceMemberListSerializer
 )
 from .permissions import IsWorkspaceOwnerOrAdmin, IsWorkspaceOwner
 
@@ -41,8 +42,15 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
     def members(self, request, pk=None):
         """List all workspace members"""
         workspace = self.get_object()
-        members = workspace.members.all()
-        serializer = WorkspaceMemberSerializer(members, many=True)
+        runs = workspace.members.all().order_by('-created_at')
+
+        # Pagination
+        page = self.paginate_queryset(runs)
+        if page is not None:
+            serializer = WorkspaceMemberListSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = WorkspaceMemberListSerializer(runs, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsWorkspaceOwnerOrAdmin])

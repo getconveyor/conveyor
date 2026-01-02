@@ -5,10 +5,9 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db.models import Q
 
-from .models import Connection, DataSource, Pipeline, PipelineRun, Schedule
+from .models import Source, Pipeline, PipelineRun, Schedule
 from .serializers import (
-    ConnectionSerializer, ConnectionListSerializer,
-    DataSourceSerializer, DataSourceListSerializer,
+    SourceSerializer, SourceListSerializer,
     PipelineSerializer, PipelineListSerializer,
     PipelineRunSerializer, PipelineRunListSerializer,
     ScheduleSerializer, ScheduleListSerializer
@@ -16,28 +15,28 @@ from .serializers import (
 from authentication.permissions import IsWorkspaceMember, IsWorkspaceOwnerOrAdmin
 
 
-class ConnectionViewSet(viewsets.ModelViewSet):
+class SourceViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing database/API connections.
+    ViewSet for managing database/API sources.
 
-    Provides CRUD operations and connection testing.
+    Provides CRUD operations and source testing.
     """
     permission_classes = [IsAuthenticated, IsWorkspaceMember]
 
     def get_serializer_class(self):
         if self.action == 'list':
-            return ConnectionListSerializer
-        return ConnectionSerializer
+            return SourceListSerializer
+        return SourceSerializer
 
     def get_queryset(self):
-        """Filter connections by user's current workspace"""
+        """Filter sources by user's current workspace"""
         workspace_id = self.request.headers.get('X-Workspace-ID')
         if not workspace_id:
-            return Connection.objects.none()
-        return Connection.objects.filter(workspace_id=workspace_id).select_related('created_by')
+            return Source.objects.none()
+        return Source.objects.filter(workspace_id=workspace_id).select_related('created_by')
 
     def perform_create(self, serializer):
-        """Set workspace and created_by when creating connection"""
+        """Set workspace and created_by when creating source"""
         workspace_id = self.request.headers.get('X-Workspace-ID')
         serializer.save(
             workspace_id=workspace_id,
@@ -47,72 +46,72 @@ class ConnectionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def test(self, request, pk=None):
         """
-        Test the connection to verify credentials and connectivity.
+        Test the source to verify credentials and connectivity.
         """
         from integration.connectors import ConnectorRegistry
         from integration.exceptions import ConnectorError
 
-        connection = self.get_object()
+        source = self.get_object()
 
         try:
-            # Create connector and test connection
-            connector = ConnectorRegistry.create(connection)
+            # Create connector and test source
+            connector = ConnectorRegistry.create(source)
             test_result = connector.test()
             connector.close()
 
-            # Update connection record
-            connection.last_tested = timezone.now()
-            connection.status = 'active' if test_result.success else 'error'
-            connection.save()
+            # Update source record
+            source.last_tested = timezone.now()
+            source.status = 'active' if test_result.success else 'error'
+            source.save()
 
             return Response({
                 'status': 'success' if test_result.success else 'error',
                 'message': test_result.message,
-                'connection_id': str(connection.id),
-                'tested_at': connection.last_tested,
+                'source_id': str(source.id),
+                'tested_at': source.last_tested,
                 'details': test_result.details
             })
 
         except ConnectorError as e:
-            connection.last_tested = timezone.now()
-            connection.status = 'error'
-            connection.save()
+            source.last_tested = timezone.now()
+            source.status = 'error'
+            source.save()
 
             return Response({
                 'status': 'error',
-                'message': f'Connection test failed: {str(e)}',
-                'connection_id': str(connection.id),
-                'tested_at': connection.last_tested
+                'message': f'Source test failed: {str(e)}',
+                'source_id': str(source.id),
+                'tested_at': source.last_tested
             }, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
             return Response({
                 'status': 'error',
                 'message': f'Unexpected error: {str(e)}',
-                'connection_id': str(connection.id)
+                'source_id': str(source.id)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['get'])
     def schema(self, request, pk=None):
         """
-        Get the schema/structure of the connection.
+        Get the schema/structure of the source.
 
         Returns tables, collections, or other structural information.
         """
         from integration.connectors import ConnectorRegistry
         from integration.exceptions import ConnectorError, SchemaDiscoveryError
 
-        connection = self.get_object()
+        source = self.get_object()
 
         try:
             # Create connector and discover schema
-            connector = ConnectorRegistry.create(connection)
+            connector = ConnectorRegistry.create(source)
             discovery = connector.discover()
             connector.close()
 
             return Response({
-                'connection_id': str(connection.id),
-                'connector_type': connection.connector_type,
+                'source_id': str(source.id),
+                'connector_type': source.connector_type,
                 'streams': discovery.streams,
                 'schemas': discovery.schemas,
                 'timestamp': discovery.timestamp.isoformat()
@@ -122,89 +121,89 @@ class ConnectionViewSet(viewsets.ModelViewSet):
             return Response({
                 'status': 'error',
                 'message': f'Schema discovery failed: {str(e)}',
-                'connection_id': str(connection.id)
+                'source_id': str(source.id)
             }, status=status.HTTP_400_BAD_REQUEST)
 
         except ConnectorError as e:
             return Response({
                 'status': 'error',
                 'message': f'Connector error: {str(e)}',
-                'connection_id': str(connection.id)
+                'source_id': str(source.id)
             }, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
             return Response({
                 'status': 'error',
                 'message': f'Unexpected error: {str(e)}',
-                'connection_id': str(connection.id)
+                'source_id': str(source.id)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class DataSourceViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing data sources.
+# class DataSourceViewSet(viewsets.ModelViewSet):
+#     """
+#     ViewSet for managing data sources.
 
-    Data sources represent specific tables, collections, or data endpoints
-    within a connection.
-    """
-    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+#     Data sources represent specific tables, collections, or data endpoints
+#     within a connection.
+#     """
+#     permission_classes = [IsAuthenticated, IsWorkspaceMember]
 
-    def get_serializer_class(self):
-        if self.action == 'list':
-            return DataSourceListSerializer
-        return DataSourceSerializer
+#     def get_serializer_class(self):
+#         if self.action == 'list':
+#             return DataSourceListSerializer
+#         return DataSourceSerializer
 
-    def get_queryset(self):
-        """Filter data sources by user's current workspace"""
-        workspace_id = self.request.headers.get('X-Workspace-ID')
-        if not workspace_id:
-            return DataSource.objects.none()
-        return DataSource.objects.filter(
-            workspace_id=workspace_id
-        ).select_related('connection')
+#     def get_queryset(self):
+#         """Filter data sources by user's current workspace"""
+#         workspace_id = self.request.headers.get('X-Workspace-ID')
+#         if not workspace_id:
+#             return DataSource.objects.none()
+#         return DataSource.objects.filter(
+#             workspace_id=workspace_id
+#         ).select_related('source')
 
-    def perform_create(self, serializer):
-        """Set workspace when creating data source"""
-        workspace_id = self.request.headers.get('X-Workspace-ID')
-        serializer.save(workspace_id=workspace_id)
+#     def perform_create(self, serializer):
+#         """Set workspace when creating data source"""
+#         workspace_id = self.request.headers.get('X-Workspace-ID')
+#         serializer.save(workspace_id=workspace_id)
 
-    @action(detail=True, methods=['post'])
-    def sync(self, request, pk=None):
-        """
-        Trigger a sync operation for this data source.
+#     @action(detail=True, methods=['post'])
+#     def sync(self, request, pk=None):
+#         """
+#         Trigger a sync operation for this data source.
 
-        Updates record count and last sync timestamp.
-        """
-        data_source = self.get_object()
+#         Updates record count and last sync timestamp.
+#         """
+#         data_source = self.get_object()
 
-        # TODO: Implement actual sync logic
-        data_source.last_sync = timezone.now()
-        data_source.status = 'connected'
-        data_source.save()
+#         # TODO: Implement actual sync logic
+#         data_source.last_sync = timezone.now()
+#         data_source.status = 'connected'
+#         data_source.save()
 
-        return Response({
-            'status': 'success',
-            'message': 'Sync initiated',
-            'data_source_id': data_source.id,
-            'last_sync': data_source.last_sync
-        })
+#         return Response({
+#             'status': 'success',
+#             'message': 'Sync initiated',
+#             'data_source_id': data_source.id,
+#             'last_sync': data_source.last_sync
+#         })
 
-    @action(detail=True, methods=['get'])
-    def preview(self, request, pk=None):
-        """
-        Get a preview of data from this source.
+#     @action(detail=True, methods=['get'])
+#     def preview(self, request, pk=None):
+#         """
+#         Get a preview of data from this source.
 
-        Returns a sample of records.
-        """
-        data_source = self.get_object()
+#         Returns a sample of records.
+#         """
+#         data_source = self.get_object()
 
-        # TODO: Implement data preview
-        return Response({
-            'data_source_id': data_source.id,
-            'preview': {
-                'message': 'Data preview not yet implemented'
-            }
-        })
+#         # TODO: Implement data preview
+#         return Response({
+#             'data_source_id': data_source.id,
+#             'preview': {
+#                 'message': 'Data preview not yet implemented'
+#             }
+#         })
 
 
 class PipelineViewSet(viewsets.ModelViewSet):
@@ -229,7 +228,7 @@ class PipelineViewSet(viewsets.ModelViewSet):
         queryset = Pipeline.objects.filter(
             workspace_id=workspace_id
         ).select_related(
-            'created_by', 'source_connection', 'destination_connection'
+            'created_by', 'source', 'destination'
         )
 
         # Filter by status if provided

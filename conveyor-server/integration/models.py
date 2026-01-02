@@ -4,11 +4,11 @@ from authentication.models import User, Workspace
 import uuid
 
 
-class Connection(models.Model):
-    """Database/API connection model"""
+class Source(models.Model):
+    """Data source model - represents a connection to a database, API, or other data source"""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='connections')
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='sources')
     name = models.CharField(max_length=255)
 
     TYPE_CHOICES = [
@@ -43,12 +43,12 @@ class Connection(models.Model):
     last_tested = models.DateTimeField(null=True, blank=True)
     config = models.JSONField(default=dict, blank=True)  # Additional config
 
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_connections')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_sources')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'connections'
+        db_table = 'sources'
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['workspace', 'status']),
@@ -83,40 +83,40 @@ class Connection(models.Model):
         return ''
 
 
-class DataSource(models.Model):
-    """Data source linked to a connection"""
+# class DataSource(models.Model):
+#     """Data source linked to a source (specific tables/collections within a source)"""
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='data_sources')
-    connection = models.ForeignKey(Connection, on_delete=models.CASCADE, related_name='data_sources')
+#     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+#     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='data_sources')
+#     source = models.ForeignKey(Source, on_delete=models.CASCADE, related_name='data_sources')
 
-    name = models.CharField(max_length=255)
-    type = models.CharField(max_length=100)  # table, collection, topic, etc.
-    tables = models.JSONField(default=list, blank=True)  # List of tables/collections
+#     name = models.CharField(max_length=255)
+#     type = models.CharField(max_length=100)  # table, collection, topic, etc.
+#     tables = models.JSONField(default=list, blank=True)  # List of tables/collections
 
-    STATUS_CHOICES = [
-        ('connected', 'Connected'),
-        ('disconnected', 'Disconnected'),
-        ('error', 'Error'),
-    ]
-    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='disconnected')
+#     STATUS_CHOICES = [
+#         ('connected', 'Connected'),
+#         ('disconnected', 'Disconnected'),
+#         ('error', 'Error'),
+#     ]
+#     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='disconnected')
 
-    last_sync = models.DateTimeField(null=True, blank=True)
-    record_count = models.BigIntegerField(default=0)
+#     last_sync = models.DateTimeField(null=True, blank=True)
+#     record_count = models.BigIntegerField(default=0)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        db_table = 'data_sources'
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['workspace', 'status']),
-            models.Index(fields=['connection']),
-        ]
+#     class Meta:
+#         db_table = 'data_sources'
+#         ordering = ['-created_at']
+#         indexes = [
+#             models.Index(fields=['workspace', 'status']),
+#             models.Index(fields=['source']),
+#         ]
 
-    def __str__(self):
-        return f"{self.name} - {self.connection.name}"
+#     def __str__(self):
+#         return f"{self.name} - {self.source.name}"
 
 
 class Pipeline(models.Model):
@@ -137,15 +137,15 @@ class Pipeline(models.Model):
     ]
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='idle')
 
-    # Source and destination connections
-    source_connection = models.ForeignKey(
-        Connection,
+    # Source and destination
+    source = models.ForeignKey(
+        Source,
         on_delete=models.SET_NULL,
         null=True,
         related_name='source_pipelines'
     )
-    destination_connection = models.ForeignKey(
-        Connection,
+    destination = models.ForeignKey(
+        Source,
         on_delete=models.SET_NULL,
         null=True,
         related_name='destination_pipelines'
@@ -183,16 +183,6 @@ class Pipeline(models.Model):
     @property
     def is_scheduled(self):
         return bool(self.schedule)
-
-    @property
-    def source(self):
-        """Alias for source_connection"""
-        return self.source_connection
-
-    @property
-    def destination(self):
-        """Alias for destination_connection"""
-        return self.destination_connection
 
 
 class PipelineRun(models.Model):

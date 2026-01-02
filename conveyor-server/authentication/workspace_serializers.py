@@ -59,6 +59,27 @@ class WorkspaceMemberSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
 
+class WorkspaceMemberListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for workspace members"""
+
+    class Meta:
+        model = WorkspaceMember
+        fields = [
+            'id',
+            'workspace',
+            'user',
+            'invited_by',
+            'invited_at',
+            'joined_at',
+            'suspended_at',
+            'suspended_by',
+            'deactivated_at',
+            'deactivated_by',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
+
 
 class InviteMemberSerializer(serializers.Serializer):
     """Serializer for inviting a new member"""

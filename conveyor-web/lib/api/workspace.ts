@@ -102,11 +102,18 @@ export const workspaceApi = {
     workspaceId: string,
     data: Partial<Workspace>
   ): Promise<Workspace> {
-    return apiClient.patch(`/api/workspaces/${workspaceId}/`, data, getAuthOptions());
+    return apiClient.patch(
+      `/api/workspaces/${workspaceId}/`,
+      data,
+      getAuthOptions()
+    );
   },
 
   async deleteWorkspace(workspaceId: string): Promise<void> {
-    return apiClient.delete(`/api/workspaces/${workspaceId}/`, getAuthOptions());
+    return apiClient.delete(
+      `/api/workspaces/${workspaceId}/`,
+      getAuthOptions()
+    );
   },
 
   async switchWorkspace(workspaceId: string): Promise<{
@@ -114,9 +121,13 @@ export const workspaceApi = {
     workspace: Workspace;
     membership: WorkspaceMember;
   }> {
-    return apiClient.post("/api/workspaces/switch/", {
-      workspace_id: workspaceId,
-    }, getAuthOptions());
+    return apiClient.post(
+      "/api/workspaces/switch/",
+      {
+        workspace_id: workspaceId,
+      },
+      getAuthOptions()
+    );
   },
 
   // Members
