@@ -88,7 +88,7 @@ Contributions are welcome! Please fork the repository, create a feature branch, 
 
 ## License
 
-Proprietary. All rights reserved.
+Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 
 ---
 
