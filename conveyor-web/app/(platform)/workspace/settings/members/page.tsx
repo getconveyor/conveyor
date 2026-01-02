@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { workspaceApi, WorkspaceMember } from '@/lib/api/workspace'
 import { MemberRow } from '@/components/workspace/member-row'
-import { MemberLimitIndicator } from '@/components/workspace/member-limit-indicator'
 import { InviteMemberModal } from '@/components/workspace/invite-member-modal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -82,9 +81,6 @@ export default function MembersPage() {
           )}
         </div>
 
-        {/* Member Limit Indicator */}
-        <MemberLimitIndicator workspace={currentWorkspace} />
-
         {/* Members List */}
         <Card>
           <CardHeader>
@@ -145,7 +141,7 @@ export default function MembersPage() {
             <div>
               <h4 className="font-medium text-sm mb-1">Owner</h4>
               <p className="text-sm text-muted-foreground">
-                Full control over the workspace including billing, member management, and all features.
+                Full control over the workspace including member management and all features.
                 Cannot be suspended or removed.
               </p>
             </div>
@@ -153,8 +149,7 @@ export default function MembersPage() {
             <div>
               <h4 className="font-medium text-sm mb-1">Admin</h4>
               <p className="text-sm text-muted-foreground">
-                Can manage members, workspace settings, and access all features. Cannot manage billing
-                or delete the workspace.
+                Can manage members, workspace settings, and access all features. Cannot delete the workspace.
               </p>
             </div>
 

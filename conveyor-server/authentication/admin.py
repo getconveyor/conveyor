@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, Session, ApiKey, Plan, Workspace, WorkspaceMember, Subscription, Invoice
+from .models import User, Session, ApiKey, Workspace, WorkspaceMember
 
 
 @admin.register(User)
@@ -51,17 +51,6 @@ class ApiKeyAdmin(admin.ModelAdmin):
     readonly_fields = ['created_at', 'last_used']
 
 
-@admin.register(Plan)
-class PlanAdmin(admin.ModelAdmin):
-    """Admin interface for Plan model"""
-
-    list_display = ['name', 'plan_type', 'price_monthly', 'price_yearly', 'max_users', 'is_active']
-    list_filter = ['plan_type', 'is_active']
-    search_fields = ['name', 'description']
-    ordering = ['price_monthly']
-    readonly_fields = ['created_at', 'updated_at']
-
-
 @admin.register(Workspace)
 class WorkspaceAdmin(admin.ModelAdmin):
     """Admin interface for Workspace model"""
@@ -85,23 +74,3 @@ class WorkspaceMemberAdmin(admin.ModelAdmin):
     readonly_fields = ['invited_at', 'created_at', 'updated_at']
 
 
-@admin.register(Subscription)
-class SubscriptionAdmin(admin.ModelAdmin):
-    """Admin interface for Subscription model"""
-
-    list_display = ['workspace', 'plan', 'status', 'billing_cycle', 'current_period_end']
-    list_filter = ['status', 'billing_cycle', 'plan']
-    search_fields = ['workspace__name', 'stripe_subscription_id', 'stripe_customer_id']
-    ordering = ['-created_at']
-    readonly_fields = ['created_at', 'updated_at']
-
-
-@admin.register(Invoice)
-class InvoiceAdmin(admin.ModelAdmin):
-    """Admin interface for Invoice model"""
-
-    list_display = ['invoice_number', 'subscription', 'amount', 'status', 'due_date', 'paid_at']
-    list_filter = ['status', 'created_at', 'due_date']
-    search_fields = ['invoice_number', 'subscription__workspace__name', 'stripe_invoice_id']
-    ordering = ['-created_at']
-    readonly_fields = ['created_at', 'updated_at']

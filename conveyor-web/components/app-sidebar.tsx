@@ -283,10 +283,6 @@ const data = {
           title: "Integrations",
           url: "/settings/integrations",
         },
-        {
-          title: "Billing",
-          url: "/settings/billing",
-        },
       ],
     },
   ],

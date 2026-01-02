@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import { workspaceApi, Workspace, Plan } from "@/lib/api/workspace";
+import { workspaceApi, Workspace } from "@/lib/api/workspace";
 import {
   IconPlus,
   IconLoader2,
   IconBuildingSkyscraper,
   IconChevronRight,
+  IconLogout,
 } from "@tabler/icons-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,21 +26,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
 
 export default function SelectWorkspacePage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { switchWorkspace: switchWorkspaceContext } = useWorkspace();
   const router = useRouter();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -47,7 +40,6 @@ export default function SelectWorkspacePage() {
     name: "",
     slug: "",
     description: "",
-    plan_id: "",
   });
 
   useEffect(() => {
@@ -62,33 +54,14 @@ export default function SelectWorkspacePage() {
 
     try {
       setLoading(true);
-
-      // Load plans and workspaces separately to handle auth errors gracefully
-      const plansPromise = workspaceApi.getPlans().catch((error) => {
-        console.error("Failed to load plans:", error);
-        return [];
-      });
-
-      const workspacesPromise = workspaceApi.getWorkspaces().catch((error) => {
+      const workspacesData = await workspaceApi.getWorkspaces().catch((error) => {
         console.error("Failed to load workspaces:", error);
         // Auth errors will be handled by the API client interceptor
         // which will auto-refresh or redirect to login
         return [];
       });
 
-      const [plansData, workspacesData] = await Promise.all([
-        plansPromise,
-        workspacesPromise,
-      ]);
-
       setWorkspaces(workspacesData);
-      setPlans(plansData);
-
-      // Set default plan (free plan)
-      const freePlan = plansData.find((p) => p.plan_type === "free");
-      if (freePlan) {
-        setFormData((prev) => ({ ...prev, plan_id: freePlan.id }));
-      }
     } catch (error: any) {
       console.error("Failed to load data:", error);
       toast.error(error.message || "Failed to load data");
@@ -108,7 +81,7 @@ export default function SelectWorkspacePage() {
   }
 
   async function handleCreateWorkspace() {
-    if (!formData.name.trim() || !formData.slug.trim() || !formData.plan_id) {
+    if (!formData.name.trim() || !formData.slug.trim()) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -227,6 +200,17 @@ export default function SelectWorkspacePage() {
               <IconPlus className="mr-2 h-5 w-5" />
               Create New Workspace
             </Button>
+
+            {/* Logout Link */}
+            <div className="mt-4">
+              <button
+                onClick={logout}
+                className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors inline-flex items-center gap-1"
+              >
+                <IconLogout className="h-4 w-4" />
+                Logout
+              </button>
+            </div>
           </div>
 
           {/* Create Workspace Dialog */}
@@ -277,26 +261,6 @@ export default function SelectWorkspacePage() {
                     }
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="plan">Plan *</Label>
-                  <Select
-                    value={formData.plan_id}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, plan_id: value })
-                    }
-                  >
-                    <SelectTrigger id="plan" className="w-full">
-                      <SelectValue placeholder="Select a plan" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {plans.map((plan) => (
-                        <SelectItem key={plan.id} value={plan.id}>
-                          {plan.name} - ${plan.price_monthly}/month
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
               <DialogFooter>
                 <Button
@@ -311,7 +275,6 @@ export default function SelectWorkspacePage() {
                   disabled={
                     !formData.name.trim() ||
                     !formData.slug.trim() ||
-                    !formData.plan_id ||
                     isCreating
                   }
                 >

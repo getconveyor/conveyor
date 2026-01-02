@@ -9,14 +9,12 @@ from .views import (
 )
 from .workspace_views import (
     WorkspaceViewSet,
-    PlanViewSet,
 )
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'api-keys', ApiKeyViewSet, basename='api-key')
 router.register(r'workspaces', WorkspaceViewSet, basename='workspace')
-router.register(r'plans', PlanViewSet, basename='plan')
 
 urlpatterns = [
     # Authentication endpoints

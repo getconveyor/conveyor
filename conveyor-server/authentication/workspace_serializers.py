@@ -2,29 +2,7 @@ from rest_framework import serializers
 from django.utils import timezone
 from datetime import timedelta
 import secrets
-from .models import Workspace, WorkspaceMember, Plan, Subscription, User
-
-
-class PlanSerializer(serializers.ModelSerializer):
-    """Serializer for subscription plans"""
-
-    class Meta:
-        model = Plan
-        fields = [
-            'id',
-            'name',
-            'description',
-            'plan_type',
-            'price_monthly',
-            'price_yearly',
-            'max_users',
-            'max_pipelines',
-            'max_storage_gb',
-            'max_queries_per_day',
-            'features',
-            'is_active',
-        ]
-        read_only_fields = ['id']
+from .models import Workspace, WorkspaceMember, User
 
 
 class WorkspaceMemberUserSerializer(serializers.ModelSerializer):
@@ -156,40 +134,12 @@ class UpdateMemberRoleSerializer(serializers.Serializer):
         return value
 
 
-class SubscriptionSerializer(serializers.ModelSerializer):
-    """Serializer for subscriptions"""
-
-    plan = PlanSerializer(read_only=True)
-    workspace_name = serializers.CharField(source='workspace.name', read_only=True)
-
-    class Meta:
-        model = Subscription
-        fields = [
-            'id',
-            'workspace',
-            'workspace_name',
-            'plan',
-            'status',
-            'billing_cycle',
-            'current_period_start',
-            'current_period_end',
-            'trial_start',
-            'trial_end',
-            'cancelled_at',
-            'usage_data',
-            'created_at',
-            'updated_at',
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-
-
 class WorkspaceSerializer(serializers.ModelSerializer):
     """Serializer for workspaces"""
 
     owner_email = serializers.EmailField(source='owner.email', read_only=True)
     owner_name = serializers.CharField(source='owner.full_name', read_only=True)
     member_count = serializers.SerializerMethodField()
-    subscription = SubscriptionSerializer(read_only=True)
 
     class Meta:
         model = Workspace
@@ -204,7 +154,6 @@ class WorkspaceSerializer(serializers.ModelSerializer):
             'status',
             'settings',
             'member_count',
-            'subscription',
             'created_at',
             'updated_at',
         ]
@@ -217,30 +166,18 @@ class WorkspaceSerializer(serializers.ModelSerializer):
 class CreateWorkspaceSerializer(serializers.ModelSerializer):
     """Serializer for creating a new workspace"""
 
-    plan_id = serializers.UUIDField(required=True, write_only=True)
-
     class Meta:
         model = Workspace
-        fields = ['name', 'slug', 'description', 'plan_id']
-
-    def validate_plan_id(self, value):
-        """Validate plan exists and is active"""
-        try:
-            plan = Plan.objects.get(id=value, is_active=True)
-        except Plan.DoesNotExist:
-            raise serializers.ValidationError("Invalid or inactive plan selected.")
-        return value
+        fields = ['name', 'slug', 'description']
 
     def create(self, validated_data):
-        """Create workspace with owner and subscription"""
-        plan_id = validated_data.pop('plan_id')
-        plan = Plan.objects.get(id=plan_id)
+        """Create workspace with owner"""
         user = self.context['request'].user
 
         # Create workspace
         workspace = Workspace.objects.create(
             owner=user,
-            status='trial' if plan.plan_type == 'free' else 'active',
+            status='active',
             **validated_data
         )
 
@@ -251,21 +188,6 @@ class CreateWorkspaceSerializer(serializers.ModelSerializer):
             role='owner',
             status='active',
             joined_at=timezone.now(),
-        )
-
-        # Create subscription
-        now = timezone.now()
-        trial_days = 14 if plan.plan_type == 'free' else 0
-
-        Subscription.objects.create(
-            workspace=workspace,
-            plan=plan,
-            status='trialing' if trial_days > 0 else 'active',
-            billing_cycle='monthly',
-            current_period_start=now,
-            current_period_end=now + timedelta(days=30),
-            trial_start=now if trial_days > 0 else None,
-            trial_end=now + timedelta(days=trial_days) if trial_days > 0 else None,
         )
 
         return workspace

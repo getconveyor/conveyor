@@ -3,25 +3,15 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from .models import Workspace, WorkspaceMember, Plan, Subscription
+from .models import Workspace, WorkspaceMember
 from .workspace_serializers import (
     WorkspaceSerializer,
     CreateWorkspaceSerializer,
     WorkspaceMemberSerializer,
     InviteMemberSerializer,
     UpdateMemberRoleSerializer,
-    PlanSerializer,
-    SubscriptionSerializer,
 )
 from .permissions import IsWorkspaceOwnerOrAdmin, IsWorkspaceOwner
-
-
-class PlanViewSet(viewsets.ReadOnlyModelViewSet):
-    """ViewSet for subscription plans"""
-
-    queryset = Plan.objects.filter(is_active=True)
-    serializer_class = PlanSerializer
-    permission_classes = [permissions.AllowAny]  # Public access to view plans
 
 
 class WorkspaceViewSet(viewsets.ModelViewSet):
@@ -48,14 +38,6 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     @action(detail=True, methods=['get'])
-    def subscription(self, request, pk=None):
-        """Get workspace subscription details"""
-        workspace = self.get_object()
-        subscription = workspace.subscription
-        serializer = SubscriptionSerializer(subscription)
-        return Response(serializer.data)
-
-    @action(detail=True, methods=['get'])
     def members(self, request, pk=None):
         """List all workspace members"""
         workspace = self.get_object()
@@ -70,18 +52,6 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
         Requires: owner or admin role
         """
         workspace = self.get_object()
-
-        # Check if workspace has reached member limit
-        active_members = workspace.members.filter(status='active').count()
-        max_members = workspace.subscription.plan.max_users
-
-        if active_members >= max_members:
-            return Response(
-                {
-                    'error': f'Member limit reached. Your plan allows {max_members} members. Please upgrade to add more.'
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
 
         serializer = InviteMemberSerializer(
             data=request.data,
