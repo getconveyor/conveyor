@@ -13,6 +13,11 @@ interface RequestOptions {
 
 class ApiClient {
   private axiosInstance: AxiosInstance;
+  private isRefreshing = false;
+  private failedQueue: Array<{
+    resolve: (value?: any) => void;
+    reject: (reason?: any) => void;
+  }> = [];
 
   constructor(baseURL: string) {
     this.axiosInstance = axios.create({
@@ -22,10 +27,95 @@ class ApiClient {
       },
     });
 
-    // Add request interceptor to handle errors
+    // Add response interceptor to handle token refresh
     this.axiosInstance.interceptors.response.use(
       (response) => response,
-      (error: AxiosError) => {
+      async (error: AxiosError) => {
+        const originalRequest = error.config as any;
+
+        // Don't retry token refresh endpoint or if already retried
+        const isRefreshEndpoint = originalRequest.url?.includes('/auth/token/refresh');
+
+        // If error is 401 and we haven't tried to refresh yet
+        if (error.response?.status === 401 && !originalRequest._retry && !isRefreshEndpoint) {
+          if (this.isRefreshing) {
+            // If already refreshing, queue this request
+            return new Promise((resolve, reject) => {
+              this.failedQueue.push({ resolve, reject });
+            })
+              .then((token) => {
+                originalRequest.headers["Authorization"] = `Bearer ${token}`;
+                return this.axiosInstance(originalRequest);
+              })
+              .catch((err) => {
+                return Promise.reject(err);
+              });
+          }
+
+          originalRequest._retry = true;
+          this.isRefreshing = true;
+
+          try {
+            // Get refresh token from localStorage
+            const tokensStr = localStorage.getItem("auth_tokens");
+            if (!tokensStr) {
+              throw new Error("No refresh token available");
+            }
+
+            const tokens = JSON.parse(tokensStr);
+            if (!tokens.refresh) {
+              throw new Error("Refresh token missing");
+            }
+
+            // Refresh the token
+            const response = await this.axiosInstance.post<{ access: string }>(
+              "/api/auth/token/refresh/",
+              { refresh: tokens.refresh }
+            );
+
+            const newAccessToken = response.data.access;
+
+            // Update tokens in localStorage
+            const updatedTokens = { ...tokens, access: newAccessToken };
+            localStorage.setItem("auth_tokens", JSON.stringify(updatedTokens));
+
+            // Update the failed request with new token
+            originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
+
+            // Process the queued requests
+            this.failedQueue.forEach((promise) => {
+              promise.resolve(newAccessToken);
+            });
+            this.failedQueue = [];
+
+            this.isRefreshing = false;
+
+            // Retry the original request
+            return this.axiosInstance(originalRequest);
+          } catch (refreshError) {
+            this.isRefreshing = false;
+
+            // Token refresh failed, clear auth and redirect to login
+            this.failedQueue.forEach((promise) => {
+              promise.reject(refreshError);
+            });
+            this.failedQueue = [];
+
+            // Clear auth data
+            localStorage.removeItem("auth_tokens");
+            localStorage.removeItem("auth_user");
+            localStorage.removeItem("currentWorkspaceId");
+
+            // Redirect to login if we're in the browser (only once)
+            if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
+              window.location.href = "/login";
+            }
+
+            return Promise.reject(refreshError);
+          }
+        }
+
+        // For other errors, return a formatted error message
         const message =
           (error.response?.data as any)?.message ||
           (error.response?.data as any)?.detail ||

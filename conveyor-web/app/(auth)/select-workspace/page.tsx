@@ -60,10 +60,25 @@ export default function SelectWorkspacePage() {
 
     try {
       setLoading(true);
-      const [workspacesData, plansData] = await Promise.all([
-        workspaceApi.getWorkspaces(),
-        workspaceApi.getPlans(),
+
+      // Load plans and workspaces separately to handle auth errors gracefully
+      const plansPromise = workspaceApi.getPlans().catch((error) => {
+        console.error("Failed to load plans:", error);
+        return [];
+      });
+
+      const workspacesPromise = workspaceApi.getWorkspaces().catch((error) => {
+        console.error("Failed to load workspaces:", error);
+        // Auth errors will be handled by the API client interceptor
+        // which will auto-refresh or redirect to login
+        return [];
+      });
+
+      const [plansData, workspacesData] = await Promise.all([
+        plansPromise,
+        workspacesPromise,
       ]);
+
       setWorkspaces(workspacesData);
       setPlans(plansData);
 
@@ -74,7 +89,7 @@ export default function SelectWorkspacePage() {
       }
     } catch (error: any) {
       console.error("Failed to load data:", error);
-      toast.error(error.message || "Failed to load workspaces");
+      toast.error(error.message || "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -270,7 +285,7 @@ export default function SelectWorkspacePage() {
                       setFormData({ ...formData, plan_id: value })
                     }
                   >
-                    <SelectTrigger id="plan" className="w-100">
+                    <SelectTrigger id="plan" className="w-full">
                       <SelectValue placeholder="Select a plan" />
                     </SelectTrigger>
                     <SelectContent>

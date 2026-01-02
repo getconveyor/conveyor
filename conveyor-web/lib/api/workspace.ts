@@ -118,7 +118,9 @@ export interface MemberActionResponse {
 export const workspaceApi = {
   // Plans
   async getPlans(): Promise<Plan[]> {
-    const response = await apiClient.get<PaginatedResponse<Plan>>("/api/plans/");
+    const response = await apiClient.get<PaginatedResponse<Plan>>(
+      "/api/plans/"
+    );
     return response.results;
   },
 
@@ -128,27 +130,30 @@ export const workspaceApi = {
 
   // Workspaces
   async getWorkspaces(): Promise<Workspace[]> {
-    const response = await apiClient.get<PaginatedResponse<Workspace>>("/api/workspaces/", getAuthOptions());
+    const response = await apiClient.get<PaginatedResponse<Workspace>>(
+      "/api/workspaces/",
+      getAuthOptions()
+    );
     return response.results;
   },
 
   async getWorkspace(workspaceId: string): Promise<Workspace> {
-    return apiClient.get(`/api/workspaces/${workspaceId}/`);
+    return apiClient.get(`/api/workspaces/${workspaceId}/`, getAuthOptions());
   },
 
   async createWorkspace(data: CreateWorkspaceData): Promise<Workspace> {
-    return apiClient.post("/api/workspaces/", data);
+    return apiClient.post("/api/workspaces/", data, getAuthOptions());
   },
 
   async updateWorkspace(
     workspaceId: string,
     data: Partial<Workspace>
   ): Promise<Workspace> {
-    return apiClient.patch(`/api/workspaces/${workspaceId}/`, data);
+    return apiClient.patch(`/api/workspaces/${workspaceId}/`, data, getAuthOptions());
   },
 
   async deleteWorkspace(workspaceId: string): Promise<void> {
-    return apiClient.delete(`/api/workspaces/${workspaceId}/`);
+    return apiClient.delete(`/api/workspaces/${workspaceId}/`, getAuthOptions());
   },
 
   async switchWorkspace(workspaceId: string): Promise<{
@@ -158,17 +163,20 @@ export const workspaceApi = {
   }> {
     return apiClient.post("/api/workspaces/switch/", {
       workspace_id: workspaceId,
-    });
+    }, getAuthOptions());
   },
 
   // Subscription
   async getSubscription(workspaceId: string): Promise<Subscription> {
-    return apiClient.get(`/api/workspaces/${workspaceId}/subscription/`);
+    return apiClient.get(`/api/workspaces/${workspaceId}/subscription/`, getAuthOptions());
   },
 
   // Members
   async getMembers(workspaceId: string): Promise<WorkspaceMember[]> {
-    const response = await apiClient.get<PaginatedResponse<WorkspaceMember>>(`/api/workspaces/${workspaceId}/members/`);
+    const response = await apiClient.get<PaginatedResponse<WorkspaceMember>>(
+      `/api/workspaces/${workspaceId}/members/`,
+      getAuthOptions()
+    );
     return response.results;
   },
 
@@ -178,7 +186,8 @@ export const workspaceApi = {
   ): Promise<InviteMemberResponse> {
     return apiClient.post(
       `/api/workspaces/${workspaceId}/invite_member/`,
-      data
+      data,
+      getAuthOptions()
     );
   },
 
@@ -189,7 +198,8 @@ export const workspaceApi = {
   ): Promise<MemberActionResponse> {
     return apiClient.patch(
       `/api/workspaces/${workspaceId}/members/${memberId}/role/`,
-      { role }
+      { role },
+      getAuthOptions()
     );
   },
 
@@ -198,7 +208,9 @@ export const workspaceApi = {
     memberId: string
   ): Promise<MemberActionResponse> {
     return apiClient.post(
-      `/api/workspaces/${workspaceId}/members/${memberId}/suspend/`
+      `/api/workspaces/${workspaceId}/members/${memberId}/suspend/`,
+      {},
+      getAuthOptions()
     );
   },
 
@@ -207,7 +219,9 @@ export const workspaceApi = {
     memberId: string
   ): Promise<MemberActionResponse> {
     return apiClient.post(
-      `/api/workspaces/${workspaceId}/members/${memberId}/activate/`
+      `/api/workspaces/${workspaceId}/members/${memberId}/activate/`,
+      {},
+      getAuthOptions()
     );
   },
 
@@ -216,7 +230,9 @@ export const workspaceApi = {
     memberId: string
   ): Promise<MemberActionResponse> {
     return apiClient.post(
-      `/api/workspaces/${workspaceId}/members/${memberId}/deactivate/`
+      `/api/workspaces/${workspaceId}/members/${memberId}/deactivate/`,
+      {},
+      getAuthOptions()
     );
   },
 
@@ -225,7 +241,8 @@ export const workspaceApi = {
     memberId: string
   ): Promise<{ detail: string }> {
     return apiClient.delete(
-      `/api/workspaces/${workspaceId}/members/${memberId}/`
+      `/api/workspaces/${workspaceId}/members/${memberId}/`,
+      getAuthOptions()
     );
   },
 };
