@@ -218,7 +218,7 @@ export default function RegisterPage() {
 
           {/* Footer */}
           <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-8">
-            © {new Date().getFullYear()} Conveyor. All rights reserved.
+            &copy; {new Date().getFullYear()} Conveyor. All rights reserved.
           </p>
         </div>
       </div>
