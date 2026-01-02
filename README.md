@@ -55,27 +55,6 @@ Access the application:
 - API Docs: http://localhost:8000/api/docs/
 - Django Admin: http://localhost:8000/admin/
 
-### Local Development
-
-**Backend**:
-
-```bash
-cd conveyor-server
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver
-```
-
-**Frontend**:
-
-```bash
-cd conveyor-web
-npm install
-echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
-npm run dev
-```
-
 ## Documentation
 
 - **API Reference**: Available at `/api/docs/` (Swagger UI)
