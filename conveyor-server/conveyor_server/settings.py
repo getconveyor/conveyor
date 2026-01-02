@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'django_filters',
     'channels',  # Django Channels for WebSocket support
     'drf_spectacular',  # API Documentation
+    'django_extensions',  # Django Extensions for management commands
     # Conveyor Apps
     'authentication',
     'integration',
