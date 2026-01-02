@@ -118,12 +118,8 @@ class LoginSerializer(serializers.Serializer):
         password = attrs.get('password')
 
         if email and password:
-            # Authenticate using email
-            try:
-                user = User.objects.get(email=email)
-                user = authenticate(username=user.username, password=password)
-            except User.DoesNotExist:
-                user = None
+            # Authenticate using email (USERNAME_FIELD is 'email' in the User model)
+            user = authenticate(username=email, password=password)
 
             if not user:
                 raise serializers.ValidationError('Unable to log in with provided credentials.')
