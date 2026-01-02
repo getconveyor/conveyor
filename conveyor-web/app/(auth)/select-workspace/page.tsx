@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { workspaceApi, Workspace, Plan } from "@/lib/api/workspace";
 import {
@@ -35,6 +36,7 @@ import { toast } from "sonner";
 
 export default function SelectWorkspacePage() {
   const { user } = useAuth();
+  const { switchWorkspace: switchWorkspaceContext } = useWorkspace();
   const router = useRouter();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -97,8 +99,7 @@ export default function SelectWorkspacePage() {
 
   async function handleSelectWorkspace(workspaceId: string) {
     try {
-      await workspaceApi.switchWorkspace(workspaceId);
-      localStorage.setItem("currentWorkspaceId", workspaceId);
+      await switchWorkspaceContext(workspaceId);
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Failed to select workspace:", error);
@@ -118,8 +119,7 @@ export default function SelectWorkspacePage() {
       toast.success("Workspace created successfully");
 
       // Switch to the new workspace and redirect
-      await workspaceApi.switchWorkspace(newWorkspace.id);
-      localStorage.setItem("currentWorkspaceId", newWorkspace.id);
+      await switchWorkspaceContext(newWorkspace.id);
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Failed to create workspace:", error);
