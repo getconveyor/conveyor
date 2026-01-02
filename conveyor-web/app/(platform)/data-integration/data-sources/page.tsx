@@ -475,9 +475,11 @@ export default function SourcesPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Data Sources</h1>
+          <h1 className="text-2xl font-bold">
+            Data Sources/Source Connections
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Connect and manage your data source instances
+            Manage your configured data source connections
           </p>
         </div>
         <Button onClick={() => setIsCatalogOpen(true)}>

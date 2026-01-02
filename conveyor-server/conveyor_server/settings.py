@@ -69,6 +69,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'conveyor_server.json_error_middleware.JsonErrorMiddleware',
 ]
 
 ROOT_URLCONF = 'conveyor_server.urls'
@@ -193,7 +194,7 @@ REST_FRAMEWORK = {
         'user': '1000/hour',
     },
     # Error handling
-    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+    'EXCEPTION_HANDLER': 'conveyor_server.exception_handler.custom_exception_handler',
     # API Documentation
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }

@@ -5,7 +5,7 @@ import uuid
 
 
 class Source(models.Model):
-    """Data source model - represents a connection to a database, API, or other data source"""
+    """Data source connection model - represents a connection to a database, API, or other data source"""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='sources')

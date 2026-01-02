@@ -18,7 +18,7 @@ import logging
 import traceback
 from datetime import datetime
 
-from integration.models import Pipeline, PipelineRun, Connection
+from integration.models import Pipeline, PipelineRun, Source
 from integration.connectors import ConnectorRegistry
 from integration.transformations import (
     ColumnMapper,

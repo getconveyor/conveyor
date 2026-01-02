@@ -40,12 +40,16 @@ const data = {
       icon: IconArrowsExchange,
       items: [
         {
-          title: "Pipelines",
-          url: "/data-integration/pipelines",
+          title: "Source Connectors",
+          url: "/data-integration/source-connectors",
         },
         {
-          title: "Sources",
-          url: "/data-integration/sources",
+          title: "Data Sources",
+          url: "/data-integration/data-sources",
+        },
+        {
+          title: "Pipelines",
+          url: "/data-integration/pipelines",
         },
         {
           title: "Schedules",
