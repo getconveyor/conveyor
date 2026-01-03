@@ -202,6 +202,13 @@ export const integrationApi = {
     );
   },
 
+  async getSourceSchema(id: string): Promise<any> {
+    return apiClient.get(
+      `/api/integration/sources/${id}/schema/`,
+      getAuthOptions()
+    );
+  },
+
   // Data Sources
   async getDataSources(): Promise<DataSource[]> {
     const response = await apiClient.get<PaginatedResponse<DataSource>>(
@@ -244,6 +251,13 @@ export const integrationApi = {
     );
   },
 
+  async deleteDataSource(id: string): Promise<void> {
+    return apiClient.delete(
+      `/api/integration/data-sources/${id}/`,
+      getAuthOptions()
+    );
+  },
+
   // Pipelines
   async getPipelines(): Promise<Pipeline[]> {
     const response = await apiClient.get<PaginatedResponse<Pipeline>>(
@@ -282,7 +296,31 @@ export const integrationApi = {
 
   async triggerPipeline(id: string): Promise<PipelineRun> {
     return apiClient.post(
-      `/api/integration/pipelines/${id}/trigger/`,
+      `/api/integration/pipelines/${id}/run/`,
+      {},
+      getAuthOptions()
+    );
+  },
+
+  async pausePipeline(id: string): Promise<void> {
+    return apiClient.post(
+      `/api/integration/pipelines/${id}/pause/`,
+      {},
+      getAuthOptions()
+    );
+  },
+
+  async resumePipeline(id: string): Promise<void> {
+    return apiClient.post(
+      `/api/integration/pipelines/${id}/resume/`,
+      {},
+      getAuthOptions()
+    );
+  },
+
+  async getPipelineStats(id: string): Promise<any> {
+    return apiClient.get(
+      `/api/integration/pipelines/${id}/stats/`,
       getAuthOptions()
     );
   },
@@ -320,6 +358,10 @@ export const integrationApi = {
     return response.results;
   },
 
+  async getSchedule(id: string): Promise<Schedule> {
+    return apiClient.get(`/api/integration/schedules/${id}/`, getAuthOptions());
+  },
+
   async createSchedule(data: {
     pipeline: string;
     cron_expression: string;
@@ -327,6 +369,14 @@ export const integrationApi = {
   }): Promise<Schedule> {
     return apiClient.post(
       "/api/integration/schedules/",
+      data,
+      getAuthOptions()
+    );
+  },
+
+  async updateSchedule(id: string, data: Partial<Schedule>): Promise<Schedule> {
+    return apiClient.patch(
+      `/api/integration/schedules/${id}/`,
       data,
       getAuthOptions()
     );
