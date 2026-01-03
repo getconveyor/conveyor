@@ -312,7 +312,12 @@ export default function SourcesPage() {
 
       const category = getCategoryForType(formData.type);
 
-      if (category === "database" || category === "file") {
+      // Special handling for BigQuery
+      if (formData.type === "bigquery") {
+        updateData.host = formData.host; // Project ID
+        updateData.database = formData.database; // Dataset ID (optional)
+        // Credentials are stored in config.credentials_json
+      } else if (category === "database" || category === "file") {
         updateData.host = formData.host;
         updateData.port = formData.port ? formData.port : undefined;
         updateData.database = formData.database;
@@ -558,52 +563,52 @@ export default function SourcesPage() {
                     key={source.id}
                     className={source.status === "testing" ? "opacity-75 animate-pulse" : ""}
                   >
-                    <CardContent className="p-2 relative">
+                    <CardContent className="p-3 relative">
+                      {/* Header with icon, name, and actions */}
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="flex items-start gap-2">
-                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <div className="flex items-start gap-2 flex-1 min-w-0">
+                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                             <SourceIcon className="h-4 w-4 text-primary" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-sm line-clamp-1">
-                              {source.name}
-                            </h3>
-                            <p className="text-xs text-muted-foreground">
-                              {source.type}
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-sm line-clamp-1">
+                                {source.name}
+                              </h3>
+                              <Badge
+                                variant={statusConfig[source.status as SourceStatus].variant}
+                                className={`text-xs ${statusConfig[source.status as SourceStatus].className}`}
+                              >
+                                {source.status === "testing" && (
+                                  <IconLoader2 className="mr-1 h-3 w-3 animate-spin" />
+                                )}
+                                {statusConfig[source.status as SourceStatus].label}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {category} • {source.type}
                             </p>
                           </div>
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                            >
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 flex-shrink-0">
                               <IconDotsVertical className="h-3.5 w-3.5" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleEditSource(source)}
-                            >
+                            <DropdownMenuItem onClick={() => handleEditSource(source)}>
                               <IconSettings className="mr-2 h-4 w-4" />
                               Edit Source
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleTestConnection(source.id, source.name)
-                              }
-                            >
+                            <DropdownMenuItem onClick={() => handleTestConnection(source.id, source.name)}>
                               <IconRefresh className="mr-2 h-4 w-4" />
                               Test Connection
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive"
-                              onClick={() =>
-                                handleDeleteSource(source.id, source.name)
-                              }
+                              onClick={() => handleDeleteSource(source.id, source.name)}
                             >
                               <IconTrash className="mr-2 h-4 w-4" />
                               Delete
@@ -611,95 +616,90 @@ export default function SourcesPage() {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
+
+                      {/* Host URL */}
                       {source.host && (
-                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">
-                          {source.host}
-                          {source.port ? `:${source.port}` : ""}
+                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1 pl-10">
+                          {source.host}{source.port ? `:${source.port}` : ""}
                         </p>
                       )}
-                      <div className="flex items-center justify-between text-xs">
-                        <Badge
-                          variant={
-                            statusConfig[source.status as SourceStatus].variant
-                          }
-                          className={`text-xs ${statusConfig[source.status as SourceStatus].className}`}
-                        >
-                          {source.status === "testing" && (
-                            <IconLoader2 className="mr-1 h-3 w-3 animate-spin" />
-                          )}
-                          {statusConfig[source.status as SourceStatus].label}
-                        </Badge>
-                      </div>
-                      <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
-                        <div>Category: {category}</div>
-                        {source.type === "api" && source.config && (
-                          <>
-                            {source.config.auth_type && (
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Auth:</span>
-                                <span className="capitalize">
-                                  {source.config.auth_type === "api_key"
-                                    ? "API Key"
-                                    : source.config.auth_type}
-                                </span>
-                              </div>
-                            )}
-                            {source.config.test_endpoint && (
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Test Endpoint:</span>
-                                <span className="truncate">{source.config.test_endpoint}</span>
-                              </div>
-                            )}
-                            {source.config.timeout && (
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Timeout:</span>
-                                <span>{source.config.timeout}s</span>
-                              </div>
-                            )}
-                          </>
-                        )}
 
-                        {/* Timestamps Section */}
-                        <div className="mt-2 pt-2 border-t space-y-1">
-                          <div className="flex items-center gap-1">
-                            <span className="font-medium">Created:</span>
-                            <span>
-                              {new Date(source.created_at).toLocaleString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          </div>
-                          {source.updated_at && (
-                            <div className="flex items-center gap-1">
-                              <span className="font-medium">Updated:</span>
+                      {/* Configuration and Metadata in 2 columns */}
+                      <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                          {/* API Config */}
+                          {source.type === "api" && source.config && (
+                            <>
+                              {source.config.auth_type && (
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium">Auth:</span>
+                                  <span className="capitalize truncate">
+                                    {source.config.auth_type === "api_key" ? "API Key" : source.config.auth_type}
+                                  </span>
+                                </div>
+                              )}
+                              {source.config.timeout && (
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium">Timeout:</span>
+                                  <span>{source.config.timeout}s</span>
+                                </div>
+                              )}
+                              {source.config.test_endpoint && (
+                                <div className="col-span-2 flex items-center gap-1">
+                                  <span className="font-medium">Endpoint:</span>
+                                  <span className="truncate">{source.config.test_endpoint}</span>
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          {/* Timestamps */}
+                          <div className="col-span-2 mt-1 pt-1 border-t">
+                            <div className="flex items-center justify-between text-[11px]">
                               <span>
-                                {new Date(source.updated_at).toLocaleString('en-US', {
+                                <span className="font-medium">Created:</span>{' '}
+                                {new Date(source.created_at).toLocaleDateString('en-US', {
                                   month: 'short',
                                   day: 'numeric',
-                                  year: 'numeric',
+                                  year: '2-digit'
+                                })}{' '}
+                                {new Date(source.created_at).toLocaleTimeString('en-US', {
                                   hour: '2-digit',
                                   minute: '2-digit'
                                 })}
                               </span>
                             </div>
-                          )}
-                          <div className="flex items-center gap-1">
-                            <span className="font-medium">Last Tested:</span>
-                            <span>
-                              {source.last_tested
-                                ? new Date(source.last_tested).toLocaleString('en-US', {
+                            {source.updated_at && (
+                              <div className="flex items-center justify-between text-[11px] mt-0.5">
+                                <span>
+                                  <span className="font-medium">Updated:</span>{' '}
+                                  {new Date(source.updated_at).toLocaleDateString('en-US', {
                                     month: 'short',
                                     day: 'numeric',
-                                    year: 'numeric',
+                                    year: '2-digit'
+                                  })}{' '}
+                                  {new Date(source.updated_at).toLocaleTimeString('en-US', {
                                     hour: '2-digit',
                                     minute: '2-digit'
-                                  })
-                                : 'Never'}
-                            </span>
+                                  })}
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between text-[11px] mt-0.5">
+                              <span>
+                                <span className="font-medium">Tested:</span>{' '}
+                                {source.last_tested
+                                  ? `${new Date(source.last_tested).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: '2-digit'
+                                    })} ${new Date(source.last_tested).toLocaleTimeString('en-US', {
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}`
+                                  : 'Never'}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -885,7 +885,7 @@ export default function SourcesPage() {
               />
             </div>
 
-            {selectedSourceType?.category === "database" && (
+            {selectedSourceType?.category === "database" && selectedSourceType?.id !== "bigquery" && (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
@@ -1136,7 +1136,62 @@ export default function SourcesPage() {
               </>
             )}
 
-            {selectedSourceType?.category === "cloud" && (
+            {selectedSourceType?.id === "bigquery" && (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="project-id">Project ID *</Label>
+                  <Input
+                    id="project-id"
+                    placeholder="my-gcp-project"
+                    value={formData.host}
+                    onChange={(e) =>
+                      setFormData({ ...formData, host: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="dataset-id">Dataset ID *</Label>
+                  <Input
+                    id="dataset-id"
+                    placeholder="my_dataset"
+                    value={formData.database}
+                    onChange={(e) =>
+                      setFormData({ ...formData, database: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="service-account-json">
+                    Service Account JSON *{" "}
+                    {editingSource && "(leave empty to keep existing)"}
+                  </Label>
+                  <textarea
+                    id="service-account-json"
+                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder={
+                      editingSource
+                        ? "Leave empty to keep existing credentials"
+                        : '{\n  "type": "service_account",\n  "project_id": "...",\n  "private_key": "...",\n  ...\n}'
+                    }
+                    value={formData.config.credentials_json || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        config: {
+                          ...formData.config,
+                          credentials_json: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Paste the entire service account JSON key file
+                  </p>
+                </div>
+              </>
+            )}
+
+            {selectedSourceType?.category === "cloud" && selectedSourceType?.id !== "bigquery" && (
               <>
                 <div className="grid gap-2">
                   <Label htmlFor="cloud-region">Region</Label>
