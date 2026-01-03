@@ -46,6 +46,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -161,6 +171,8 @@ export default function SourcesPage() {
   const [editingSource, setEditingSource] = useState<Source | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [sourceToDelete, setSourceToDelete] = useState<{ id: string; name: string } | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -370,16 +382,24 @@ export default function SourcesPage() {
     }
   };
 
-  const handleDeleteSource = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+  const handleDeleteSource = (id: string, name: string) => {
+    setSourceToDelete({ id, name });
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteSource = async () => {
+    if (!sourceToDelete) return;
 
     try {
-      await integrationApi.deleteSource(id);
+      await integrationApi.deleteSource(sourceToDelete.id);
       toast.success("Source deleted successfully");
       await loadSources();
     } catch (error: any) {
       console.error("Failed to delete source:", error);
       toast.error(error.message || "Failed to delete source");
+    } finally {
+      setDeleteConfirmOpen(false);
+      setSourceToDelete(null);
     }
   };
 
@@ -609,14 +629,79 @@ export default function SourcesPage() {
                           )}
                           {statusConfig[source.status as SourceStatus].label}
                         </Badge>
-                        <span className="text-muted-foreground">
-                          {source.last_tested
-                            ? new Date(source.last_tested).toLocaleDateString()
-                            : "Never tested"}
-                        </span>
                       </div>
-                      <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
-                        Category: {category}
+                      <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
+                        <div>Category: {category}</div>
+                        {source.type === "api" && source.config && (
+                          <>
+                            {source.config.auth_type && (
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">Auth:</span>
+                                <span className="capitalize">
+                                  {source.config.auth_type === "api_key"
+                                    ? "API Key"
+                                    : source.config.auth_type}
+                                </span>
+                              </div>
+                            )}
+                            {source.config.test_endpoint && (
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">Test Endpoint:</span>
+                                <span className="truncate">{source.config.test_endpoint}</span>
+                              </div>
+                            )}
+                            {source.config.timeout && (
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">Timeout:</span>
+                                <span>{source.config.timeout}s</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Timestamps Section */}
+                        <div className="mt-2 pt-2 border-t space-y-1">
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium">Created:</span>
+                            <span>
+                              {new Date(source.created_at).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                          {source.updated_at && (
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium">Updated:</span>
+                              <span>
+                                {new Date(source.updated_at).toLocaleString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium">Last Tested:</span>
+                            <span>
+                              {source.last_tested
+                                ? new Date(source.last_tested).toLocaleString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })
+                                : 'Never'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -1211,6 +1296,27 @@ export default function SourcesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Source</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{sourceToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteSource}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
