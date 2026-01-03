@@ -102,10 +102,6 @@ export default function SourceConnectorsPage() {
             List of available data source connectors
           </p>
         </div>
-        <Button onClick={() => setIsCatalogOpen(true)}>
-          <IconPlus className="mr-2 h-4 w-4" />
-          Add Source
-        </Button>
       </div>
 
       <div className="py-4 min-h-0 overflow-hidden flex-1 flex flex-col">
@@ -141,7 +137,9 @@ export default function SourceConnectorsPage() {
             ) : filteredCatalog.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <IconDatabase className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-sm text-muted-foreground">No source types found</p>
+                <p className="text-sm text-muted-foreground">
+                  No source types found
+                </p>
               </div>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-6">

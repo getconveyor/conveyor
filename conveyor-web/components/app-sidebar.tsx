@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import {
-  IconActivity,
   IconArrowsExchange,
   IconBrain,
   IconChartBar,
@@ -14,6 +13,7 @@ import {
   IconTransform,
   IconWaveSine,
   IconSchool,
+  IconActivity,
 } from "@tabler/icons-react";
 
 import { NavPlatform } from "@/components/nav-platform";
@@ -40,6 +40,10 @@ const data = {
       icon: IconArrowsExchange,
       items: [
         {
+          title: "Overview",
+          url: "/data-integration",
+        },
+        {
           title: "Source Connectors",
           url: "/data-integration/source-connectors",
         },
@@ -62,6 +66,10 @@ const data = {
       url: "/data-transformation",
       icon: IconTransform,
       items: [
+        {
+          title: "Overview",
+          url: "/data-transformation",
+        },
         {
           title: "Notebooks",
           url: "/data-transformation/notebooks",
@@ -86,6 +94,10 @@ const data = {
       icon: IconStack,
       items: [
         {
+          title: "Overview",
+          url: "/data-lake",
+        },
+        {
           title: "Explorer",
           url: "/data-lake/explorer",
         },
@@ -108,6 +120,10 @@ const data = {
       url: "/data-warehouse",
       icon: IconServer,
       items: [
+        {
+          title: "Overview",
+          url: "/data-warehouse",
+        },
         {
           title: "SQL Editor",
           url: "/data-warehouse/editor",
@@ -132,6 +148,10 @@ const data = {
       icon: IconWaveSine,
       items: [
         {
+          title: "Overview",
+          url: "/real-time-analytics",
+        },
+        {
           title: "Streaming Jobs",
           url: "/real-time-analytics/streaming",
         },
@@ -154,6 +174,10 @@ const data = {
       url: "/data-analytics",
       icon: IconChartBar,
       items: [
+        {
+          title: "Overview",
+          url: "/data-analytics",
+        },
         {
           title: "Dashboards",
           url: "/data-analytics/dashboards",
@@ -178,6 +202,10 @@ const data = {
       icon: IconBrain,
       items: [
         {
+          title: "Overview",
+          url: "/data-science",
+        },
+        {
           title: "Notebooks",
           url: "/data-science/notebooks",
         },
@@ -200,6 +228,10 @@ const data = {
       url: "/data-governance",
       icon: IconShield,
       items: [
+        {
+          title: "Overview",
+          url: "/data-governance",
+        },
         {
           title: "Data Catalog",
           url: "/data-governance/catalog",
@@ -225,19 +257,19 @@ const data = {
       items: [
         {
           title: "Overview",
-          url: "/monitoring/overview",
-        },
-        {
-          title: "Pipeline Runs",
-          url: "/monitoring/pipelines",
+          url: "/monitoring",
         },
         {
           title: "System Health",
           url: "/monitoring/health",
         },
         {
-          title: "Alerts & Logs",
+          title: "Logs",
           url: "/monitoring/logs",
+        },
+        {
+          title: "Alerts",
+          url: "/monitoring/alerts",
         },
       ],
     },
