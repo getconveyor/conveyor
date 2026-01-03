@@ -1,6 +1,15 @@
 from rest_framework import serializers
-from .models import Source, Pipeline, PipelineRun, Schedule
+from .models import Source, Pipeline, PipelineRun, Schedule, SourceCatalog
 from authentication.serializers import UserSerializer
+
+
+class SourceCatalogSerializer(serializers.ModelSerializer):
+    """Serializer for SourceCatalog model"""
+
+    class Meta:
+        model = SourceCatalog
+        fields = ['id', 'name', 'category', 'description', 'auth_types', 'documentation', 'popular']
+        read_only_fields = ['id', 'name', 'category', 'description', 'auth_types', 'documentation', 'popular']
 
 
 class SourceSerializer(serializers.ModelSerializer):

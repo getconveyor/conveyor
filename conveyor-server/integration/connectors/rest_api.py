@@ -48,18 +48,18 @@ class RESTAPIConnector(BaseConnector):
     Note: This is a source-only connector (read-only).
     """
 
-    def __init__(self, connection: 'Connection'):
+    def __init__(self, source: 'Source'):
         """
         Initialize REST API connector.
 
-        Config options:
-        - base_url: Base API URL
-        - auth_type: Authentication type (api_key, bearer, basic, oauth2, none)
-        - api_key: API key (for api_key auth)
-        - api_key_header: Header name for API key (default: 'X-API-Key')
-        - bearer_token: Bearer token (for bearer auth)
+        Source model fields used:
+        - host: Base API URL
         - username: Username (for basic auth)
-        - password: Password (for basic auth)
+        - password: Password/API key/Bearer token (encrypted)
+
+        Config options:
+        - auth_type: Authentication type (api_key, bearer, basic, oauth2, none)
+        - api_key_header: Header name for API key (default: 'X-API-Key')
         - headers: Additional custom headers (dict)
         - pagination_type: Pagination strategy (offset, cursor, page, link, none)
         - pagination_param: Query param for pagination (default: 'offset' or 'page')
@@ -70,18 +70,32 @@ class RESTAPIConnector(BaseConnector):
         - rate_limit_period: Period in seconds for rate limiting
         - timeout: Request timeout in seconds (default: 30)
         """
-        super().__init__(connection)
+        super().__init__(source)
 
-        self.base_url = self.config.get('base_url', '').rstrip('/')
+        self.base_url = (source.host or '').rstrip('/')
         self.auth_type = self.config.get('auth_type', 'none')
         self.timeout = self.config.get('timeout', 30)
 
         # Authentication
-        self.api_key = self.config.get('api_key')
+        # For API key and bearer token auth, use the password field
+        password_value = source.get_password() if source.password_encrypted else None
+
+        if self.auth_type == 'api_key':
+            self.api_key = password_value
+            self.bearer_token = None
+        elif self.auth_type == 'bearer':
+            self.api_key = None
+            self.bearer_token = password_value
+        elif self.auth_type == 'basic':
+            self.api_key = None
+            self.bearer_token = None
+        else:
+            self.api_key = None
+            self.bearer_token = None
+
         self.api_key_header = self.config.get('api_key_header', 'X-API-Key')
-        self.bearer_token = self.config.get('bearer_token')
-        self.username = self.config.get('username')
-        self.password = connection.get_password() if self.auth_type == 'basic' else None
+        self.username = source.username
+        self.password = password_value if self.auth_type == 'basic' else None
 
         # Custom headers
         self.custom_headers = self.config.get('headers', {})

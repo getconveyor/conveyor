@@ -4,6 +4,35 @@ from authentication.models import User, Workspace
 import uuid
 
 
+class SourceCatalog(models.Model):
+    """Catalog of available source types with metadata"""
+
+    id = models.CharField(max_length=50, primary_key=True)
+    name = models.CharField(max_length=255)
+    category = models.CharField(
+        max_length=20,
+        choices=[
+            ('api', 'API'),
+            ('database', 'Database'),
+            ('cloud', 'Cloud Storage'),
+            ('file', 'File System'),
+        ]
+    )
+    description = models.TextField()
+    auth_types = models.JSONField(default=list)  # List of auth method strings
+    documentation = models.URLField(max_length=500)
+    popular = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'source_catalog'
+        ordering = ['-popular', 'name']
+
+    def __str__(self):
+        return self.name
+
+
 class Source(models.Model):
     """Data source connection model - represents a connection to a database, API, or other data source"""
 
@@ -64,9 +93,14 @@ class Source(models.Model):
         type_mapping = {
             'mysql': 'mysql',
             'postgresql': 'postgresql',
+            'mongodb': 'mongodb',
+            'snowflake': 'snowflake',
+            'bigquery': 'bigquery',
+            'redshift': 'redshift',
+            's3': 's3',
+            'kafka': 'kafka',
+            'salesforce': 'salesforce',
             'api': 'rest_api',
-            's3': 'file',  # S3 would be file connector
-            # Add more mappings as needed
         }
         return type_mapping.get(self.type, self.type)
 

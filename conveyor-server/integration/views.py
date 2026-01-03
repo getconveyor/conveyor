@@ -5,12 +5,13 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db.models import Q
 
-from .models import Source, Pipeline, PipelineRun, Schedule
+from .models import Source, Pipeline, PipelineRun, Schedule, SourceCatalog
 from .serializers import (
     SourceSerializer, SourceListSerializer,
     PipelineSerializer, PipelineListSerializer,
     PipelineRunSerializer, PipelineRunListSerializer,
-    ScheduleSerializer, ScheduleListSerializer
+    ScheduleSerializer, ScheduleListSerializer,
+    SourceCatalogSerializer
 )
 from authentication.permissions import IsWorkspaceMember, IsWorkspaceOwnerOrAdmin
 
@@ -91,7 +92,18 @@ class SourceViewSet(viewsets.ModelViewSet):
                 'message': f'Unexpected error: {str(e)}',
                 'source_id': str(source.id)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def catalog(self, request):
+        """
+        Get available source types catalog from database.
+        
+        Returns list of source types with full metadata.
+        """
+        catalogs = SourceCatalog.objects.all().order_by('-popular', 'name')
+        serializer = SourceCatalogSerializer(catalogs, many=True)
+        return Response({
+            'source_types': serializer.data
+        })
     @action(detail=True, methods=['get'])
     def schema(self, request, pk=None):
         """

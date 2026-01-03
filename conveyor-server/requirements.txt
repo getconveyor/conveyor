@@ -49,6 +49,11 @@ daphne==4.0.0
 
 # Database Connectors
 PyMySQL==1.1.0
+pymongo==4.6.1
+snowflake-connector-python==3.7.0
+google-cloud-bigquery==3.17.1
+kafka-python==2.0.2
+simple-salesforce==1.12.5
 
 # HTTP/REST API Support
 requests==2.31.0

@@ -40,6 +40,16 @@ export interface CreateSourceData {
   config?: Record<string, any>;
 }
 
+export interface SourceType {
+  id: string;
+  name: string;
+  category: "api" | "database" | "cloud" | "file";
+  description: string;
+  auth_types: string[];
+  documentation: string;
+  popular?: boolean;
+}
+
 export interface DataSource {
   id: string;
   workspace?: string;
@@ -158,6 +168,12 @@ export const integrationApi = {
 
   async getSource(id: string): Promise<Source> {
     return apiClient.get(`/api/integration/sources/${id}/`, getAuthOptions());
+  },
+
+  async getSourceCatalog(): Promise<{
+    source_types: SourceType[];
+  }> {
+    return apiClient.get("/api/integration/sources/catalog/", getAuthOptions());
   },
 
   async createSource(data: CreateSourceData): Promise<Source> {

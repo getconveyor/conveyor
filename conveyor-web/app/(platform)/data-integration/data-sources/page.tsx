@@ -5,6 +5,7 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   integrationApi,
   Source,
+  SourceType,
   CreateSourceData,
 } from "@/lib/api/integration";
 import { toast } from "sonner";
@@ -64,121 +65,6 @@ import {
 type SourceStatus = "active" | "inactive" | "error" | "testing";
 type SourceCategory = "api" | "database" | "cloud" | "file";
 
-interface SourceType {
-  id: string;
-  name: string;
-  description: string;
-  category: SourceCategory;
-  icon: React.ElementType;
-  popular: boolean;
-  authTypes: string[];
-  documentation: string;
-}
-
-// Source Types Catalog (templates)
-const sourceTypesCatalog: SourceType[] = [
-  {
-    id: "rest-api",
-    name: "REST API",
-    description: "Connect to any REST API endpoint with custom authentication",
-    category: "api",
-    icon: IconApi,
-    popular: true,
-    authTypes: ["API Key", "Bearer Token", "OAuth 2.0", "Basic Auth"],
-    documentation: "https://docs.example.com/rest-api",
-  },
-  {
-    id: "graphql",
-    name: "GraphQL API",
-    description: "Query GraphQL endpoints with custom queries and mutations",
-    category: "api",
-    icon: IconApi,
-    popular: false,
-    authTypes: ["API Key", "Bearer Token", "OAuth 2.0"],
-    documentation: "https://docs.example.com/graphql",
-  },
-  {
-    id: "github",
-    name: "GitHub API",
-    description: "Access repositories, issues, pull requests, and more",
-    category: "api",
-    icon: IconBrandGithub,
-    popular: true,
-    authTypes: ["Personal Access Token", "OAuth App", "GitHub App"],
-    documentation: "https://docs.github.com/rest",
-  },
-  {
-    id: "google-analytics",
-    name: "Google Analytics",
-    description: "Website and app analytics data from Google Analytics 4",
-    category: "api",
-    icon: IconBrandGoogle,
-    popular: true,
-    authTypes: ["OAuth 2.0", "Service Account"],
-    documentation: "https://developers.google.com/analytics",
-  },
-  {
-    id: "stripe",
-    name: "Stripe",
-    description: "Payment processing and subscription management data",
-    category: "api",
-    icon: IconBrandStripe,
-    popular: true,
-    authTypes: ["Secret Key", "Restricted Key"],
-    documentation: "https://stripe.com/docs/api",
-  },
-  {
-    id: "slack",
-    name: "Slack API",
-    description: "Messages, channels, users, and workspace data",
-    category: "api",
-    icon: IconBrandSlack,
-    popular: false,
-    authTypes: ["OAuth 2.0", "Bot Token"],
-    documentation: "https://api.slack.com",
-  },
-  {
-    id: "mysql",
-    name: "MySQL",
-    description: "MySQL relational database connection",
-    category: "database",
-    icon: IconDatabase,
-    popular: true,
-    authTypes: ["Password", "SSL Certificate"],
-    documentation: "https://dev.mysql.com/doc/",
-  },
-  {
-    id: "postgresql",
-    name: "PostgreSQL",
-    description: "PostgreSQL database with advanced SQL features",
-    category: "database",
-    icon: IconDatabase,
-    popular: true,
-    authTypes: ["Password", "SSL Certificate", "SCRAM-SHA-256"],
-    documentation: "https://www.postgresql.org/docs/",
-  },
-  {
-    id: "aws-s3",
-    name: "AWS S3",
-    description: "Amazon S3 object storage buckets",
-    category: "cloud",
-    icon: IconCloud,
-    popular: true,
-    authTypes: ["Access Key", "IAM Role", "Temporary Credentials"],
-    documentation: "https://docs.aws.amazon.com/s3/",
-  },
-  {
-    id: "sftp",
-    name: "SFTP",
-    description: "Secure file transfer protocol for file storage",
-    category: "file",
-    icon: IconFile,
-    popular: false,
-    authTypes: ["Password", "SSH Key"],
-    documentation: "https://www.ssh.com/academy/ssh/sftp",
-  },
-];
-
 const statusConfig: Record<
   SourceStatus,
   {
@@ -219,6 +105,10 @@ function getCategoryForType(type: string): SourceCategory {
   if (
     lowerType.includes("mysql") ||
     lowerType.includes("postgres") ||
+    lowerType.includes("mongodb") ||
+    lowerType.includes("snowflake") ||
+    lowerType.includes("bigquery") ||
+    lowerType.includes("redshift") ||
     lowerType.includes("database")
   )
     return "database";
@@ -232,6 +122,7 @@ function getCategoryForType(type: string): SourceCategory {
   if (
     lowerType.includes("sftp") ||
     lowerType.includes("ftp") ||
+    lowerType.includes("kafka") ||
     lowerType.includes("file")
   )
     return "file";
@@ -241,6 +132,7 @@ function getCategoryForType(type: string): SourceCategory {
 export default function SourcesPage() {
   const { currentWorkspace } = useWorkspace();
   const [sources, setSources] = useState<Source[]>([]);
+  const [sourceTypes, setSourceTypes] = useState<SourceType[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -270,7 +162,18 @@ export default function SourcesPage() {
 
   useEffect(() => {
     loadSources();
+    loadSourceTypes();
   }, [currentWorkspace]);
+
+  async function loadSourceTypes() {
+    try {
+      const response = await integrationApi.getSourceCatalog();
+      setSourceTypes(response.source_types);
+    } catch (error: any) {
+      console.error("Failed to load source types:", error);
+      toast.error("Failed to load available source types");
+    }
+  }
 
   async function loadSources() {
     if (!currentWorkspace) return;
@@ -299,12 +202,10 @@ export default function SourcesPage() {
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
-  const filteredCatalog = sourceTypesCatalog.filter((source) => {
-    const matchesSearch =
-      source.name.toLowerCase().includes(catalogSearchQuery.toLowerCase()) ||
-      source.description
-        .toLowerCase()
-        .includes(catalogSearchQuery.toLowerCase());
+  const filteredCatalog = sourceTypes.filter((source) => {
+    const matchesSearch = source.name
+      .toLowerCase()
+      .includes(catalogSearchQuery.toLowerCase());
     const matchesCategory =
       catalogCategory === "all" || source.category === catalogCategory;
     return matchesSearch && matchesCategory;
@@ -342,11 +243,7 @@ export default function SourcesPage() {
       // Fetch full source details including all configuration
       const fullSource = await integrationApi.getSource(source.id);
 
-      const sourceType = sourceTypesCatalog.find(
-        (st) =>
-          st.id === fullSource.type ||
-          st.name.toLowerCase() === fullSource.type.toLowerCase()
-      );
+      const sourceType = sourceTypes.find((st) => st.id === fullSource.type);
       setSelectedSourceType(sourceType || null);
       setEditingSource(fullSource);
       setFormData({
@@ -379,18 +276,20 @@ export default function SourcesPage() {
     setIsLoading(true);
     try {
       if (editingSource) {
-        // Update existing source
-        const updateData: Partial<Source> = {
-          name: formData.name,
-          type: formData.type,
-        };
+      // Update existing source
+      const updateData: Partial<Source> = {
+        name: formData.name,
+        type: formData.type,
+      };
 
-        if (
-          selectedSourceType.category === "database" ||
-          selectedSourceType.category === "file"
-        ) {
-          updateData.host = formData.host;
-          updateData.port = formData.port;
+      if (
+        selectedSourceType.id === "database" ||
+        selectedSourceType.id === "file" ||
+        getCategoryForType(formData.type) === "database" ||
+        getCategoryForType(formData.type) === "file"
+      ) {
+        updateData.host = formData.host;
+        updateData.port = formData.port ? formData.port : undefined;
           updateData.database = formData.database;
           updateData.username = formData.username;
           if (formData.password) {
@@ -409,7 +308,7 @@ export default function SourcesPage() {
           name: formData.name,
           type: formData.type,
           host: formData.host,
-          port: formData.port,
+          port: formData.port || undefined,
           database: formData.database,
           username: formData.username,
           password: formData.password,
@@ -740,7 +639,7 @@ export default function SourcesPage() {
               <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-6">
                   {filteredCatalog.map((sourceType) => {
-                    const TypeIcon = sourceType.icon;
+                    const TypeIcon = getIconForType(sourceType.id);
                     return (
                       <Card
                         key={sourceType.id}
@@ -766,7 +665,8 @@ export default function SourcesPage() {
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                                {sourceType.category}
+                                {sourceType.category.charAt(0).toUpperCase() +
+                                  sourceType.category.slice(1)}
                               </p>
                             </div>
                           </div>
@@ -778,7 +678,7 @@ export default function SourcesPage() {
                               Authentication
                             </p>
                             <div className="flex flex-wrap gap-1">
-                              {sourceType.authTypes
+                              {sourceType.auth_types
                                 .slice(0, 3)
                                 .map((auth, idx) => (
                                   <Badge
@@ -789,9 +689,9 @@ export default function SourcesPage() {
                                     {auth}
                                   </Badge>
                                 ))}
-                              {sourceType.authTypes.length > 3 && (
+                              {sourceType.auth_types.length > 3 && (
                                 <Badge variant="outline" className="text-xs">
-                                  +{sourceType.authTypes.length - 3}
+                                  +{sourceType.auth_types.length - 3}
                                 </Badge>
                               )}
                             </div>
