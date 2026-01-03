@@ -56,6 +56,14 @@ const data = {
           url: "/data-integration/pipelines",
         },
         {
+          title: "Pipeline Runs",
+          url: "/data-integration/pipeline-runs",
+        },
+        {
+          title: "Synced Data",
+          url: "/data-integration/synced-data",
+        },
+        {
           title: "Schedules",
           url: "/data-integration/schedules",
         },
