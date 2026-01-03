@@ -16,6 +16,7 @@ import {
   IconCopy,
   IconEye,
   IconLoader2,
+  IconTrendingUp,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { useWorkspace } from "@/contexts/WorkspaceContext";

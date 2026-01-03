@@ -7,8 +7,8 @@ import {
   IconTrash,
   IconClock,
   IconDotsVertical,
-  IconCheckCircle,
-  IconXCircle,
+  IconCircleCheck,
+  IconCircleX,
   IconLoader2,
   IconAlertCircle,
   IconStopwatch,
@@ -75,12 +75,12 @@ const statusConfig: Record<
   success: {
     label: "Success",
     variant: "default",
-    icon: <IconCheckCircle className="h-4 w-4" />,
+    icon: <IconCircleCheck className="h-4 w-4" />,
   },
   failed: {
     label: "Failed",
     variant: "destructive",
-    icon: <IconXCircle className="h-4 w-4" />,
+    icon: <IconCircleX className="h-4 w-4" />,
   },
   cancelled: {
     label: "Cancelled",
@@ -399,7 +399,7 @@ export default function PipelineRunsPage() {
                             {isLoading ? (
                               <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
-                              <IconXCircle className="h-3.5 w-3.5" />
+                              <IconCircleX className="h-3.5 w-3.5" />
                             )}
                           </Button>
                         )}
