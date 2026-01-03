@@ -67,6 +67,7 @@ class SourceViewSet(viewsets.ModelViewSet):
             source.save()
 
             return Response({
+                'success': test_result.success,
                 'status': 'success' if test_result.success else 'error',
                 'message': test_result.message,
                 'source_id': str(source.id),
@@ -80,6 +81,7 @@ class SourceViewSet(viewsets.ModelViewSet):
             source.save()
 
             return Response({
+                'success': False,
                 'status': 'error',
                 'message': f'Source test failed: {str(e)}',
                 'source_id': str(source.id),
@@ -88,6 +90,7 @@ class SourceViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             return Response({
+                'success': False,
                 'status': 'error',
                 'message': f'Unexpected error: {str(e)}',
                 'source_id': str(source.id)

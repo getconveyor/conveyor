@@ -70,13 +70,29 @@ const statusConfig: Record<
   {
     label: string;
     variant: "default" | "secondary" | "destructive" | "outline";
-    color: string;
+    className: string;
   }
 > = {
-  active: { label: "Active", variant: "default", color: "text-green-500" },
-  error: { label: "Error", variant: "destructive", color: "text-red-500" },
-  inactive: { label: "Inactive", variant: "secondary", color: "text-gray-500" },
-  testing: { label: "Testing", variant: "outline", color: "text-blue-500" },
+  active: {
+    label: "Active",
+    variant: "default",
+    className: "bg-green-500/10 text-green-700 border-green-500/20 hover:bg-green-500/20"
+  },
+  error: {
+    label: "Error",
+    variant: "destructive",
+    className: ""
+  },
+  inactive: {
+    label: "Inactive",
+    variant: "secondary",
+    className: ""
+  },
+  testing: {
+    label: "Testing",
+    variant: "outline",
+    className: "bg-blue-500/10 text-blue-700 border-blue-500/20 hover:bg-blue-500/20"
+  },
 };
 
 // Helper function to get icon for connection type
@@ -282,26 +298,37 @@ export default function SourcesPage() {
         type: formData.type,
       };
 
-      if (
-        selectedSourceType.id === "database" ||
-        selectedSourceType.id === "file" ||
-        getCategoryForType(formData.type) === "database" ||
-        getCategoryForType(formData.type) === "file"
-      ) {
+      const category = getCategoryForType(formData.type);
+
+      if (category === "database" || category === "file") {
         updateData.host = formData.host;
         updateData.port = formData.port ? formData.port : undefined;
-          updateData.database = formData.database;
-          updateData.username = formData.username;
-          if (formData.password) {
-            (updateData as any).password = formData.password;
-          }
-          updateData.ssl = formData.ssl;
+        updateData.database = formData.database;
+        updateData.username = formData.username;
+        if (formData.password) {
+          (updateData as any).password = formData.password;
         }
+        updateData.ssl = formData.ssl;
+      } else if (category === "api") {
+        updateData.host = formData.host;
+        if (formData.password) {
+          (updateData as any).password = formData.password;
+        }
+        if (formData.username) {
+          updateData.username = formData.username;
+        }
+      } else if (category === "cloud") {
+        updateData.database = formData.database;
+        updateData.username = formData.username;
+        if (formData.password) {
+          (updateData as any).password = formData.password;
+        }
+      }
 
-        updateData.config = formData.config;
+      updateData.config = formData.config;
 
-        await integrationApi.updateSource(editingSource.id, updateData);
-        toast.success("Source updated successfully");
+      await integrationApi.updateSource(editingSource.id, updateData);
+      toast.success("Source updated successfully");
       } else {
         // Create new source
         const createData: CreateSourceData = {
@@ -507,8 +534,11 @@ export default function SourcesPage() {
                 const SourceIcon = getIconForType(source.type);
                 const category = getCategoryForType(source.type);
                 return (
-                  <Card key={source.id}>
-                    <CardContent className="p-2">
+                  <Card
+                    key={source.id}
+                    className={source.status === "testing" ? "opacity-75 animate-pulse" : ""}
+                  >
+                    <CardContent className="p-2 relative">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="flex items-start gap-2">
                           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -572,8 +602,11 @@ export default function SourcesPage() {
                           variant={
                             statusConfig[source.status as SourceStatus].variant
                           }
-                          className="text-xs"
+                          className={`text-xs ${statusConfig[source.status as SourceStatus].className}`}
                         >
+                          {source.status === "testing" && (
+                            <IconLoader2 className="mr-1 h-3 w-3 animate-spin" />
+                          )}
                           {statusConfig[source.status as SourceStatus].label}
                         </Badge>
                         <span className="text-muted-foreground">
@@ -854,21 +887,164 @@ export default function SourcesPage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="api-key">
-                    API Key / Token{" "}
-                    {editingSource && "(leave empty to keep existing)"}
+                  <Label htmlFor="auth-type">Authentication Type *</Label>
+                  <Select
+                    value={formData.config.auth_type || "none"}
+                    onValueChange={(value) =>
+                      setFormData({
+                        ...formData,
+                        config: { ...formData.config, auth_type: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger id="auth-type">
+                      <SelectValue placeholder="Select authentication type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Authentication</SelectItem>
+                      <SelectItem value="bearer">Bearer Token</SelectItem>
+                      <SelectItem value="api_key">API Key (Header)</SelectItem>
+                      <SelectItem value="basic">Basic Auth</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.config.auth_type === "bearer" && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="bearer-token">
+                      Bearer Token{" "}
+                      {editingSource && "(leave empty to keep existing)"}
+                    </Label>
+                    <Input
+                      id="bearer-token"
+                      type="password"
+                      placeholder={
+                        editingSource
+                          ? "Leave empty to keep existing"
+                          : "Enter your bearer token"
+                      }
+                      value={formData.password}
+                      onChange={(e) =>
+                        setFormData({ ...formData, password: e.target.value })
+                      }
+                    />
+                  </div>
+                )}
+
+                {formData.config.auth_type === "api_key" && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label htmlFor="api-key-header">API Key Header Name</Label>
+                      <Input
+                        id="api-key-header"
+                        placeholder="X-API-Key"
+                        value={formData.config.api_key_header || "X-API-Key"}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            config: {
+                              ...formData.config,
+                              api_key_header: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="api-key">
+                        API Key{" "}
+                        {editingSource && "(leave empty to keep existing)"}
+                      </Label>
+                      <Input
+                        id="api-key"
+                        type="password"
+                        placeholder={
+                          editingSource
+                            ? "Leave empty to keep existing"
+                            : "Enter your API key"
+                        }
+                        value={formData.password}
+                        onChange={(e) =>
+                          setFormData({ ...formData, password: e.target.value })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+
+                {formData.config.auth_type === "basic" && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label htmlFor="basic-username">Username *</Label>
+                      <Input
+                        id="basic-username"
+                        placeholder="Enter username"
+                        value={formData.username}
+                        onChange={(e) =>
+                          setFormData({ ...formData, username: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="basic-password">
+                        Password{" "}
+                        {editingSource && "(leave empty to keep existing)"}
+                      </Label>
+                      <Input
+                        id="basic-password"
+                        type="password"
+                        placeholder={
+                          editingSource
+                            ? "Leave empty to keep existing"
+                            : "Enter password"
+                        }
+                        value={formData.password}
+                        onChange={(e) =>
+                          setFormData({ ...formData, password: e.target.value })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="grid gap-2">
+                  <Label htmlFor="test-endpoint">
+                    Test Endpoint (optional)
                   </Label>
                   <Input
-                    id="api-key"
-                    type="password"
-                    placeholder={
-                      editingSource
-                        ? "Leave empty to keep existing"
-                        : "Enter your API key or token"
-                    }
-                    value={formData.password}
+                    id="test-endpoint"
+                    placeholder="/health or /status"
+                    value={formData.config.test_endpoint || ""}
                     onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
+                      setFormData({
+                        ...formData,
+                        config: {
+                          ...formData.config,
+                          test_endpoint: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Path to use for testing connection (relative to base URL)
+                  </p>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="timeout">Request Timeout (seconds)</Label>
+                  <Input
+                    id="timeout"
+                    type="number"
+                    placeholder="30"
+                    value={formData.config.timeout || "30"}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        config: {
+                          ...formData.config,
+                          timeout: parseInt(e.target.value) || 30,
+                        },
+                      })
                     }
                   />
                 </div>

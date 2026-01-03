@@ -198,6 +198,7 @@ export const integrationApi = {
   async testSource(id: string): Promise<{ success: boolean; message: string }> {
     return apiClient.post(
       `/api/integration/sources/${id}/test/`,
+      {},
       getAuthOptions()
     );
   },

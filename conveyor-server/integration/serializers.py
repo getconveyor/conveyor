@@ -16,19 +16,39 @@ class SourceSerializer(serializers.ModelSerializer):
     """Serializer for Source model"""
 
     created_by_details = UserSerializer(source='created_by', read_only=True)
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = Source
         fields = [
             'id', 'workspace', 'name', 'type', 'host', 'port',
-            'database', 'username', 'password_encrypted', 'ssl',
+            'database', 'username', 'password', 'ssl',
             'status', 'last_tested', 'config', 'created_by',
             'created_by_details', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'workspace', 'created_at', 'updated_at', 'created_by_details', 'created_by', 'status', 'last_tested']
-        extra_kwargs = {
-            'password_encrypted': {'write_only': True}
-        }
+
+    def create(self, validated_data):
+        """Handle password encryption on create"""
+        password = validated_data.pop('password', None)
+        source = Source.objects.create(**validated_data)
+        if password:
+            source.set_password(password)
+            source.save()
+        return source
+
+    def update(self, instance, validated_data):
+        """Handle password encryption on update"""
+        password = validated_data.pop('password', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if password:
+            instance.set_password(password)
+
+        instance.save()
+        return instance
 
 
 class SourceListSerializer(serializers.ModelSerializer):
