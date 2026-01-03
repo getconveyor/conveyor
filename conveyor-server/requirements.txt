@@ -67,7 +67,7 @@ jsonschema==4.23.0
 pydantic==2.10.3
 
 # Encryption
-cryptography==46.0.3
+cryptography
 
 # Scheduling
 croniter==2.0.1
