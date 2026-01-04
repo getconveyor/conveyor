@@ -4,7 +4,8 @@ from .views import (
     TransformationViewSet,
     TransformationRuleViewSet,
     DataQualityCheckViewSet,
-    DataQualityResultViewSet
+    DataQualityResultViewSet,
+    NotebookViewSet
 )
 
 # Create a router and register our viewsets
@@ -13,6 +14,7 @@ router.register(r'transformations', TransformationViewSet, basename='transformat
 router.register(r'transformation-rules', TransformationRuleViewSet, basename='transformation-rule')
 router.register(r'quality-checks', DataQualityCheckViewSet, basename='quality-check')
 router.register(r'quality-results', DataQualityResultViewSet, basename='quality-result')
+router.register(r'notebooks', NotebookViewSet, basename='notebook')
 
 app_name = 'transformation'
 

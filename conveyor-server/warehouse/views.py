@@ -67,10 +67,13 @@ class TrinoQueryViewSet(viewsets.ViewSet):
                 cursor.execute(f"USE {catalog}.{schema}")
 
             # Execute query with limit
-            if limit and not any(keyword in query_text.upper() for keyword in ['LIMIT', 'CREATE', 'INSERT', 'UPDATE', 'DELETE']):
-                limited_query = f"{query_text.rstrip(';')} LIMIT {limit}"
+            # Strip trailing semicolons - Trino Python client doesn't expect them
+            clean_query = query_text.rstrip(';').strip()
+            
+            if limit and not any(keyword in clean_query.upper() for keyword in ['LIMIT', 'CREATE', 'INSERT', 'UPDATE', 'DELETE']):
+                limited_query = f"{clean_query} LIMIT {limit}"
             else:
-                limited_query = query_text
+                limited_query = clean_query
 
             cursor.execute(limited_query)
 

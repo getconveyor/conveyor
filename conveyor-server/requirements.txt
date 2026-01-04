@@ -80,3 +80,22 @@ cryptography
 # Scheduling
 croniter==2.0.1
 whitenoise==6.6.0
+
+# Observability - Structured Logging
+structlog==24.1.0
+
+# Observability - Metrics (Prometheus)
+prometheus-client==0.19.0
+django-prometheus==2.3.1
+
+# Observability - Distributed Tracing (OpenTelemetry)
+opentelemetry-api==1.22.0
+opentelemetry-sdk==1.22.0
+opentelemetry-instrumentation-django==0.43b0
+opentelemetry-instrumentation-celery==0.43b0
+opentelemetry-instrumentation-redis==0.43b0
+opentelemetry-instrumentation-psycopg2==0.43b0
+opentelemetry-exporter-otlp==1.22.0
+
+# Rate Limiting
+django-ratelimit==4.1.0

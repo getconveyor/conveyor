@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   IconPlus,
   IconSearch,
@@ -52,76 +52,15 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-
-interface Notebook {
-  id: string
-  name: string
-  description: string
-  kernel: string
-  lastModified: string
-  createdBy: string
-  cellCount: number
-  language: string
-}
-
-const initialNotebooks: Notebook[] = [
-  {
-    id: "1",
-    name: "Customer Segmentation Analysis",
-    description: "Cluster analysis for customer segmentation using K-means",
-    kernel: "Python 3.11",
-    lastModified: "2 hours ago",
-    createdBy: "Jane Smith",
-    cellCount: 24,
-    language: "python",
-  },
-  {
-    id: "2",
-    name: "Sales Forecasting Model",
-    description: "Time series forecasting using ARIMA and Prophet",
-    kernel: "Python 3.11",
-    lastModified: "1 day ago",
-    createdBy: "John Doe",
-    cellCount: 18,
-    language: "python",
-  },
-  {
-    id: "3",
-    name: "Data Quality Exploration",
-    description: "Exploratory data analysis for quality checks",
-    kernel: "Python 3.11",
-    lastModified: "3 days ago",
-    createdBy: "Sarah Wilson",
-    cellCount: 32,
-    language: "python",
-  },
-  {
-    id: "4",
-    name: "SQL Query Development",
-    description: "Complex SQL queries for data transformation",
-    kernel: "SQL",
-    lastModified: "1 week ago",
-    createdBy: "Mike Johnson",
-    cellCount: 15,
-    language: "sql",
-  },
-  {
-    id: "5",
-    name: "Feature Engineering Pipeline",
-    description: "Feature extraction and transformation for ML models",
-    kernel: "Python 3.11",
-    lastModified: "2 weeks ago",
-    createdBy: "Tom Brown",
-    cellCount: 28,
-    language: "python",
-  },
-]
+import { transformationApi, Notebook } from "@/lib/api/transformation"
+import { toast } from "sonner"
 
 export default function NotebooksPage() {
-  const [notebooks, setNotebooks] = useState<Notebook[]>(initialNotebooks)
+  const [notebooks, setNotebooks] = useState<Notebook[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [languageFilter, setLanguageFilter] = useState<string>("all")
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isActionLoading, setIsActionLoading] = useState(false)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [notebookToDelete, setNotebookToDelete] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -130,11 +69,29 @@ export default function NotebooksPage() {
     language: "python",
   })
 
+  const loadNotebooks = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const data = await transformationApi.getNotebooks(
+        languageFilter !== "all" ? languageFilter : undefined
+      )
+      setNotebooks(data)
+    } catch (error: any) {
+      console.error("Failed to load notebooks:", error)
+      toast.error(error.message || "Failed to load notebooks")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [languageFilter])
+
+  useEffect(() => {
+    loadNotebooks()
+  }, [loadNotebooks])
+
   const filteredNotebooks = notebooks.filter((notebook) => {
     const matchesSearch = notebook.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       notebook.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesLanguage = languageFilter === "all" || notebook.language === languageFilter
-    return matchesSearch && matchesLanguage
+    return matchesSearch
   })
 
   const stats = {
@@ -142,102 +99,94 @@ export default function NotebooksPage() {
     python: notebooks.filter(n => n.language === "python").length,
     sql: notebooks.filter(n => n.language === "sql").length,
     avgCells: notebooks.length > 0
-      ? Math.round(notebooks.reduce((acc, n) => acc + n.cellCount, 0) / notebooks.length)
+      ? Math.round(notebooks.reduce((acc, n) => acc + n.cell_count, 0) / notebooks.length)
       : 0,
   }
 
   const handleCreateNotebook = async () => {
     if (!formData.name.trim()) return
 
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    const newNotebook: Notebook = {
-      id: Date.now().toString(),
-      name: formData.name,
-      description: formData.description,
-      kernel: formData.language === "python" ? "Python 3.11" : "SQL",
-      lastModified: "Just now",
-      createdBy: "Current User",
-      cellCount: 1,
-      language: formData.language,
+    setIsActionLoading(true)
+    try {
+      await transformationApi.createNotebook({
+        name: formData.name,
+        description: formData.description,
+        language: formData.language,
+      })
+      toast.success("Notebook created successfully")
+      setIsCreateDialogOpen(false)
+      resetForm()
+      await loadNotebooks()
+    } catch (error: any) {
+      console.error("Failed to create notebook:", error)
+      toast.error(error.message || "Failed to create notebook")
+    } finally {
+      setIsActionLoading(false)
     }
-
-    setNotebooks([newNotebook, ...notebooks])
-    setIsLoading(false)
-    setIsCreateDialogOpen(false)
-    resetForm()
   }
 
   const handleRunNotebook = async (notebook: Notebook) => {
-    setIsLoading(true)
-    // Simulate running all cells
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
-    setNotebooks(notebooks =>
-      notebooks.map(n =>
-        n.id === notebook.id
-          ? { ...n, lastModified: "Just now" }
-          : n
-      )
-    )
-    setIsLoading(false)
+    setIsActionLoading(true)
+    try {
+      await transformationApi.runNotebook(notebook.id)
+      toast.success("Notebook executed successfully")
+      await loadNotebooks()
+    } catch (error: any) {
+      console.error("Failed to run notebook:", error)
+      toast.error(error.message || "Failed to run notebook")
+    } finally {
+      setIsActionLoading(false)
+    }
   }
 
   const handleDuplicateNotebook = async (notebook: Notebook) => {
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    const duplicatedNotebook: Notebook = {
-      ...notebook,
-      id: Date.now().toString(),
-      name: `${notebook.name} (Copy)`,
-      lastModified: "Just now",
+    setIsActionLoading(true)
+    try {
+      await transformationApi.duplicateNotebook(notebook.id)
+      toast.success("Notebook duplicated successfully")
+      await loadNotebooks()
+    } catch (error: any) {
+      console.error("Failed to duplicate notebook:", error)
+      toast.error(error.message || "Failed to duplicate notebook")
+    } finally {
+      setIsActionLoading(false)
     }
-    setNotebooks([duplicatedNotebook, ...notebooks])
-    setIsLoading(false)
   }
 
-  const handleExportNotebook = (notebook: Notebook) => {
-    // Create a simple notebook JSON structure
-    const notebookData = {
-      metadata: {
-        kernelspec: {
-          name: notebook.language,
-          display_name: notebook.kernel,
-        },
-      },
-      cells: Array.from({ length: notebook.cellCount }, (_, i) => ({
-        cell_type: "code",
-        execution_count: null,
-        metadata: {},
-        source: [`# Cell ${i + 1}\n`],
-        outputs: [],
-      })),
-    }
+  const handleExportNotebook = async (notebook: Notebook) => {
+    try {
+      const exportData = await transformationApi.exportNotebook(notebook.id)
 
-    // Create download link
-    const blob = new Blob([JSON.stringify(notebookData, null, 2)], { type: "application/json" })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${notebook.name.replace(/\s+/g, "_")}.ipynb`
-    a.click()
-    window.URL.revokeObjectURL(url)
+      // Create download link
+      const blob = new Blob([JSON.stringify(exportData.content, null, 2)], { type: "application/json" })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = exportData.filename
+      a.click()
+      window.URL.revokeObjectURL(url)
+      toast.success("Notebook exported successfully")
+    } catch (error: any) {
+      console.error("Failed to export notebook:", error)
+      toast.error(error.message || "Failed to export notebook")
+    }
   }
 
   const handleDeleteNotebook = async () => {
     if (!notebookToDelete) return
 
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 600))
-
-    setNotebooks(notebooks => notebooks.filter(n => n.id !== notebookToDelete))
-    setIsLoading(false)
-    setNotebookToDelete(null)
+    setIsActionLoading(true)
+    try {
+      await transformationApi.deleteNotebook(notebookToDelete)
+      toast.success("Notebook deleted successfully")
+      setNotebookToDelete(null)
+      await loadNotebooks()
+    } catch (error: any) {
+      console.error("Failed to delete notebook:", error)
+      toast.error(error.message || "Failed to delete notebook")
+    } finally {
+      setIsActionLoading(false)
+    }
   }
 
   const resetForm = () => {
@@ -317,8 +266,8 @@ export default function NotebooksPage() {
                   <SelectItem value="sql">SQL</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="icon">
-                <IconRefresh className="h-4 w-4" />
+              <Button variant="outline" size="icon" onClick={loadNotebooks} disabled={isLoading}>
+                <IconRefresh className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
               </Button>
             </div>
           </div>
@@ -342,8 +291,8 @@ export default function NotebooksPage() {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={isLoading}>
-                          {isLoading ? (
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={isActionLoading}>
+                          {isActionLoading ? (
                             <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <IconDotsVertical className="h-3.5 w-3.5" />
@@ -384,15 +333,15 @@ export default function NotebooksPage() {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <p className="text-muted-foreground">Cells</p>
-                      <p className="font-medium">{notebook.cellCount}</p>
+                      <p className="font-medium">{notebook.cell_count}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Modified</p>
-                      <p className="font-medium">{notebook.lastModified}</p>
+                      <p className="font-medium">{new Date(notebook.updated_at).toLocaleDateString()}</p>
                     </div>
                     <div className="col-span-2">
                       <p className="text-muted-foreground">Created by</p>
-                      <p className="font-medium">{notebook.createdBy}</p>
+                      <p className="font-medium">{notebook.created_by_name}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -460,12 +409,12 @@ export default function NotebooksPage() {
                 setIsCreateDialogOpen(false)
                 resetForm()
               }}
-              disabled={isLoading}
+              disabled={isActionLoading}
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateNotebook} disabled={!formData.name.trim() || isLoading}>
-              {isLoading ? (
+            <Button onClick={handleCreateNotebook} disabled={!formData.name.trim() || isActionLoading}>
+              {isActionLoading ? (
                 <>
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creating...
@@ -488,9 +437,9 @@ export default function NotebooksPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteNotebook} disabled={isLoading}>
-              {isLoading ? (
+            <AlertDialogCancel disabled={isActionLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteNotebook} disabled={isActionLoading}>
+              {isActionLoading ? (
                 <>
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
                   Deleting...

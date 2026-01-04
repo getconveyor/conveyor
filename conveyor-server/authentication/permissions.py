@@ -46,17 +46,50 @@ class IsWorkspaceOwnerOrAdmin(permissions.BasePermission):
 
 class IsWorkspaceMember(permissions.BasePermission):
     """
-    Permission check for any active workspace member
+    Permission check for any active workspace member.
+    Checks workspace from X-Workspace-ID header or object's workspace.
     """
 
     message = "You must be a member of this workspace to access it."
+
+    def has_permission(self, request, view):
+        """Check if user is an active member via X-Workspace-ID header"""
+        if not request.user or not request.user.is_authenticated:
+            return False
+            
+        workspace_id = request.headers.get('X-Workspace-ID')
+        if not workspace_id:
+            # No workspace header - defer to has_object_permission
+            return True
+            
+        try:
+            membership = WorkspaceMember.objects.get(
+                workspace_id=workspace_id,
+                user=request.user,
+                status='active'
+            )
+            return True
+        except WorkspaceMember.DoesNotExist:
+            return False
 
     def has_object_permission(self, request, view, obj):
         """Check if user is an active member of the workspace"""
         # obj could be a Workspace or a workspace-scoped object (Source, Pipeline, etc.)
         workspace = obj if hasattr(obj, '__class__') and obj.__class__.__name__ == 'Workspace' else getattr(obj, 'workspace', None)
         
+        # Also check workspace_id for models that use UUID field instead of FK
         if not workspace:
+            workspace_id = getattr(obj, 'workspace_id', None)
+            if workspace_id:
+                try:
+                    membership = WorkspaceMember.objects.get(
+                        workspace_id=workspace_id,
+                        user=request.user,
+                        status='active'
+                    )
+                    return True
+                except WorkspaceMember.DoesNotExist:
+                    return False
             return False
             
         try:

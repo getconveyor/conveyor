@@ -292,3 +292,62 @@ class Schedule(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.cron_expression}"
+
+
+class FailedPipelineRecord(models.Model):
+    """
+    Dead letter queue storage for failed pipeline records.
+    
+    Stores records that failed processing for later inspection,
+    retry, or manual intervention.
+    """
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    record_id = models.CharField(max_length=255, db_index=True)
+    pipeline_id = models.UUIDField(db_index=True)
+    pipeline_run_id = models.UUIDField(db_index=True)
+    
+    # Record details
+    stream = models.CharField(max_length=255)
+    data = models.JSONField(default=dict)
+    
+    # Error details
+    error_message = models.TextField()
+    error_type = models.CharField(max_length=255)
+    error_traceback = models.TextField(blank=True)
+    
+    # Retry tracking
+    attempt_count = models.IntegerField(default=1)
+    max_retries = models.IntegerField(default=3)
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending Retry'),
+        ('retrying', 'Retrying'),
+        ('recovered', 'Recovered'),
+        ('abandoned', 'Abandoned'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
+    # Timestamps
+    first_failed_at = models.DateTimeField()
+    last_failed_at = models.DateTimeField()
+    recovered_at = models.DateTimeField(null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'failed_pipeline_records'
+        ordering = ['-last_failed_at']
+        indexes = [
+            models.Index(fields=['pipeline_id', 'status']),
+            models.Index(fields=['pipeline_run_id']),
+            models.Index(fields=['status', '-last_failed_at']),
+        ]
+    
+    def __str__(self):
+        return f"DLQ: {self.stream} - {self.error_type}"
+    
+    def can_retry(self) -> bool:
+        """Check if this record can be retried"""
+        return self.attempt_count < self.max_retries and self.status == 'pending'

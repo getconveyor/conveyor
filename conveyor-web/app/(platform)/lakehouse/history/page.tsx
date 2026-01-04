@@ -1,8 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { getQueryHistory, deleteQuery, QueryHistory } from "@/lib/api/lakehouse";
-import { IconClock, IconRefresh, IconTrash, IconCode, IconCheck, IconX, IconLoader2 } from "@tabler/icons-react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  getQueryHistory,
+  deleteQuery,
+  QueryHistory,
+} from "@/lib/api/lakehouse";
+import {
+  IconClock,
+  IconRefresh,
+  IconTrash,
+  IconCode,
+  IconCheck,
+  IconX,
+  IconLoader2,
+} from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,11 +38,7 @@ export default function HistoryPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadHistory();
-  }, []);
-
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     setIsLoading(true);
     try {
       const history = await getQueryHistory();
@@ -45,7 +53,11 @@ export default function HistoryPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -84,7 +96,10 @@ export default function HistoryPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+    const variants: Record<
+      string,
+      "default" | "secondary" | "destructive" | "outline"
+    > = {
       finished: "default",
       failed: "destructive",
       running: "secondary",
@@ -108,7 +123,9 @@ export default function HistoryPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={loadHistory} disabled={isLoading}>
-            <IconRefresh className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            <IconRefresh
+              className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+            />
             Refresh
           </Button>
           <Link href="/lakehouse/sql-editor">
@@ -134,7 +151,9 @@ export default function HistoryPage() {
           <CardContent className="p-12 text-center text-muted-foreground">
             <IconClock className="h-12 w-12 mx-auto mb-4 opacity-20" />
             <p className="mb-2">No query history</p>
-            <p className="text-sm mb-4">Execute queries to see them appear here</p>
+            <p className="text-sm mb-4">
+              Execute queries to see them appear here
+            </p>
             <Link href="/lakehouse/sql-editor">
               <Button size="sm">Go to SQL Editor →</Button>
             </Link>
@@ -142,7 +161,7 @@ export default function HistoryPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {queries.map((query) => (
+          {queries?.map((query) => (
             <Card key={query.id}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-4">
@@ -162,9 +181,7 @@ export default function HistoryPage() {
                     </pre>
 
                     <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-                      <span>
-                        {new Date(query.created_at).toLocaleString()}
-                      </span>
+                      <span>{new Date(query.created_at).toLocaleString()}</span>
                       {query.rows_returned !== null && (
                         <span>{query.rows_returned.toLocaleString()} rows</span>
                       )}
@@ -175,13 +192,19 @@ export default function HistoryPage() {
                       )}
                       <span>Catalog: {query.catalog}</span>
                       {query.schema && <span>Schema: {query.schema}</span>}
-                      <span className="text-muted-foreground">By: {query.user_email}</span>
+                      <span className="text-muted-foreground">
+                        By: {query.user_email}
+                      </span>
                     </div>
 
                     {query.error_message && (
                       <div className="mt-2 p-2 rounded bg-destructive/10 border border-destructive/20">
-                        <p className="text-xs text-destructive font-medium">Error:</p>
-                        <p className="text-xs text-destructive/80">{query.error_message}</p>
+                        <p className="text-xs text-destructive font-medium">
+                          Error:
+                        </p>
+                        <p className="text-xs text-destructive/80">
+                          {query.error_message}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -209,12 +232,16 @@ export default function HistoryPage() {
         </CardContent>
       </Card>
 
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+      <AlertDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Query?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this query from history. This action cannot be undone.
+              This will permanently delete this query from history. This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

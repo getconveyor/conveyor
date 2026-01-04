@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { workspaceApi, WorkspaceMember } from '@/lib/api/workspace'
 import { MemberRow } from '@/components/workspace/member-row'
@@ -18,13 +18,7 @@ export default function MembersPage() {
   const [error, setError] = useState<string | null>(null)
   const [inviteModalOpen, setInviteModalOpen] = useState(false)
 
-  useEffect(() => {
-    if (currentWorkspace) {
-      loadMembers()
-    }
-  }, [currentWorkspace])
-
-  async function loadMembers() {
+  const loadMembers = useCallback(async () => {
     if (!currentWorkspace) return
 
     try {
@@ -48,7 +42,15 @@ export default function MembersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [currentWorkspace])
+
+  useEffect(() => {
+    if (currentWorkspace) {
+      loadMembers()
+    } else {
+      setLoading(false)
+    }
+  }, [currentWorkspace, loadMembers])
 
   if (!currentWorkspace) {
     return (

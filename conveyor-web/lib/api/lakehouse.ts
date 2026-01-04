@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, getAuthOptions } from "./client";
 
 export interface ExecuteQueryRequest {
   query: string;
@@ -10,7 +10,7 @@ export interface ExecuteQueryRequest {
 
 export interface ExecuteQueryResponse {
   query_id: string;
-  status: 'finished' | 'failed';
+  status: "finished" | "failed";
   columns: string[];
   data: Record<string, any>[];
   rows_returned: number;
@@ -22,7 +22,7 @@ export interface ExecuteQueryResponse {
 export interface IcebergTable {
   catalog: string;
   schema: string;
-  layer: 'bronze' | 'silver' | 'gold';
+  layer: "bronze" | "silver" | "gold";
   namespace: string;
   table_name: string;
   full_name: string;
@@ -44,7 +44,7 @@ export interface QueryHistory {
   query_text: string;
   catalog: string;
   schema: string | null;
-  status: 'running' | 'finished' | 'failed' | 'cancelled';
+  status: "running" | "finished" | "failed" | "cancelled";
   rows_returned: number | null;
   execution_time_ms: number | null;
   execution_time_display: string;
@@ -56,8 +56,14 @@ export interface QueryHistory {
 /**
  * Execute a Trino SQL query
  */
-export async function executeQuery(data: ExecuteQueryRequest): Promise<ExecuteQueryResponse> {
-  return apiClient.post<ExecuteQueryResponse>('/api/lakehouse/queries/execute/', data);
+export async function executeQuery(
+  data: ExecuteQueryRequest
+): Promise<ExecuteQueryResponse> {
+  return apiClient.post<ExecuteQueryResponse>(
+    "/api/lakehouse/queries/execute/",
+    data,
+    getAuthOptions()
+  );
 }
 
 /**
@@ -66,28 +72,48 @@ export async function executeQuery(data: ExecuteQueryRequest): Promise<ExecuteQu
 export async function listTables(params?: {
   catalog?: string;
   schema?: string;
-  layer?: 'bronze' | 'silver' | 'gold';
+  layer?: "bronze" | "silver" | "gold";
 }): Promise<TablesResponse> {
-  return apiClient.get<TablesResponse>('/api/lakehouse/queries/tables/', { params });
+  return apiClient.get<TablesResponse>("/api/lakehouse/queries/tables/", {
+    params,
+    ...getAuthOptions(),
+  });
+}
+
+interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
 }
 
 /**
  * Get query history
  */
 export async function getQueryHistory(): Promise<QueryHistory[]> {
-  return apiClient.get<QueryHistory[]>('/api/lakehouse/history/');
+  const response = await apiClient.get<PaginatedResponse<QueryHistory>>(
+    "/api/lakehouse/history/",
+    getAuthOptions()
+  );
+  return response.results || [];
 }
 
 /**
  * Get a specific query from history
  */
 export async function getQuery(id: string): Promise<QueryHistory> {
-  return apiClient.get<QueryHistory>(`/api/lakehouse/history/${id}/`);
+  return apiClient.get<QueryHistory>(
+    `/api/lakehouse/history/${id}/`,
+    getAuthOptions()
+  );
 }
 
 /**
  * Delete a query from history
  */
 export async function deleteQuery(id: string): Promise<void> {
-  await apiClient.delete(`/api/lakehouse/history/${id}/delete_query/`);
+  await apiClient.delete(
+    `/api/lakehouse/history/${id}/delete_query/`,
+    getAuthOptions()
+  );
 }

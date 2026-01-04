@@ -4,12 +4,13 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 
-from .models import Transformation, TransformationRule, DataQualityCheck, DataQualityResult
+from .models import Transformation, TransformationRule, DataQualityCheck, DataQualityResult, Notebook
 from .serializers import (
     TransformationSerializer, TransformationListSerializer,
     TransformationRuleSerializer,
     DataQualityCheckSerializer, DataQualityCheckListSerializer,
-    DataQualityResultSerializer, DataQualityResultListSerializer
+    DataQualityResultSerializer, DataQualityResultListSerializer,
+    NotebookSerializer, NotebookListSerializer
 )
 from authentication.permissions import IsWorkspaceMember
 
@@ -280,3 +281,123 @@ class DataQualityResultViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(result=result_filter)
 
         return queryset.order_by('-executed_at')
+
+
+class NotebookViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing notebooks.
+
+    Provides CRUD operations and notebook execution.
+    """
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return NotebookListSerializer
+        return NotebookSerializer
+
+    def get_queryset(self):
+        """Filter notebooks by user's current workspace"""
+        workspace_id = self.request.headers.get('X-Workspace-ID')
+        if not workspace_id:
+            return Notebook.objects.none()
+
+        queryset = Notebook.objects.filter(
+            workspace_id=workspace_id
+        ).select_related('created_by')
+
+        # Filter by language if provided
+        language = self.request.query_params.get('language')
+        if language:
+            queryset = queryset.filter(language=language)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        """Set workspace and created_by when creating notebook"""
+        workspace_id = self.request.headers.get('X-Workspace-ID')
+
+        # Set default kernel based on language
+        language = serializer.validated_data.get('language', 'python')
+        kernel = serializer.validated_data.get('kernel')
+        if not kernel:
+            kernel_map = {
+                'python': 'Python 3.11',
+                'sql': 'SQL',
+                'r': 'R'
+            }
+            kernel = kernel_map.get(language, 'Python 3.11')
+
+        serializer.save(
+            workspace_id=workspace_id,
+            created_by=self.request.user,
+            kernel=kernel,
+            cell_count=1,  # Start with 1 empty cell
+            content={'cells': [{'cell_type': 'code', 'source': '', 'outputs': []}]}
+        )
+
+    @action(detail=True, methods=['post'])
+    def run(self, request, pk=None):
+        """
+        Execute all cells in the notebook.
+
+        This is a placeholder - implement actual execution logic.
+        """
+        notebook = self.get_object()
+
+        notebook.status = 'running'
+        notebook.save()
+
+        # TODO: Implement actual notebook execution logic
+        # For now, just mark as idle after a simulated delay
+        notebook.status = 'idle'
+        notebook.last_executed = timezone.now()
+        notebook.save()
+
+        return Response({
+            'status': 'success',
+            'message': 'Notebook executed successfully',
+            'notebook_id': str(notebook.id),
+            'executed_at': notebook.last_executed
+        })
+
+    @action(detail=True, methods=['post'])
+    def duplicate(self, request, pk=None):
+        """Duplicate the notebook"""
+        original = self.get_object()
+
+        # Create a copy
+        duplicate = Notebook.objects.create(
+            workspace=original.workspace,
+            name=f"{original.name} (Copy)",
+            description=original.description,
+            language=original.language,
+            kernel=original.kernel,
+            content=original.content,
+            cell_count=original.cell_count,
+            created_by=request.user
+        )
+
+        serializer = NotebookSerializer(duplicate)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['get'])
+    def export(self, request, pk=None):
+        """Export the notebook as .ipynb file"""
+        notebook = self.get_object()
+
+        # Create Jupyter notebook format
+        notebook_data = {
+            'metadata': {
+                'kernelspec': {
+                    'name': notebook.language,
+                    'display_name': notebook.kernel
+                }
+            },
+            'cells': notebook.content.get('cells', [])
+        }
+
+        return Response({
+            'filename': f"{notebook.name.replace(' ', '_')}.ipynb",
+            'content': notebook_data
+        })

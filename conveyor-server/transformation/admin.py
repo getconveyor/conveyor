@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Transformation, TransformationRule, DataQualityCheck, DataQualityResult
+from .models import Transformation, TransformationRule, DataQualityCheck, DataQualityResult, Notebook
 
 
 class TransformationRuleInline(admin.TabularInline):
@@ -107,5 +107,36 @@ class DataQualityResultAdmin(admin.ModelAdmin):
         ('Details', {
             'fields': ('error_message', 'details'),
             'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(Notebook)
+class NotebookAdmin(admin.ModelAdmin):
+    """Admin interface for Notebook model"""
+
+    list_display = ('name', 'language', 'kernel', 'workspace', 'cell_count',
+                   'status', 'last_executed', 'created_by', 'created_at', 'updated_at')
+    list_filter = ('language', 'status', 'workspace', 'created_at')
+    search_fields = ('name', 'description', 'workspace__name', 'created_by__username')
+    readonly_fields = ('id', 'created_at', 'updated_at', 'last_executed', 'status')
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('id', 'workspace', 'name', 'description')
+        }),
+        ('Configuration', {
+            'fields': ('language', 'kernel', 'cell_count', 'status')
+        }),
+        ('Content', {
+            'fields': ('content',),
+            'classes': ('collapse',)
+        }),
+        ('Execution', {
+            'fields': ('last_executed',),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created_by', 'created_at', 'updated_at')
         }),
     )

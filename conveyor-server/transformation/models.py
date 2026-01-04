@@ -192,3 +192,49 @@ class DataQualityResult(models.Model):
 
     def __str__(self):
         return f"{self.quality_check.name} - {self.result} ({self.executed_at})"
+
+
+class Notebook(models.Model):
+    """Interactive notebook for data exploration and transformation"""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='notebooks')
+
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+
+    LANGUAGE_CHOICES = [
+        ('python', 'Python'),
+        ('sql', 'SQL'),
+        ('r', 'R'),
+    ]
+    language = models.CharField(max_length=50, choices=LANGUAGE_CHOICES, default='python')
+    kernel = models.CharField(max_length=100, default='Python 3.11')
+
+    # Notebook content
+    content = models.JSONField(default=dict, blank=True)  # Stores notebook cells and metadata
+    cell_count = models.IntegerField(default=0)
+
+    # Execution state
+    STATUS_CHOICES = [
+        ('idle', 'Idle'),
+        ('running', 'Running'),
+        ('error', 'Error'),
+    ]
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='idle')
+    last_executed = models.DateTimeField(null=True, blank=True)
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_notebooks')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'notebooks'
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['workspace', 'language']),
+            models.Index(fields=['created_by']),
+        ]
+
+    def __str__(self):
+        return self.name
