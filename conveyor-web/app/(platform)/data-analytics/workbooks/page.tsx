@@ -171,7 +171,6 @@ export default function WorkbooksPage() {
   )
 
   const handleCreateWorkbook = () => {
-    console.log("Creating workbook:", formData)
     setCreateDialogOpen(false)
     setFormData({ name: "", description: "" })
   }

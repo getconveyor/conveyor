@@ -147,12 +147,10 @@ export default function DashboardBuilderPage() {
   }
 
   const handleSave = () => {
-    console.log("Saving dashboard:", { name: dashboardName, widgets })
     // In a real app, would save to backend
   }
 
   const handlePreview = () => {
-    console.log("Preview dashboard")
     // In a real app, would open preview modal or navigate to preview page
   }
 

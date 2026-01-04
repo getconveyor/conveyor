@@ -172,7 +172,6 @@ export default function ReportsPage() {
   })
 
   const handleCreateReport = () => {
-    console.log("Creating report:", formData)
     setCreateDialogOpen(false)
     setFormData({
       name: "",

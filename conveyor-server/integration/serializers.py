@@ -63,36 +63,6 @@ class SourceListSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-# class DataSourceSerializer(serializers.ModelSerializer):
-#     """Serializer for DataSource model"""
-
-#     source_details = SourceListSerializer(source='source', read_only=True)
-
-#     class Meta:
-#         model = DataSource
-#         fields = [
-#             'id', 'workspace', 'source', 'source_details',
-#             'name', 'type', 'tables', 'status', 'last_sync',
-#             'record_count', 'created_at', 'updated_at'
-#         ]
-#         read_only_fields = ['id', 'created_at', 'updated_at', 'source_details']
-
-
-# class DataSourceListSerializer(serializers.ModelSerializer):
-#     """Lightweight serializer for listing data sources"""
-
-#     source_name = serializers.CharField(source='source.name', read_only=True)
-#     source_type = serializers.CharField(source='source.type', read_only=True)
-
-#     class Meta:
-#         model = DataSource
-#         fields = [
-#             'id', 'name', 'type', 'source_name', 'source_type',
-#             'status', 'last_sync', 'record_count', 'created_at'
-#         ]
-#         read_only_fields = fields
-
-
 class PipelineSerializer(serializers.ModelSerializer):
     """Serializer for Pipeline model"""
 

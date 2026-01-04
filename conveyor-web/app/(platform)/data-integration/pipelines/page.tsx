@@ -105,7 +105,9 @@ export default function PipelinesPage() {
     name: "",
     description: "",
     source: "",
-    destination: "",
+    layer: "bronze", // Lakehouse layer: "bronze" | "silver" | "gold"
+    namespace: "", // Logical grouping (e.g., "sales", "marketing")
+    table_name: "", // Table name within the layer
     schedule: "",
   });
 
@@ -164,7 +166,11 @@ export default function PipelinesPage() {
   }
 
   const handleCreateOrUpdatePipeline = async () => {
-    if (!formData.name.trim() || !formData.source || !formData.destination) {
+    if (
+      !formData.name.trim() ||
+      !formData.source ||
+      !formData.table_name.trim()
+    ) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -185,8 +191,18 @@ export default function PipelinesPage() {
           name: formData.name,
           description: formData.description,
           source: formData.source,
-          destination: formData.destination,
+          destination: formData.source, // Temporary: set to source, will be handled by backend
           schedule: formData.schedule || undefined,
+          config: {
+            destination_type: "lakehouse",
+            lakehouse: {
+              layer: formData.layer,
+              namespace: formData.namespace || "default",
+              table_name: formData.table_name,
+              format: "iceberg",
+              storage: "minio",
+            },
+          },
         };
         await integrationApi.createPipeline(createData);
         toast.success("Pipeline created successfully");
@@ -208,11 +224,18 @@ export default function PipelinesPage() {
 
   const handleEditPipeline = (pipeline: Pipeline) => {
     setEditingPipeline(pipeline);
+
+    // Support both old and new config formats
+    const lakehouseConfig = pipeline.config?.lakehouse;
+
     setFormData({
       name: pipeline.name,
       description: pipeline.description || "",
-      source: "", // Source IDs not directly available from pipeline
-      destination: "", // Will need to be selected again
+      source: pipeline.source || "", // Source ID from pipeline
+      layer: lakehouseConfig?.layer || "bronze",
+      namespace: lakehouseConfig?.namespace || "",
+      table_name:
+        lakehouseConfig?.table_name || pipeline.config?.table_name || "",
       schedule: pipeline.schedule || "",
     });
     setIsCreateDialogOpen(true);
@@ -323,17 +346,6 @@ export default function PipelinesPage() {
       toast.error(
         "Pipeline duplication requires source IDs - feature coming soon"
       );
-      // TODO: Implement when pipeline object includes source IDs
-      // const createData: CreatePipelineData = {
-      //   name: `${pipeline.name} (Copy)`,
-      //   description: pipeline.description,
-      //   source: pipeline.source,
-      //   destination: pipeline.destination,
-      //   schedule: pipeline.schedule,
-      // }
-      // await integrationApi.createPipeline(createData)
-      // toast.success('Pipeline duplicated successfully')
-      // await loadPipelines()
     } catch (error: any) {
       console.error("Failed to duplicate pipeline:", error);
       toast.error(error.message || "Failed to duplicate pipeline");
@@ -347,7 +359,9 @@ export default function PipelinesPage() {
       name: "",
       description: "",
       source: "",
-      destination: "",
+      layer: "bronze",
+      namespace: "",
+      table_name: "",
       schedule: "",
     });
     setEditingPipeline(null);
@@ -636,7 +650,7 @@ export default function PipelinesPage() {
         modal
       >
         <DialogContent
-          className="max-w-2xl"
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
@@ -704,34 +718,203 @@ export default function PipelinesPage() {
                   Configure sources in the Sources page
                 </p>
               </div>
+
+              {/* Lakehouse Layer Selection */}
               <div className="grid gap-2">
-                <Label htmlFor="destination">Destination</Label>
+                <Label htmlFor="layer" className="flex items-center gap-2">
+                  Lakehouse Layer *
+                  <span className="text-xs font-normal text-muted-foreground">
+                    (Medallion Architecture)
+                  </span>
+                </Label>
                 <Select
-                  value={formData.destination}
+                  value={formData.layer}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, destination: value })
+                    setFormData({ ...formData, layer: value })
                   }
                 >
-                  <SelectTrigger id="destination">
-                    <SelectValue placeholder="Select destination" />
+                  <SelectTrigger id="layer" className="h-auto">
+                    <SelectValue placeholder="Select data quality layer" />
                   </SelectTrigger>
                   <SelectContent>
-                    {sources.length === 0 ? (
-                      <SelectItem value="none" disabled>
-                        No sources available
-                      </SelectItem>
-                    ) : (
-                      sources.map((source) => (
-                        <SelectItem key={source.id} value={source.id}>
-                          {source.name} ({source.type})
-                        </SelectItem>
-                      ))
-                    )}
+                    <SelectItem value="bronze" className="py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">🥉</span>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-semibold">Bronze Layer</span>
+                          <span className="text-xs text-muted-foreground">
+                            Raw data • Exact copy from source • No
+                            transformations
+                          </span>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="silver" className="py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">🥈</span>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-semibold">Silver Layer</span>
+                          <span className="text-xs text-muted-foreground">
+                            Cleaned • Validated • Deduplicated • Type-safe
+                          </span>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="gold" className="py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">🥇</span>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-semibold">Gold Layer</span>
+                          <span className="text-xs text-muted-foreground">
+                            Business-ready • Aggregated • Optimized for BI
+                          </span>
+                        </div>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Select where the data will be synced to
-                </p>
+                <div className="flex items-start gap-2 p-3 rounded-md bg-muted/50 border">
+                  <span className="text-lg">
+                    {formData.layer === "bronze" && "🥉"}
+                    {formData.layer === "silver" && "🥈"}
+                    {formData.layer === "gold" && "🥇"}
+                  </span>
+                  <div className="text-xs space-y-1">
+                    {formData.layer === "bronze" && (
+                      <>
+                        <p className="font-medium">
+                          Bronze Layer (Landing Zone)
+                        </p>
+                        <p className="text-muted-foreground">
+                          Ingests raw data exactly as it appears in the source
+                          system. Useful for data lineage, auditing, and
+                          re-processing.
+                        </p>
+                      </>
+                    )}
+                    {formData.layer === "silver" && (
+                      <>
+                        <p className="font-medium">
+                          Silver Layer (Refined Zone)
+                        </p>
+                        <p className="text-muted-foreground">
+                          Applies data quality rules: removes duplicates,
+                          validates schemas, standardizes formats. Ready for
+                          analytics.
+                        </p>
+                      </>
+                    )}
+                    {formData.layer === "gold" && (
+                      <>
+                        <p className="font-medium">Gold Layer (Curated Zone)</p>
+                        <p className="text-muted-foreground">
+                          Business-level aggregations and metrics. Optimized
+                          tables for dashboards, reports, and ML models.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Namespace/Domain */}
+              <div className="grid gap-2">
+                <Label htmlFor="namespace" className="flex items-center gap-2">
+                  Database / Namespace
+                  <span className="text-xs font-normal text-muted-foreground">
+                    (Optional)
+                  </span>
+                </Label>
+                <Input
+                  id="namespace"
+                  placeholder="e.g., sales, marketing, finance, operations"
+                  value={formData.namespace}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      namespace: e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9_]/g, "_"),
+                    })
+                  }
+                />
+                <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <span>💡</span>
+                  <div>
+                    <p className="font-medium">
+                      Organize your tables by business domain
+                    </p>
+                    <p className="mt-1">
+                      Common namespaces:{" "}
+                      <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                        sales
+                      </code>
+                      ,{" "}
+                      <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                        marketing
+                      </code>
+                      ,{" "}
+                      <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                        finance
+                      </code>
+                      ,{" "}
+                      <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                        operations
+                      </code>
+                    </p>
+                    <p className="mt-1 text-muted-foreground">
+                      Leave empty to use{" "}
+                      <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                        default
+                      </code>{" "}
+                      namespace
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Table Name */}
+              <div className="grid gap-2">
+                <Label htmlFor="table_name">Table Name *</Label>
+                <Input
+                  id="table_name"
+                  placeholder={
+                    formData.layer === "bronze"
+                      ? "e.g., customer_orders, product_catalog"
+                      : formData.layer === "silver"
+                      ? "e.g., customers_cleaned, orders_validated"
+                      : "e.g., daily_sales_summary, customer_metrics"
+                  }
+                  value={formData.table_name}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      table_name: e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9_]/g, "_"),
+                    })
+                  }
+                />
+                <div className="flex items-start gap-2 p-3 rounded-md bg-primary/5 border border-primary/20">
+                  <span className="text-sm">📍</span>
+                  <div className="flex-1 text-xs space-y-1">
+                    <p className="font-medium text-primary">
+                      Full Iceberg Table Path:
+                    </p>
+                    <code className="block p-2 rounded bg-background border font-mono">
+                      iceberg.{formData.layer}.{formData.namespace || "default"}
+                      .{formData.table_name || "table_name"}
+                    </code>
+                    <p className="text-muted-foreground mt-2">
+                      Query in Trino:{" "}
+                      <code className="bg-muted px-1 py-0.5 rounded">
+                        SELECT * FROM iceberg.{formData.layer}.
+                        {formData.namespace || "default"}.
+                        {formData.table_name || "table_name"}
+                      </code>
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="grid gap-2">
@@ -765,7 +948,7 @@ export default function PipelinesPage() {
               disabled={
                 !formData.name.trim() ||
                 !formData.source ||
-                !formData.destination ||
+                !formData.table_name.trim() ||
                 isLoading
               }
             >

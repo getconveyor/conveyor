@@ -92,6 +92,8 @@ services:
       S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       S3_BUCKET: ${S3_BUCKET:-conveyor-storage}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
 
       # CORS
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
@@ -163,6 +165,8 @@ services:
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
 
       # Encryption Key for password storage
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-S5ffr3p0XI1yCl8-HENXVLcFpjkFGmmdsvUR6SyCJsg=}
@@ -212,6 +216,72 @@ services:
     networks:
       - conveyor-network
 
+  # Hive Metastore (for Iceberg catalog)
+  hive-metastore:
+    build:
+      context: ./hive-metastore
+      dockerfile: Dockerfile
+    container_name: conveyor-metastore
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: metastore
+      DB_DRIVER: postgres
+      SERVICE_OPTS: "-Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-conveyor} -Djavax.jdo.option.ConnectionUserName=${POSTGRES_USER:-conveyor} -Djavax.jdo.option.ConnectionPassword=${POSTGRES_PASSWORD:-conveyor_password}"
+      # S3 Configuration for MinIO
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3_ENDPOINT: http://minio:9000
+      S3_PATH_STYLE_ACCESS: "true"
+    ports:
+      - "${METASTORE_PORT:-9083}:9083"
+    volumes:
+      - metastore_data:/opt/hive/data/warehouse
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - conveyor-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9083"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Trino Query Engine (for SQL on Iceberg)
+  trino:
+    image: trinodb/trino:438
+    container_name: conveyor-trino
+    restart: unless-stopped
+    ports:
+      - "${TRINO_PORT:-8090}:8080"
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog:ro
+      - ./trino/config.properties:/etc/trino/config.properties:ro
+    environment:
+      # MinIO S3 credentials
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      AWS_REGION: us-east-1
+      # PostgreSQL credentials for federated queries
+      POSTGRES_USER: ${POSTGRES_USER:-conveyor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-conveyor_password}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      hive-metastore:
+        condition: service_healthy
+    networks:
+      - conveyor-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
 volumes:
   postgres_data:
     driver: local
@@ -222,6 +292,8 @@ volumes:
   static_volume:
     driver: local
   media_volume:
+    driver: local
+  metastore_data:
     driver: local
 
 networks:

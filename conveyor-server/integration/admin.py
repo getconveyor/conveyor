@@ -28,28 +28,6 @@ class SourceAdmin(admin.ModelAdmin):
     )
 
 
-# @admin.register(DataSource)
-# class DataSourceAdmin(admin.ModelAdmin):
-#     """Admin interface for DataSource model"""
-
-#     list_display = ('name', 'type', 'workspace', 'source', 'status', 'record_count', 'last_sync')
-#     list_filter = ('type', 'status', 'workspace', 'created_at')
-#     search_fields = ('name', 'workspace__name', 'source__name')
-#     readonly_fields = ('id', 'created_at', 'updated_at', 'last_sync')
-
-#     fieldsets = (
-#         ('Basic Information', {
-#             'fields': ('id', 'workspace', 'source', 'name', 'type', 'status')
-#         }),
-#         ('Data Details', {
-#             'fields': ('tables', 'record_count', 'last_sync')
-#         }),
-#         ('Metadata', {
-#             'fields': ('created_at', 'updated_at')
-#         }),
-#     )
-
-
 @admin.register(Pipeline)
 class PipelineAdmin(admin.ModelAdmin):
     """Admin interface for Pipeline model"""

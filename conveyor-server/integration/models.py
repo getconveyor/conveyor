@@ -117,42 +117,6 @@ class Source(models.Model):
         return ''
 
 
-# class DataSource(models.Model):
-#     """Data source linked to a source (specific tables/collections within a source)"""
-
-#     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-#     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='data_sources')
-#     source = models.ForeignKey(Source, on_delete=models.CASCADE, related_name='data_sources')
-
-#     name = models.CharField(max_length=255)
-#     type = models.CharField(max_length=100)  # table, collection, topic, etc.
-#     tables = models.JSONField(default=list, blank=True)  # List of tables/collections
-
-#     STATUS_CHOICES = [
-#         ('connected', 'Connected'),
-#         ('disconnected', 'Disconnected'),
-#         ('error', 'Error'),
-#     ]
-#     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='disconnected')
-
-#     last_sync = models.DateTimeField(null=True, blank=True)
-#     record_count = models.BigIntegerField(default=0)
-
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     updated_at = models.DateTimeField(auto_now=True)
-
-#     class Meta:
-#         db_table = 'data_sources'
-#         ordering = ['-created_at']
-#         indexes = [
-#             models.Index(fields=['workspace', 'status']),
-#             models.Index(fields=['source']),
-#         ]
-
-#     def __str__(self):
-#         return f"{self.name} - {self.source.name}"
-
-
 class Pipeline(models.Model):
     """Data integration pipeline"""
 

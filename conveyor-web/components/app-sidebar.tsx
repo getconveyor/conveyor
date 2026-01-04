@@ -5,6 +5,7 @@ import {
   IconArrowsExchange,
   IconBrain,
   IconChartBar,
+  IconDatabase,
   IconInnerShadowTop,
   IconServer,
   IconSettings,
@@ -44,16 +45,16 @@ const data = {
           url: "/data-integration",
         },
         {
-          title: "Source Connectors",
-          url: "/data-integration/source-connectors",
+          title: "Pipelines",
+          url: "/data-integration/pipelines",
         },
         {
           title: "Data Sources",
           url: "/data-integration/data-sources",
         },
         {
-          title: "Pipelines",
-          url: "/data-integration/pipelines",
+          title: "Schedules",
+          url: "/data-integration/schedules",
         },
         {
           title: "Pipeline Runs",
@@ -64,8 +65,8 @@ const data = {
           url: "/data-integration/synced-data",
         },
         {
-          title: "Schedules",
-          url: "/data-integration/schedules",
+          title: "Source Connectors",
+          url: "/data-integration/source-connectors",
         },
       ],
     },
@@ -97,56 +98,41 @@ const data = {
       ],
     },
     {
-      title: "Data Lake",
-      url: "/data-lake",
-      icon: IconStack,
+      title: "Lakehouse",
+      url: "/lakehouse",
+      icon: IconDatabase,
       items: [
         {
           title: "Overview",
-          url: "/data-lake",
+          url: "/lakehouse",
         },
         {
-          title: "Explorer",
-          url: "/data-lake/explorer",
+          title: "SQL Editor (Trino)",
+          url: "/lakehouse/sql-editor",
         },
         {
-          title: "Files & Folders",
-          url: "/data-lake/files",
+          title: "Bronze Layer",
+          url: "/lakehouse/bronze",
         },
         {
-          title: "Schemas",
-          url: "/data-lake/schemas",
+          title: "Silver Layer",
+          url: "/lakehouse/silver",
         },
         {
-          title: "Storage Settings",
-          url: "/data-lake/storage",
-        },
-      ],
-    },
-    {
-      title: "Data Warehouse",
-      url: "/data-warehouse",
-      icon: IconServer,
-      items: [
-        {
-          title: "Overview",
-          url: "/data-warehouse",
+          title: "Gold Layer",
+          url: "/lakehouse/gold",
         },
         {
-          title: "SQL Editor",
-          url: "/data-warehouse/editor",
-        },
-        {
-          title: "Tables & Views",
-          url: "/data-warehouse/tables",
+          title: "Table Explorer",
+          url: "/lakehouse/tables",
         },
         {
           title: "Query History",
-          url: "/data-warehouse/history",
+          url: "/lakehouse/history",
         },
         {
-          title: "Performance",
-          url: "/data-warehouse/performance",
+          title: "Storage Settings",
+          url: "/lakehouse/storage",
         },
       ],
     },

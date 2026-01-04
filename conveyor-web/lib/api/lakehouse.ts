@@ -1,0 +1,93 @@
+import { apiClient } from './client';
+
+export interface ExecuteQueryRequest {
+  query: string;
+  catalog?: string;
+  schema?: string;
+  name?: string;
+  limit?: number;
+}
+
+export interface ExecuteQueryResponse {
+  query_id: string;
+  status: 'finished' | 'failed';
+  columns: string[];
+  data: Record<string, any>[];
+  rows_returned: number;
+  execution_time_ms: number;
+  execution_time_display: string;
+  error?: string;
+}
+
+export interface IcebergTable {
+  catalog: string;
+  schema: string;
+  layer: 'bronze' | 'silver' | 'gold';
+  namespace: string;
+  table_name: string;
+  full_name: string;
+  row_count: number | null;
+}
+
+export interface TablesResponse {
+  catalog: string;
+  tables: IcebergTable[];
+  total_tables: number;
+}
+
+export interface QueryHistory {
+  id: string;
+  workspace_id: string;
+  user: string;
+  user_email: string;
+  name: string | null;
+  query_text: string;
+  catalog: string;
+  schema: string | null;
+  status: 'running' | 'finished' | 'failed' | 'cancelled';
+  rows_returned: number | null;
+  execution_time_ms: number | null;
+  execution_time_display: string;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+/**
+ * Execute a Trino SQL query
+ */
+export async function executeQuery(data: ExecuteQueryRequest): Promise<ExecuteQueryResponse> {
+  return apiClient.post<ExecuteQueryResponse>('/api/lakehouse/queries/execute/', data);
+}
+
+/**
+ * List Iceberg tables, optionally filtered by layer
+ */
+export async function listTables(params?: {
+  catalog?: string;
+  schema?: string;
+  layer?: 'bronze' | 'silver' | 'gold';
+}): Promise<TablesResponse> {
+  return apiClient.get<TablesResponse>('/api/lakehouse/queries/tables/', { params });
+}
+
+/**
+ * Get query history
+ */
+export async function getQueryHistory(): Promise<QueryHistory[]> {
+  return apiClient.get<QueryHistory[]>('/api/lakehouse/history/');
+}
+
+/**
+ * Get a specific query from history
+ */
+export async function getQuery(id: string): Promise<QueryHistory> {
+  return apiClient.get<QueryHistory>(`/api/lakehouse/history/${id}/`);
+}
+
+/**
+ * Delete a query from history
+ */
+export async function deleteQuery(id: string): Promise<void> {
+  await apiClient.delete(`/api/lakehouse/history/${id}/delete_query/`);
+}

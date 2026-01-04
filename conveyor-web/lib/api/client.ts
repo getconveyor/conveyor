@@ -9,6 +9,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 interface RequestOptions {
   token?: string;
   workspaceId?: string;
+  params?: any;
 }
 
 class ApiClient {
@@ -138,7 +139,7 @@ class ApiClient {
   }
 
   private getConfig(options: RequestOptions = {}): AxiosRequestConfig {
-    const { token, workspaceId } = options;
+    const { token, workspaceId, params } = options;
     const config: AxiosRequestConfig = {
       headers: {},
     };
@@ -149,6 +150,10 @@ class ApiClient {
 
     if (workspaceId) {
       config.headers!["X-Workspace-ID"] = workspaceId;
+    }
+
+    if (params) {
+      config.params = params;
     }
 
     return config;

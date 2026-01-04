@@ -86,22 +86,24 @@ const statusConfig: Record<
   active: {
     label: "Active",
     variant: "default",
-    className: "bg-green-500/10 text-green-700 border-green-500/20 hover:bg-green-500/20"
+    className:
+      "bg-green-500/10 text-green-700 border-green-500/20 hover:bg-green-500/20",
   },
   error: {
     label: "Error",
     variant: "destructive",
-    className: ""
+    className: "",
   },
   inactive: {
     label: "Inactive",
     variant: "secondary",
-    className: ""
+    className: "",
   },
   testing: {
     label: "Testing",
     variant: "outline",
-    className: "bg-blue-500/10 text-blue-700 border-blue-500/20 hover:bg-blue-500/20"
+    className:
+      "bg-blue-500/10 text-blue-700 border-blue-500/20 hover:bg-blue-500/20",
   },
 };
 
@@ -172,7 +174,10 @@ export default function SourcesPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [sourceToDelete, setSourceToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [sourceToDelete, setSourceToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -304,48 +309,48 @@ export default function SourcesPage() {
     setIsLoading(true);
     try {
       if (editingSource) {
-      // Update existing source
-      const updateData: Partial<Source> = {
-        name: formData.name,
-        type: formData.type,
-      };
+        // Update existing source
+        const updateData: Partial<Source> = {
+          name: formData.name,
+          type: formData.type,
+        };
 
-      const category = getCategoryForType(formData.type);
+        const category = getCategoryForType(formData.type);
 
-      // Special handling for BigQuery
-      if (formData.type === "bigquery") {
-        updateData.host = formData.host; // Project ID
-        updateData.database = formData.database; // Dataset ID (optional)
-        // Credentials are stored in config.credentials_json
-      } else if (category === "database" || category === "file") {
-        updateData.host = formData.host;
-        updateData.port = formData.port ? formData.port : undefined;
-        updateData.database = formData.database;
-        updateData.username = formData.username;
-        if (formData.password) {
-          (updateData as any).password = formData.password;
-        }
-        updateData.ssl = formData.ssl;
-      } else if (category === "api") {
-        updateData.host = formData.host;
-        if (formData.password) {
-          (updateData as any).password = formData.password;
-        }
-        if (formData.username) {
+        // Special handling for BigQuery
+        if (formData.type === "bigquery") {
+          updateData.host = formData.host; // Project ID
+          updateData.database = formData.database; // Dataset ID (optional)
+          // Credentials are stored in config.credentials_json
+        } else if (category === "database" || category === "file") {
+          updateData.host = formData.host;
+          updateData.port = formData.port ? formData.port : undefined;
+          updateData.database = formData.database;
           updateData.username = formData.username;
+          if (formData.password) {
+            (updateData as any).password = formData.password;
+          }
+          updateData.ssl = formData.ssl;
+        } else if (category === "api") {
+          updateData.host = formData.host;
+          if (formData.password) {
+            (updateData as any).password = formData.password;
+          }
+          if (formData.username) {
+            updateData.username = formData.username;
+          }
+        } else if (category === "cloud") {
+          updateData.database = formData.database;
+          updateData.username = formData.username;
+          if (formData.password) {
+            (updateData as any).password = formData.password;
+          }
         }
-      } else if (category === "cloud") {
-        updateData.database = formData.database;
-        updateData.username = formData.username;
-        if (formData.password) {
-          (updateData as any).password = formData.password;
-        }
-      }
 
-      updateData.config = formData.config;
+        updateData.config = formData.config;
 
-      await integrationApi.updateSource(editingSource.id, updateData);
-      toast.success("Source updated successfully");
+        await integrationApi.updateSource(editingSource.id, updateData);
+        toast.success("Source updated successfully");
       } else {
         // Create new source
         const createData: CreateSourceData = {
@@ -561,7 +566,11 @@ export default function SourcesPage() {
                 return (
                   <Card
                     key={source.id}
-                    className={source.status === "testing" ? "opacity-75 animate-pulse" : ""}
+                    className={
+                      source.status === "testing"
+                        ? "opacity-75 animate-pulse"
+                        : ""
+                    }
                   >
                     <CardContent className="p-3 relative">
                       {/* Header with icon, name, and actions */}
@@ -576,13 +585,22 @@ export default function SourcesPage() {
                                 {source.name}
                               </h3>
                               <Badge
-                                variant={statusConfig[source.status as SourceStatus].variant}
-                                className={`text-xs ${statusConfig[source.status as SourceStatus].className}`}
+                                variant={
+                                  statusConfig[source.status as SourceStatus]
+                                    .variant
+                                }
+                                className={`text-xs ${
+                                  statusConfig[source.status as SourceStatus]
+                                    .className
+                                }`}
                               >
                                 {source.status === "testing" && (
                                   <IconLoader2 className="mr-1 h-3 w-3 animate-spin" />
                                 )}
-                                {statusConfig[source.status as SourceStatus].label}
+                                {
+                                  statusConfig[source.status as SourceStatus]
+                                    .label
+                                }
                               </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">
@@ -592,23 +610,35 @@ export default function SourcesPage() {
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 flex-shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 flex-shrink-0"
+                            >
                               <IconDotsVertical className="h-3.5 w-3.5" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEditSource(source)}>
+                            <DropdownMenuItem
+                              onClick={() => handleEditSource(source)}
+                            >
                               <IconSettings className="mr-2 h-4 w-4" />
                               Edit Source
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleTestConnection(source.id, source.name)}>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleTestConnection(source.id, source.name)
+                              }
+                            >
                               <IconRefresh className="mr-2 h-4 w-4" />
                               Test Connection
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive"
-                              onClick={() => handleDeleteSource(source.id, source.name)}
+                              onClick={() =>
+                                handleDeleteSource(source.id, source.name)
+                              }
                             >
                               <IconTrash className="mr-2 h-4 w-4" />
                               Delete
@@ -620,12 +650,19 @@ export default function SourcesPage() {
                       {/* Host URL */}
                       {source.host && (
                         <p className="text-xs text-muted-foreground mb-2 line-clamp-1 pl-10">
-                          {source.host}{source.port ? `:${source.port}` : ""}
+                          {source.host}
+                          {source.port ? `:${source.port}` : ""}
                         </p>
                       )}
 
                       {/* Configuration and Metadata in 2 columns */}
-                      <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                      <div
+                        className={` pt-2 ${
+                          source.type === "api" && source.config
+                            ? "mt-2 border-t"
+                            : ""
+                        } text-xs text-muted-foreground`}
+                      >
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                           {/* API Config */}
                           {source.type === "api" && source.config && (
@@ -634,7 +671,9 @@ export default function SourcesPage() {
                                 <div className="flex items-center gap-1">
                                   <span className="font-medium">Auth:</span>
                                   <span className="capitalize truncate">
-                                    {source.config.auth_type === "api_key" ? "API Key" : source.config.auth_type}
+                                    {source.config.auth_type === "api_key"
+                                      ? "API Key"
+                                      : source.config.auth_type}
                                   </span>
                                 </div>
                               )}
@@ -647,7 +686,9 @@ export default function SourcesPage() {
                               {source.config.test_endpoint && (
                                 <div className="col-span-2 flex items-center gap-1">
                                   <span className="font-medium">Endpoint:</span>
-                                  <span className="truncate">{source.config.test_endpoint}</span>
+                                  <span className="truncate">
+                                    {source.config.test_endpoint}
+                                  </span>
                                 </div>
                               )}
                             </>
@@ -657,47 +698,63 @@ export default function SourcesPage() {
                           <div className="col-span-2 mt-1 pt-1 border-t">
                             <div className="flex items-center justify-between text-[11px]">
                               <span>
-                                <span className="font-medium">Created:</span>{' '}
-                                {new Date(source.created_at).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: '2-digit'
-                                })}{' '}
-                                {new Date(source.created_at).toLocaleTimeString('en-US', {
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
+                                <span className="font-medium">Created:</span>{" "}
+                                {new Date(source.created_at).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "2-digit",
+                                  }
+                                )}{" "}
+                                {new Date(source.created_at).toLocaleTimeString(
+                                  "en-US",
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  }
+                                )}
                               </span>
                             </div>
                             {source.updated_at && (
                               <div className="flex items-center justify-between text-[11px] mt-0.5">
                                 <span>
-                                  <span className="font-medium">Updated:</span>{' '}
-                                  {new Date(source.updated_at).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: '2-digit'
-                                  })}{' '}
-                                  {new Date(source.updated_at).toLocaleTimeString('en-US', {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
+                                  <span className="font-medium">Updated:</span>{" "}
+                                  {new Date(
+                                    source.updated_at
+                                  ).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "2-digit",
+                                  })}{" "}
+                                  {new Date(
+                                    source.updated_at
+                                  ).toLocaleTimeString("en-US", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
                                   })}
                                 </span>
                               </div>
                             )}
                             <div className="flex items-center justify-between text-[11px] mt-0.5">
                               <span>
-                                <span className="font-medium">Tested:</span>{' '}
+                                <span className="font-medium">
+                                  Last Tested:
+                                </span>{" "}
                                 {source.last_tested
-                                  ? `${new Date(source.last_tested).toLocaleDateString('en-US', {
-                                      month: 'short',
-                                      day: 'numeric',
-                                      year: '2-digit'
-                                    })} ${new Date(source.last_tested).toLocaleTimeString('en-US', {
-                                      hour: '2-digit',
-                                      minute: '2-digit'
+                                  ? `${new Date(
+                                      source.last_tested
+                                    ).toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "2-digit",
+                                    })} ${new Date(
+                                      source.last_tested
+                                    ).toLocaleTimeString("en-US", {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
                                     })}`
-                                  : 'Never'}
+                                  : "Never"}
                               </span>
                             </div>
                           </div>
@@ -885,77 +942,78 @@ export default function SourcesPage() {
               />
             </div>
 
-            {selectedSourceType?.category === "database" && selectedSourceType?.id !== "bigquery" && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
+            {selectedSourceType?.category === "database" &&
+              selectedSourceType?.id !== "bigquery" && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="db-host">Host *</Label>
+                      <Input
+                        id="db-host"
+                        placeholder="localhost"
+                        value={formData.host}
+                        onChange={(e) =>
+                          setFormData({ ...formData, host: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="db-port">Port</Label>
+                      <Input
+                        id="db-port"
+                        placeholder="3306"
+                        value={formData.port}
+                        onChange={(e) =>
+                          setFormData({ ...formData, port: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="db-host">Host *</Label>
+                    <Label htmlFor="db-name">Database Name</Label>
                     <Input
-                      id="db-host"
-                      placeholder="localhost"
-                      value={formData.host}
+                      id="db-name"
+                      placeholder="my_database"
+                      value={formData.database}
                       onChange={(e) =>
-                        setFormData({ ...formData, host: e.target.value })
+                        setFormData({ ...formData, database: e.target.value })
                       }
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="db-port">Port</Label>
-                    <Input
-                      id="db-port"
-                      placeholder="3306"
-                      value={formData.port}
-                      onChange={(e) =>
-                        setFormData({ ...formData, port: e.target.value })
-                      }
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="db-user">Username</Label>
+                      <Input
+                        id="db-user"
+                        placeholder="username"
+                        value={formData.username}
+                        onChange={(e) =>
+                          setFormData({ ...formData, username: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="db-password">
+                        Password{" "}
+                        {editingSource && "(leave empty to keep existing)"}
+                      </Label>
+                      <Input
+                        id="db-password"
+                        type="password"
+                        placeholder={
+                          editingSource
+                            ? "Leave empty to keep existing"
+                            : "••••••••"
+                        }
+                        value={formData.password}
+                        onChange={(e) =>
+                          setFormData({ ...formData, password: e.target.value })
+                        }
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="db-name">Database Name</Label>
-                  <Input
-                    id="db-name"
-                    placeholder="my_database"
-                    value={formData.database}
-                    onChange={(e) =>
-                      setFormData({ ...formData, database: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="db-user">Username</Label>
-                    <Input
-                      id="db-user"
-                      placeholder="username"
-                      value={formData.username}
-                      onChange={(e) =>
-                        setFormData({ ...formData, username: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="db-password">
-                      Password{" "}
-                      {editingSource && "(leave empty to keep existing)"}
-                    </Label>
-                    <Input
-                      id="db-password"
-                      type="password"
-                      placeholder={
-                        editingSource
-                          ? "Leave empty to keep existing"
-                          : "••••••••"
-                      }
-                      value={formData.password}
-                      onChange={(e) =>
-                        setFormData({ ...formData, password: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-              </>
-            )}
+                </>
+              )}
 
             {selectedSourceType?.category === "api" && (
               <>
@@ -1019,7 +1077,9 @@ export default function SourcesPage() {
                 {formData.config.auth_type === "api_key" && (
                   <>
                     <div className="grid gap-2">
-                      <Label htmlFor="api-key-header">API Key Header Name</Label>
+                      <Label htmlFor="api-key-header">
+                        API Key Header Name
+                      </Label>
                       <Input
                         id="api-key-header"
                         placeholder="X-API-Key"
@@ -1191,67 +1251,73 @@ export default function SourcesPage() {
               </>
             )}
 
-            {selectedSourceType?.category === "cloud" && selectedSourceType?.id !== "bigquery" && (
-              <>
-                <div className="grid gap-2">
-                  <Label htmlFor="cloud-region">Region</Label>
-                  <Input
-                    id="cloud-region"
-                    placeholder="us-east-1"
-                    value={formData.config.region || ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        config: { ...formData.config, region: e.target.value },
-                      })
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="bucket-name">Bucket / Container Name *</Label>
-                  <Input
-                    id="bucket-name"
-                    placeholder="my-bucket"
-                    value={formData.database}
-                    onChange={(e) =>
-                      setFormData({ ...formData, database: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+            {selectedSourceType?.category === "cloud" &&
+              selectedSourceType?.id !== "bigquery" && (
+                <>
                   <div className="grid gap-2">
-                    <Label htmlFor="access-key">Access Key *</Label>
+                    <Label htmlFor="cloud-region">Region</Label>
                     <Input
-                      id="access-key"
-                      placeholder="Access key"
-                      value={formData.username}
+                      id="cloud-region"
+                      placeholder="us-east-1"
+                      value={formData.config.region || ""}
                       onChange={(e) =>
-                        setFormData({ ...formData, username: e.target.value })
+                        setFormData({
+                          ...formData,
+                          config: {
+                            ...formData.config,
+                            region: e.target.value,
+                          },
+                        })
                       }
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="secret-key">
-                      Secret Key{" "}
-                      {editingSource && "(leave empty to keep existing)"} *
+                    <Label htmlFor="bucket-name">
+                      Bucket / Container Name *
                     </Label>
                     <Input
-                      id="secret-key"
-                      type="password"
-                      placeholder={
-                        editingSource
-                          ? "Leave empty to keep existing"
-                          : "••••••••"
-                      }
-                      value={formData.password}
+                      id="bucket-name"
+                      placeholder="my-bucket"
+                      value={formData.database}
                       onChange={(e) =>
-                        setFormData({ ...formData, password: e.target.value })
+                        setFormData({ ...formData, database: e.target.value })
                       }
                     />
                   </div>
-                </div>
-              </>
-            )}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="access-key">Access Key *</Label>
+                      <Input
+                        id="access-key"
+                        placeholder="Access key"
+                        value={formData.username}
+                        onChange={(e) =>
+                          setFormData({ ...formData, username: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="secret-key">
+                        Secret Key{" "}
+                        {editingSource && "(leave empty to keep existing)"} *
+                      </Label>
+                      <Input
+                        id="secret-key"
+                        type="password"
+                        placeholder={
+                          editingSource
+                            ? "Leave empty to keep existing"
+                            : "••••••••"
+                        }
+                        value={formData.password}
+                        onChange={(e) =>
+                          setFormData({ ...formData, password: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
             {selectedSourceType?.category === "file" && (
               <>
@@ -1358,7 +1424,8 @@ export default function SourcesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Source</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{sourceToDelete?.name}"? This action cannot be undone.
+              Are you sure you want to delete "{sourceToDelete?.name}"? This
+              action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

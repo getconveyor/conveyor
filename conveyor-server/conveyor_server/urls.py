@@ -46,7 +46,7 @@ urlpatterns = [
     path('api/integration/', include('integration.urls')),
     path('api/transformation/', include('transformation.urls')),
     path('api/data-lake/', include('data_lake.urls')),
-    # path('api/', include('warehouse.urls')),
+    path('api/lakehouse/', include('warehouse.urls')),
     # path('api/', include('streaming.urls')),
     # path('api/', include('analytics.urls')),
     # path('api/', include('data_science.urls')),

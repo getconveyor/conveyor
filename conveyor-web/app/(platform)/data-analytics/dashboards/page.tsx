@@ -148,7 +148,6 @@ export default function DashboardsPage() {
 
   const handleCreateDashboard = () => {
     // In a real app, this would create the dashboard and navigate to builder
-    console.log("Creating dashboard:", formData)
     setCreateDialogOpen(false)
     setFormData({ name: "", description: "" })
   }
