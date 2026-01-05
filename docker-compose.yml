@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
@@ -203,6 +201,13 @@ services:
       # Redis (Celery broker)
       REDIS_HOST: redis
       REDIS_PORT: 6379
+
+      # MinIO/S3
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
 
       # Encryption Key for password storage
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-S5ffr3p0XI1yCl8-HENXVLcFpjkFGmmdsvUR6SyCJsg=}

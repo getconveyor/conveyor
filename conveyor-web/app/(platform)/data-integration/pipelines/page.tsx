@@ -650,7 +650,7 @@ export default function PipelinesPage() {
         modal
       >
         <DialogContent
-          className="w-[70%] max-w-none max-h-[90vh] overflow-y-auto"
+          className="!w-[70%] !max-w-none max-h-[90vh] overflow-y-auto sm:!max-w-[70%]"
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
@@ -690,24 +690,26 @@ export default function PipelinesPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="source">Source</Label>
+                <Label htmlFor="source">Source *</Label>
                 <Select
-                  value={formData.source}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, source: value })
-                  }
+                  value={formData.source || ""}
+                  onValueChange={(value) => {
+                    console.log("Source selected:", value);
+                    setFormData({ ...formData, source: value });
+                  }}
+                  disabled={!!editingPipeline} // Can't change source when editing
                 >
                   <SelectTrigger id="source">
                     <SelectValue placeholder="Select source" />
                   </SelectTrigger>
                   <SelectContent>
                     {sources.length === 0 ? (
-                      <SelectItem value="none" disabled>
+                      <SelectItem value="__none__" disabled>
                         No sources available
                       </SelectItem>
                     ) : (
                       sources.map((source) => (
-                        <SelectItem key={source.id} value={source.id}>
+                        <SelectItem key={source.id} value={String(source.id)}>
                           {source.name} ({source.type})
                         </SelectItem>
                       ))
@@ -715,7 +717,9 @@ export default function PipelinesPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Configure sources in the Sources page
+                  {editingPipeline
+                    ? "Source cannot be changed after creation"
+                    : "Configure sources in the Sources page"}
                 </p>
               </div>
 
@@ -946,10 +950,10 @@ export default function PipelinesPage() {
             <Button
               onClick={handleCreateOrUpdatePipeline}
               disabled={
+                isLoading ||
                 !formData.name.trim() ||
-                !formData.source ||
                 !formData.table_name.trim() ||
-                isLoading
+                (!editingPipeline && !formData.source) // Source required only for new pipelines
               }
             >
               {isLoading ? (

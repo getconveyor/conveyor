@@ -1,5 +1,5 @@
 # Stage 1: Base
-FROM python:3.11-slim as base
+FROM python:3.11-slim AS base
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Stage 2: Dependencies
-FROM base as deps
+FROM base AS deps
 
 # Copy requirements file
 COPY requirements.txt .
@@ -30,7 +30,7 @@ RUN pip install --no-cache-dir \
     -r requirements.txt
 
 # Stage 3: Production
-FROM base as runner
+FROM base AS runner
 
 # Copy installed dependencies from deps stage
 COPY --from=deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
