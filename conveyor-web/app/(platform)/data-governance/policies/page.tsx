@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react";
 import {
   IconPlus,
   IconSearch,
@@ -13,25 +13,26 @@ import {
   IconToggleLeft,
   IconToggleRight,
   IconLoader2,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+  IconAlertCircle,
+} from "@tabler/icons-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -39,7 +40,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,109 +50,98 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { governanceApi, Policy as ApiPolicy } from "@/lib/api/governance";
 
 interface Policy {
-  id: string
-  name: string
-  description: string
-  type: string
-  status: "active" | "inactive"
-  scope: string
-  rules: number
-  createdBy: string
-  createdAt: string
-  lastModified: string
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  status: "active" | "inactive";
+  scope: string;
+  rules: number;
+  createdBy: string;
+  createdAt: string;
+  lastModified: string;
 }
 
-const initialPolicies: Policy[] = [
-  {
-    id: "1",
-    name: "PII Data Access Control",
-    description: "Restrict access to personally identifiable information",
-    type: "Access Control",
-    status: "active",
-    scope: "customer_data.*",
-    rules: 5,
-    createdBy: "Jane Smith",
-    createdAt: "2 weeks ago",
-    lastModified: "2 hours ago",
-  },
-  {
-    id: "2",
-    name: "Data Retention Policy",
-    description: "Automatically archive data after 90 days",
-    type: "Retention",
-    status: "active",
-    scope: "analytics.*",
-    rules: 3,
-    createdBy: "John Doe",
-    createdAt: "1 month ago",
-    lastModified: "1 week ago",
-  },
-  {
-    id: "3",
-    name: "Data Masking for Non-Prod",
-    description: "Mask sensitive fields in non-production environments",
-    type: "Masking",
-    status: "active",
-    scope: "*.staging",
-    rules: 8,
-    createdBy: "Sarah Wilson",
-    createdAt: "3 weeks ago",
-    lastModified: "3 days ago",
-  },
-  {
-    id: "4",
-    name: "Audit Logging",
-    description: "Log all access to financial data",
-    type: "Audit",
-    status: "inactive",
-    scope: "finance.*",
-    rules: 2,
-    createdBy: "Mike Johnson",
-    createdAt: "2 months ago",
-    lastModified: "1 month ago",
-  },
-]
+const mapApiPolicyToPolicy = (policy: ApiPolicy): Policy => {
+  return {
+    id: policy.id,
+    name: policy.name,
+    description: policy.description || "",
+    type: policy.policy_type || "Access Control",
+    status: policy.is_active ? "active" : "inactive",
+    scope: "*",
+    rules: policy.rules ? Object.keys(policy.rules).length : 0,
+    createdBy: policy.created_by_name || "System",
+    createdAt: policy.created_at
+      ? new Date(policy.created_at).toLocaleDateString()
+      : "Unknown",
+    lastModified: policy.updated_at
+      ? new Date(policy.updated_at).toLocaleString()
+      : "Unknown",
+  };
+};
 
 export default function PoliciesPage() {
-  const [policies, setPolicies] = useState<Policy[]>(initialPolicies)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [typeFilter, setTypeFilter] = useState<string>("all")
-  const [isLoading, setIsLoading] = useState(false)
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [policyToDelete, setPolicyToDelete] = useState<string | null>(null)
-  const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null)
+  const [policies, setPolicies] = useState<Policy[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [policyToDelete, setPolicyToDelete] = useState<string | null>(null);
+  const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     type: "Access Control",
     scope: "",
-  })
+  });
+
+  const loadPolicies = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const apiPolicies = await governanceApi.getPolicies();
+      setPolicies(apiPolicies.map(mapApiPolicyToPolicy));
+    } catch (err) {
+      console.error("Failed to load policies:", err);
+      setError("Failed to load policies");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPolicies();
+  }, [loadPolicies]);
 
   const filteredPolicies = policies.filter((policy) => {
-    const matchesSearch = policy.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      policy.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesType = typeFilter === "all" || policy.type === typeFilter
-    return matchesSearch && matchesType
-  })
+    const matchesSearch =
+      policy.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      policy.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = typeFilter === "all" || policy.type === typeFilter;
+    return matchesSearch && matchesType;
+  });
 
   const stats = {
     total: policies.length,
-    active: policies.filter(p => p.status === "active").length,
-    inactive: policies.filter(p => p.status === "inactive").length,
+    active: policies.filter((p) => p.status === "active").length,
+    inactive: policies.filter((p) => p.status === "inactive").length,
     totalRules: policies.reduce((acc, p) => acc + p.rules, 0),
-  }
+  };
 
   const handleCreatePolicy = async () => {
-    if (!formData.name.trim()) return
+    if (!formData.name.trim()) return;
 
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    setIsLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     const newPolicy: Policy = {
       id: Date.now().toString(),
@@ -164,68 +154,79 @@ export default function PoliciesPage() {
       createdBy: "Current User",
       createdAt: "Just now",
       lastModified: "Just now",
-    }
+    };
 
-    setPolicies([newPolicy, ...policies])
-    setIsLoading(false)
-    setIsCreateDialogOpen(false)
-    resetForm()
-  }
+    setPolicies([newPolicy, ...policies]);
+    setIsLoading(false);
+    setIsCreateDialogOpen(false);
+    resetForm();
+  };
 
   const handleEditPolicy = async () => {
-    if (!selectedPolicy || !formData.name.trim()) return
+    if (!selectedPolicy || !formData.name.trim()) return;
 
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 800))
+    setIsLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
-    setPolicies(policies =>
-      policies.map(p =>
+    setPolicies((policies) =>
+      policies.map((p) =>
         p.id === selectedPolicy.id
-          ? { ...p, name: formData.name, description: formData.description, type: formData.type, scope: formData.scope, lastModified: "Just now" }
+          ? {
+              ...p,
+              name: formData.name,
+              description: formData.description,
+              type: formData.type,
+              scope: formData.scope,
+              lastModified: "Just now",
+            }
           : p
       )
-    )
-    setIsLoading(false)
-    setIsEditDialogOpen(false)
-    setSelectedPolicy(null)
-    resetForm()
-  }
+    );
+    setIsLoading(false);
+    setIsEditDialogOpen(false);
+    setSelectedPolicy(null);
+    resetForm();
+  };
 
   const handleTogglePolicy = async (policy: Policy) => {
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 600))
+    setIsLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 600));
 
-    setPolicies(policies =>
-      policies.map(p =>
+    setPolicies((policies) =>
+      policies.map((p) =>
         p.id === policy.id
-          ? { ...p, status: p.status === "active" ? "inactive" : "active", lastModified: "Just now" }
+          ? {
+              ...p,
+              status: p.status === "active" ? "inactive" : "active",
+              lastModified: "Just now",
+            }
           : p
       )
-    )
-    setIsLoading(false)
-  }
+    );
+    setIsLoading(false);
+  };
 
   const handleDeletePolicy = async () => {
-    if (!policyToDelete) return
+    if (!policyToDelete) return;
 
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 600))
+    setIsLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 600));
 
-    setPolicies(policies => policies.filter(p => p.id !== policyToDelete))
-    setIsLoading(false)
-    setPolicyToDelete(null)
-  }
+    setPolicies((policies) => policies.filter((p) => p.id !== policyToDelete));
+    setIsLoading(false);
+    setPolicyToDelete(null);
+  };
 
   const openEditDialog = (policy: Policy) => {
-    setSelectedPolicy(policy)
+    setSelectedPolicy(policy);
     setFormData({
       name: policy.name,
       description: policy.description,
       type: policy.type,
       scope: policy.scope,
-    })
-    setIsEditDialogOpen(true)
-  }
+    });
+    setIsEditDialogOpen(true);
+  };
 
   const resetForm = () => {
     setFormData({
@@ -233,8 +234,8 @@ export default function PoliciesPage() {
       description: "",
       type: "Access Control",
       scope: "",
-    })
-  }
+    });
+  };
 
   return (
     <>
@@ -255,25 +256,37 @@ export default function PoliciesPage() {
       <div className="grid gap-2 md:grid-cols-4">
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Total Policies</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Total Policies
+            </div>
             <div className="text-xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Active</div>
-            <div className="text-xl font-bold text-green-500">{stats.active}</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Active
+            </div>
+            <div className="text-xl font-bold text-green-500">
+              {stats.active}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Inactive</div>
-            <div className="text-xl font-bold text-gray-500">{stats.inactive}</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Inactive
+            </div>
+            <div className="text-xl font-bold text-gray-500">
+              {stats.inactive}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Total Rules</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Total Rules
+            </div>
             <div className="text-xl font-bold">{stats.totalRules}</div>
           </CardContent>
         </Card>
@@ -323,7 +336,12 @@ export default function PoliciesPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <IconShield className="h-4 w-4 text-muted-foreground" />
                         <h3 className="font-semibold text-sm">{policy.name}</h3>
-                        <Badge variant={policy.status === "active" ? "default" : "secondary"} className="text-xs">
+                        <Badge
+                          variant={
+                            policy.status === "active" ? "default" : "secondary"
+                          }
+                          className="text-xs"
+                        >
                           {policy.status}
                         </Badge>
                         <Badge variant="outline" className="text-xs">
@@ -336,7 +354,9 @@ export default function PoliciesPage() {
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
                         <div>
                           <p className="text-muted-foreground">Scope</p>
-                          <p className="font-medium font-mono">{policy.scope}</p>
+                          <p className="font-medium font-mono">
+                            {policy.scope}
+                          </p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Rules</p>
@@ -365,14 +385,25 @@ export default function PoliciesPage() {
                         disabled={isLoading}
                       >
                         {policy.status === "active" ? (
-                          <><IconToggleRight className="h-3.5 w-3.5 mr-1" />Disable</>
+                          <>
+                            <IconToggleRight className="h-3.5 w-3.5 mr-1" />
+                            Disable
+                          </>
                         ) : (
-                          <><IconToggleLeft className="h-3.5 w-3.5 mr-1" />Enable</>
+                          <>
+                            <IconToggleLeft className="h-3.5 w-3.5 mr-1" />
+                            Enable
+                          </>
                         )}
                       </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={isLoading}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            disabled={isLoading}
+                          >
                             {isLoading ? (
                               <IconLoader2 className="h-4 w-4 animate-spin" />
                             ) : (
@@ -385,7 +416,9 @@ export default function PoliciesPage() {
                             <IconEye className="mr-2 h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openEditDialog(policy)}>
+                          <DropdownMenuItem
+                            onClick={() => openEditDialog(policy)}
+                          >
                             <IconEdit className="mr-2 h-4 w-4" />
                             Edit Policy
                           </DropdownMenuItem>
@@ -409,21 +442,50 @@ export default function PoliciesPage() {
       </Card>
 
       {/* Create Policy Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={(open) => { if (!open) { setIsCreateDialogOpen(false); resetForm() }}} modal>
-        <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+      <Dialog
+        open={isCreateDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsCreateDialogOpen(false);
+            resetForm();
+          }
+        }}
+        modal
+      >
+        <DialogContent
+          className="max-w-md"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>Create Policy</DialogTitle>
-            <DialogDescription>Define a new data governance policy</DialogDescription>
+            <DialogDescription>
+              Define a new data governance policy
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="policy-name">Policy Name</Label>
-              <Input id="policy-name" placeholder="e.g., PII Access Control" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+              <Input
+                id="policy-name"
+                placeholder="e.g., PII Access Control"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="type">Policy Type</Label>
-              <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-                <SelectTrigger id="type"><SelectValue /></SelectTrigger>
+              <Select
+                value={formData.type}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, type: value })
+                }
+              >
+                <SelectTrigger id="type">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Access Control">Access Control</SelectItem>
                   <SelectItem value="Retention">Data Retention</SelectItem>
@@ -435,25 +497,73 @@ export default function PoliciesPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="scope">Scope Pattern</Label>
-              <Input id="scope" placeholder="e.g., customer_data.*" value={formData.scope} onChange={(e) => setFormData({ ...formData, scope: e.target.value })} />
+              <Input
+                id="scope"
+                placeholder="e.g., customer_data.*"
+                value={formData.scope}
+                onChange={(e) =>
+                  setFormData({ ...formData, scope: e.target.value })
+                }
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea id="description" placeholder="Describe the policy..." rows={3} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
+              <Textarea
+                id="description"
+                placeholder="Describe the policy..."
+                rows={3}
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsCreateDialogOpen(false); resetForm() }} disabled={isLoading}>Cancel</Button>
-            <Button onClick={handleCreatePolicy} disabled={!formData.name.trim() || isLoading}>
-              {isLoading ? <><IconLoader2 className="mr-2 h-4 w-4 animate-spin" />Creating...</> : "Create Policy"}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCreateDialogOpen(false);
+                resetForm();
+              }}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreatePolicy}
+              disabled={!formData.name.trim() || isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Policy"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Edit Policy Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open) { setIsEditDialogOpen(false); setSelectedPolicy(null); resetForm() }}} modal>
-        <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsEditDialogOpen(false);
+            setSelectedPolicy(null);
+            resetForm();
+          }
+        }}
+        modal
+      >
+        <DialogContent
+          className="max-w-md"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>Edit Policy</DialogTitle>
             <DialogDescription>Update policy information</DialogDescription>
@@ -461,12 +571,25 @@ export default function PoliciesPage() {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="edit-policy-name">Policy Name</Label>
-              <Input id="edit-policy-name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+              <Input
+                id="edit-policy-name"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-type">Policy Type</Label>
-              <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-                <SelectTrigger id="edit-type"><SelectValue /></SelectTrigger>
+              <Select
+                value={formData.type}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, type: value })
+                }
+              >
+                <SelectTrigger id="edit-type">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Access Control">Access Control</SelectItem>
                   <SelectItem value="Retention">Data Retention</SelectItem>
@@ -478,37 +601,86 @@ export default function PoliciesPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-scope">Scope Pattern</Label>
-              <Input id="edit-scope" value={formData.scope} onChange={(e) => setFormData({ ...formData, scope: e.target.value })} />
+              <Input
+                id="edit-scope"
+                value={formData.scope}
+                onChange={(e) =>
+                  setFormData({ ...formData, scope: e.target.value })
+                }
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-description">Description</Label>
-              <Textarea id="edit-description" rows={3} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
+              <Textarea
+                id="edit-description"
+                rows={3}
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedPolicy(null); resetForm() }} disabled={isLoading}>Cancel</Button>
-            <Button onClick={handleEditPolicy} disabled={!formData.name.trim() || isLoading}>
-              {isLoading ? <><IconLoader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : "Save Changes"}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                setSelectedPolicy(null);
+                resetForm();
+              }}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditPolicy}
+              disabled={!formData.name.trim() || isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!policyToDelete} onOpenChange={(open) => !open && setPolicyToDelete(null)}>
+      <AlertDialog
+        open={!!policyToDelete}
+        onOpenChange={(open) => !open && setPolicyToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Policy?</AlertDialogTitle>
-            <AlertDialogDescription>This will permanently delete this policy and all its rules. This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This will permanently delete this policy and all its rules. This
+              action cannot be undone.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeletePolicy} disabled={isLoading}>
-              {isLoading ? <><IconLoader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</> : "Delete Policy"}
+            <AlertDialogAction
+              onClick={handleDeletePolicy}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Policy"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }

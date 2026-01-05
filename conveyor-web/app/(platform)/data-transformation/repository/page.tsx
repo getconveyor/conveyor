@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react";
 import {
   IconPlus,
   IconSearch,
@@ -14,25 +14,26 @@ import {
   IconGitCommit,
   IconFile,
   IconLoader2,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+  IconPlayerPlay,
+} from "@tabler/icons-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -40,7 +41,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,170 +51,231 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { transformationApi, Notebook } from "@/lib/api/transformation";
+import { useToast } from "@/hooks/use-toast";
 
 interface RepositoryItem {
-  id: string
-  name: string
-  type: "folder" | "file"
-  language?: string
-  lastCommit: string
-  author: string
-  branch: string
-  size?: string
+  id: string;
+  name: string;
+  type: "folder" | "file";
+  language?: string;
+  lastCommit: string;
+  author: string;
+  branch: string;
+  size?: string;
+  status?: string;
+  cellCount?: number;
 }
 
-const initialRepositoryItems: RepositoryItem[] = [
-  {
-    id: "1",
-    name: "etl_pipelines",
-    type: "folder",
-    lastCommit: "Updated customer ETL logic",
-    author: "Jane Smith",
-    branch: "main",
-  },
-  {
-    id: "2",
-    name: "data_quality",
-    type: "folder",
-    lastCommit: "Added new validation rules",
-    author: "John Doe",
-    branch: "main",
-  },
-  {
-    id: "3",
-    name: "transform_customer_data.py",
-    type: "file",
-    language: "python",
-    lastCommit: "Fixed date parsing bug",
-    author: "Sarah Wilson",
-    branch: "main",
-    size: "12.5 KB",
-  },
-  {
-    id: "4",
-    name: "aggregate_sales.sql",
-    type: "file",
-    language: "sql",
-    lastCommit: "Optimized query performance",
-    author: "Mike Johnson",
-    branch: "main",
-    size: "3.2 KB",
-  },
-  {
-    id: "5",
-    name: "utils",
-    type: "folder",
-    lastCommit: "Added helper functions",
-    author: "Tom Brown",
-    branch: "main",
-  },
-  {
-    id: "6",
-    name: "validate_schema.py",
-    type: "file",
-    language: "python",
-    lastCommit: "Enhanced schema validation",
-    author: "Jane Smith",
-    branch: "develop",
-    size: "8.7 KB",
-  },
-]
-
 export default function RepositoryPage() {
-  const [repositoryItems, setRepositoryItems] = useState<RepositoryItem[]>(initialRepositoryItems)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [typeFilter, setTypeFilter] = useState<string>("all")
-  const [branchFilter, setBranchFilter] = useState<string>("all")
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [itemToDelete, setItemToDelete] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [repositoryItems, setRepositoryItems] = useState<RepositoryItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [languageFilter, setLanguageFilter] = useState<string>("all");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     name: "",
-    type: "file" as "file" | "folder",
-    language: "",
-    branch: "main",
-    commitMessage: "",
-  })
+    description: "",
+    language: "python",
+  });
+
+  const fetchNotebooks = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const notebooks = await transformationApi.getNotebooks();
+
+      // Convert notebooks to repository items
+      const items: RepositoryItem[] = notebooks.map((notebook: Notebook) => ({
+        id: notebook.id,
+        name: notebook.name,
+        type: "file" as const,
+        language: notebook.language,
+        lastCommit: notebook.description || "No description",
+        author: notebook.created_by_name || "Unknown",
+        branch: "main",
+        size: `${notebook.cell_count} cells`,
+        status: notebook.status,
+        cellCount: notebook.cell_count,
+      }));
+
+      setRepositoryItems(items);
+    } catch (error) {
+      console.error("Failed to fetch notebooks:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch notebooks",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchNotebooks();
+  }, [fetchNotebooks]);
 
   const filteredItems = repositoryItems.filter((item) => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesType = typeFilter === "all" || item.type === typeFilter
-    const matchesBranch = branchFilter === "all" || item.branch === branchFilter
-    return matchesSearch && matchesType && matchesBranch
-  })
+    const matchesSearch = item.name
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    const matchesType = typeFilter === "all" || item.type === typeFilter;
+    const matchesLanguage =
+      languageFilter === "all" || item.language === languageFilter;
+    return matchesSearch && matchesType && matchesLanguage;
+  });
 
   const stats = {
     total: repositoryItems.length,
-    folders: repositoryItems.filter(i => i.type === "folder").length,
-    files: repositoryItems.filter(i => i.type === "file").length,
-    branches: new Set(repositoryItems.map(i => i.branch)).size,
-  }
+    python: repositoryItems.filter((i) => i.language === "python").length,
+    sql: repositoryItems.filter((i) => i.language === "sql").length,
+    running: repositoryItems.filter((i) => i.status === "running").length,
+  };
 
   const handleCreateItem = async () => {
-    if (!formData.name.trim()) return
+    if (!formData.name.trim()) return;
 
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    const newItem: RepositoryItem = {
-      id: Date.now().toString(),
-      name: formData.name,
-      type: formData.type,
-      language: formData.type === "file" ? formData.language : undefined,
-      lastCommit: formData.commitMessage || "Initial commit",
-      author: "You",
-      branch: formData.branch,
-      size: formData.type === "file" ? "0 KB" : undefined,
+    setIsActionLoading(true);
+    try {
+      await transformationApi.createNotebook({
+        name: formData.name,
+        description: formData.description,
+        language: formData.language,
+      });
+      toast({
+        title: "Success",
+        description: "Notebook created successfully",
+      });
+      setIsCreateDialogOpen(false);
+      resetForm();
+      fetchNotebooks();
+    } catch (error) {
+      console.error("Failed to create notebook:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create notebook",
+        variant: "destructive",
+      });
+    } finally {
+      setIsActionLoading(false);
     }
-
-    setRepositoryItems([...repositoryItems, newItem])
-    setIsLoading(false)
-    setIsCreateDialogOpen(false)
-    resetForm()
-  }
+  };
 
   const handleDeleteItem = async () => {
-    if (!itemToDelete) return
+    if (!itemToDelete) return;
 
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    setRepositoryItems(items => items.filter(i => i.id !== itemToDelete))
-    setIsLoading(false)
-    setItemToDelete(null)
-  }
+    setIsActionLoading(true);
+    try {
+      await transformationApi.deleteNotebook(itemToDelete);
+      toast({
+        title: "Success",
+        description: "Notebook deleted successfully",
+      });
+      setItemToDelete(null);
+      fetchNotebooks();
+    } catch (error) {
+      console.error("Failed to delete notebook:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete notebook",
+        variant: "destructive",
+      });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
 
   const handleDuplicateItem = async (item: RepositoryItem) => {
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    const duplicatedItem: RepositoryItem = {
-      ...item,
-      id: Date.now().toString(),
-      name: item.type === "file"
-        ? item.name.replace(/(\.[^.]+)$/, "_copy$1")
-        : `${item.name}_copy`,
-      lastCommit: "Duplicated from " + item.name,
+    setIsActionLoading(true);
+    try {
+      await transformationApi.duplicateNotebook(item.id);
+      toast({
+        title: "Success",
+        description: "Notebook duplicated successfully",
+      });
+      fetchNotebooks();
+    } catch (error) {
+      console.error("Failed to duplicate notebook:", error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate notebook",
+        variant: "destructive",
+      });
+    } finally {
+      setIsActionLoading(false);
     }
-    setRepositoryItems([...repositoryItems, duplicatedItem])
-    setIsLoading(false)
-  }
+  };
+
+  const handleRunNotebook = async (item: RepositoryItem) => {
+    setIsActionLoading(true);
+    try {
+      await transformationApi.runNotebook(item.id);
+      toast({
+        title: "Success",
+        description: "Notebook execution started",
+      });
+      fetchNotebooks();
+    } catch (error) {
+      console.error("Failed to run notebook:", error);
+      toast({
+        title: "Error",
+        description: "Failed to run notebook",
+        variant: "destructive",
+      });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleExportNotebook = async (item: RepositoryItem) => {
+    try {
+      const result = await transformationApi.exportNotebook(item.id);
+      // Create download link
+      const blob = new Blob([JSON.stringify(result.content, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = result.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({
+        title: "Success",
+        description: "Notebook exported successfully",
+      });
+    } catch (error) {
+      console.error("Failed to export notebook:", error);
+      toast({
+        title: "Error",
+        description: "Failed to export notebook",
+        variant: "destructive",
+      });
+    }
+  };
 
   const resetForm = () => {
     setFormData({
       name: "",
-      type: "file",
-      language: "",
-      branch: "main",
-      commitMessage: "",
-    })
+      description: "",
+      language: "python",
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   return (
@@ -222,12 +284,12 @@ export default function RepositoryPage() {
         <div>
           <h1 className="text-2xl font-bold">Repository</h1>
           <p className="text-sm text-muted-foreground">
-            Version-controlled transformation code and scripts
+            Transformation notebooks and scripts
           </p>
         </div>
         <Button onClick={() => setIsCreateDialogOpen(true)}>
           <IconPlus className="mr-2 h-4 w-4" />
-          New File
+          New Notebook
         </Button>
       </div>
 
@@ -235,26 +297,38 @@ export default function RepositoryPage() {
       <div className="grid gap-2 md:grid-cols-4">
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Total</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Total
+            </div>
             <div className="text-xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Folders</div>
-            <div className="text-xl font-bold text-blue-500">{stats.folders}</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Python
+            </div>
+            <div className="text-xl font-bold text-blue-500">
+              {stats.python}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Files</div>
-            <div className="text-xl font-bold text-green-500">{stats.files}</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              SQL
+            </div>
+            <div className="text-xl font-bold text-green-500">{stats.sql}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Branches</div>
-            <div className="text-xl font-bold text-purple-500">{stats.branches}</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Running
+            </div>
+            <div className="text-xl font-bold text-purple-500">
+              {stats.running}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -267,7 +341,7 @@ export default function RepositoryPage() {
               <div className="relative">
                 <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search repository..."
+                  placeholder="Search notebooks..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -275,202 +349,218 @@ export default function RepositoryPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <Select value={languageFilter} onValueChange={setLanguageFilter}>
                 <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder="Type" />
+                  <SelectValue placeholder="Language" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="folder">Folders</SelectItem>
-                  <SelectItem value="file">Files</SelectItem>
+                  <SelectItem value="all">All Languages</SelectItem>
+                  <SelectItem value="python">Python</SelectItem>
+                  <SelectItem value="sql">SQL</SelectItem>
+                  <SelectItem value="scala">Scala</SelectItem>
+                  <SelectItem value="r">R</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={branchFilter} onValueChange={setBranchFilter}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder="Branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Branches</SelectItem>
-                  <SelectItem value="main">main</SelectItem>
-                  <SelectItem value="develop">develop</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="icon">
-                <IconRefresh className="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => fetchNotebooks()}
+                disabled={isLoading}
+              >
+                <IconRefresh
+                  className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+                />
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent className="pt-2">
           <div className="space-y-2">
-            {filteredItems.map((item) => (
-              <Card key={item.id}>
-                <CardContent className="p-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-2 flex-1 min-w-0">
-                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center mt-0.5">
-                        {item.type === "folder" ? (
-                          <IconFolder className="h-4 w-4 text-primary" />
-                        ) : (
+            {filteredItems.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No notebooks found. Create your first notebook to get started.
+              </div>
+            ) : (
+              filteredItems.map((item) => (
+                <Card key={item.id}>
+                  <CardContent className="p-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2 flex-1 min-w-0">
+                        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center mt-0.5">
                           <IconFile className="h-4 w-4 text-primary" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-sm">{item.name}</h3>
-                          {item.language && (
-                            <Badge variant="secondary" className="text-xs">
-                              {item.language}
-                            </Badge>
-                          )}
-                          <Badge variant="outline" className="text-xs">
-                            <IconGitBranch className="mr-1 h-3 w-3" />
-                            {item.branch}
-                          </Badge>
                         </div>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
-                          <IconGitCommit className="h-3 w-3" />
-                          <span>{item.lastCommit}</span>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-                          <div>
-                            <p className="text-muted-foreground">Author</p>
-                            <p className="font-medium">{item.author}</p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-sm">
+                              {item.name}
+                            </h3>
+                            {item.language && (
+                              <Badge variant="secondary" className="text-xs">
+                                {item.language}
+                              </Badge>
+                            )}
+                            {item.status && (
+                              <Badge
+                                variant={
+                                  item.status === "running"
+                                    ? "default"
+                                    : item.status === "error"
+                                    ? "destructive"
+                                    : "outline"
+                                }
+                                className="text-xs"
+                              >
+                                {item.status}
+                              </Badge>
+                            )}
                           </div>
-                          <div>
-                            <p className="text-muted-foreground">Branch</p>
-                            <p className="font-medium">{item.branch}</p>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+                            <span>{item.lastCommit}</span>
                           </div>
-                          {item.size && (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
                             <div>
-                              <p className="text-muted-foreground">Size</p>
-                              <p className="font-medium">{item.size}</p>
+                              <p className="text-muted-foreground">Author</p>
+                              <p className="font-medium">{item.author}</p>
                             </div>
-                          )}
+                            <div>
+                              <p className="text-muted-foreground">Cells</p>
+                              <p className="font-medium">
+                                {item.cellCount || 0}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Language</p>
+                              <p className="font-medium">
+                                {item.language || "unknown"}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-2"
+                          onClick={() => handleRunNotebook(item)}
+                          disabled={
+                            isActionLoading || item.status === "running"
+                          }
+                        >
+                          <IconPlayerPlay className="h-3.5 w-3.5 mr-1" />
+                          Run
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              disabled={isActionLoading}
+                            >
+                              <IconDotsVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <IconFile className="mr-2 h-4 w-4" />
+                              Open
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDuplicateItem(item)}
+                            >
+                              <IconCopy className="mr-2 h-4 w-4" />
+                              Duplicate
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleExportNotebook(item)}
+                            >
+                              <IconDownload className="mr-2 h-4 w-4" />
+                              Export
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => setItemToDelete(item.id)}
+                            >
+                              <IconTrash className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={isLoading}>
-                            <IconDotsVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <IconFile className="mr-2 h-4 w-4" />
-                            Open
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <IconGitCommit className="mr-2 h-4 w-4" />
-                            View History
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDuplicateItem(item)}>
-                            <IconCopy className="mr-2 h-4 w-4" />
-                            Duplicate
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <IconDownload className="mr-2 h-4 w-4" />
-                            Download
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => setItemToDelete(item.id)}
-                          >
-                            <IconTrash className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Create File/Folder Dialog */}
+      {/* Create Notebook Dialog */}
       <Dialog
         open={isCreateDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
-            setIsCreateDialogOpen(false)
-            resetForm()
+            setIsCreateDialogOpen(false);
+            resetForm();
           }
         }}
         modal
       >
-        <DialogContent className="max-w-2xl" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+        <DialogContent
+          className="max-w-2xl"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
-            <DialogTitle>Create New {formData.type === "file" ? "File" : "Folder"}</DialogTitle>
+            <DialogTitle>Create New Notebook</DialogTitle>
             <DialogDescription>
-              Add a new {formData.type} to the repository
+              Add a new transformation notebook
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="item-type">Type</Label>
-              <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value as "file" | "folder" })}>
-                <SelectTrigger id="item-type">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="file">File</SelectItem>
-                  <SelectItem value="folder">Folder</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
               <Label htmlFor="item-name">Name</Label>
               <Input
                 id="item-name"
-                placeholder={formData.type === "file" ? "e.g., transform_data.py" : "e.g., transformations"}
+                placeholder="e.g., transform_customer_data"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
               />
             </div>
-            {formData.type === "file" && (
-              <div className="grid gap-2">
-                <Label htmlFor="language">Language</Label>
-                <Select value={formData.language} onValueChange={(value) => setFormData({ ...formData, language: value })}>
-                  <SelectTrigger id="language">
-                    <SelectValue placeholder="Select language" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="python">Python</SelectItem>
-                    <SelectItem value="sql">SQL</SelectItem>
-                    <SelectItem value="javascript">JavaScript</SelectItem>
-                    <SelectItem value="scala">Scala</SelectItem>
-                    <SelectItem value="r">R</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
             <div className="grid gap-2">
-              <Label htmlFor="branch">Branch</Label>
-              <Select value={formData.branch} onValueChange={(value) => setFormData({ ...formData, branch: value })}>
-                <SelectTrigger id="branch">
-                  <SelectValue placeholder="Select branch" />
+              <Label htmlFor="language">Language</Label>
+              <Select
+                value={formData.language}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, language: value })
+                }
+              >
+                <SelectTrigger id="language">
+                  <SelectValue placeholder="Select language" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="main">main</SelectItem>
-                  <SelectItem value="develop">develop</SelectItem>
-                  <SelectItem value="feature">feature</SelectItem>
+                  <SelectItem value="python">Python</SelectItem>
+                  <SelectItem value="sql">SQL</SelectItem>
+                  <SelectItem value="scala">Scala</SelectItem>
+                  <SelectItem value="r">R</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="commit-message">Commit Message</Label>
+              <Label htmlFor="description">Description</Label>
               <Textarea
-                id="commit-message"
-                placeholder="Initial commit"
+                id="description"
+                placeholder="What does this notebook do?"
                 rows={2}
-                value={formData.commitMessage}
-                onChange={(e) => setFormData({ ...formData, commitMessage: e.target.value })}
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
               />
             </div>
           </div>
@@ -478,24 +568,24 @@ export default function RepositoryPage() {
             <Button
               variant="outline"
               onClick={() => {
-                setIsCreateDialogOpen(false)
-                resetForm()
+                setIsCreateDialogOpen(false);
+                resetForm();
               }}
-              disabled={isLoading}
+              disabled={isActionLoading}
             >
               Cancel
             </Button>
             <Button
               onClick={handleCreateItem}
-              disabled={!formData.name.trim() || isLoading}
+              disabled={!formData.name.trim() || isActionLoading}
             >
-              {isLoading ? (
+              {isActionLoading ? (
                 <>
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creating...
                 </>
               ) : (
-                `Create ${formData.type === "file" ? "File" : "Folder"}`
+                "Create Notebook"
               )}
             </Button>
           </DialogFooter>
@@ -503,18 +593,27 @@ export default function RepositoryPage() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!itemToDelete} onOpenChange={(open) => !open && setItemToDelete(null)}>
+      <AlertDialog
+        open={!!itemToDelete}
+        onOpenChange={(open) => !open && setItemToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Notebook?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this item from the repository. This action cannot be undone.
+              This will permanently delete this notebook. This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteItem} disabled={isLoading}>
-              {isLoading ? (
+            <AlertDialogCancel disabled={isActionLoading}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteItem}
+              disabled={isActionLoading}
+            >
+              {isActionLoading ? (
                 <>
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
                   Deleting...
@@ -527,5 +626,5 @@ export default function RepositoryPage() {
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }

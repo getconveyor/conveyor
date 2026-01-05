@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   IconPlus,
   IconSearch,
@@ -16,25 +16,32 @@ import {
   IconCode,
   IconGitBranch,
   IconLoader2,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+  IconAlertCircle,
+} from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -42,7 +49,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,152 +59,159 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { integrationApi, Pipeline } from "@/lib/api/integration";
 
-type WorkflowStatus = "running" | "idle" | "failed" | "success"
+type WorkflowStatus = "running" | "idle" | "failed" | "success";
 
 interface Workflow {
-  id: string
-  name: string
-  description: string
-  status: WorkflowStatus
-  lastRun: string
-  nextRun: string
-  steps: number
-  successRate: number
-  schedule: string
-  createdBy: string
+  id: string;
+  name: string;
+  description: string;
+  status: WorkflowStatus;
+  lastRun: string;
+  nextRun: string;
+  steps: number;
+  successRate: number;
+  schedule: string;
+  createdBy: string;
 }
 
-const initialWorkflows: Workflow[] = [
+const statusConfig: Record<
+  WorkflowStatus,
   {
-    id: "1",
-    name: "Customer Data ETL",
-    description: "Extract, transform, and load customer data from multiple sources",
-    status: "success",
-    lastRun: "10 minutes ago",
-    nextRun: "in 50 minutes",
-    steps: 5,
-    successRate: 99.2,
-    schedule: "Hourly",
-    createdBy: "John Doe",
-  },
-  {
-    id: "2",
-    name: "Sales Analytics Pipeline",
-    description: "Process and aggregate sales data for analytics",
-    status: "running",
-    lastRun: "2 minutes ago",
-    nextRun: "in 58 minutes",
-    steps: 8,
-    successRate: 98.5,
-    schedule: "Hourly",
-    createdBy: "Jane Smith",
-  },
-  {
-    id: "3",
-    name: "Real-time Event Processing",
-    description: "Stream processing for user events",
-    status: "running",
-    lastRun: "Just now",
-    nextRun: "Continuous",
-    steps: 3,
-    successRate: 99.9,
-    schedule: "Real-time",
-    createdBy: "Mike Johnson",
-  },
-  {
-    id: "4",
-    name: "Daily Data Quality Check",
-    description: "Validate data quality across all datasets",
-    status: "failed",
-    lastRun: "2 hours ago",
-    nextRun: "in 22 hours",
-    steps: 12,
-    successRate: 94.1,
-    schedule: "Daily",
-    createdBy: "Sarah Wilson",
-  },
-  {
-    id: "5",
-    name: "Weekly Report Generation",
-    description: "Generate weekly business intelligence reports",
-    status: "idle",
-    lastRun: "3 days ago",
-    nextRun: "in 4 days",
-    steps: 6,
-    successRate: 100,
-    schedule: "Weekly",
-    createdBy: "Tom Brown",
-  },
-]
-
-const statusConfig: Record<WorkflowStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; color: string }> = {
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+    color: string;
+  }
+> = {
   running: { label: "Running", variant: "default", color: "text-blue-500" },
   success: { label: "Success", variant: "outline", color: "text-green-500" },
   failed: { label: "Failed", variant: "destructive", color: "text-red-500" },
   idle: { label: "Idle", variant: "secondary", color: "text-gray-500" },
-}
+};
+
+const mapPipelineToWorkflow = (pipeline: Pipeline): Workflow => {
+  const status: WorkflowStatus =
+    pipeline.status === "running"
+      ? "running"
+      : pipeline.status === "error"
+      ? "failed"
+      : pipeline.status === "active"
+      ? "success"
+      : "idle";
+
+  return {
+    id: pipeline.id,
+    name: pipeline.name,
+    description:
+      pipeline.description ||
+      `Pipeline from ${pipeline.source_name || "source"} to ${
+        pipeline.destination_name || "destination"
+      }`,
+    status,
+    lastRun: pipeline.last_run
+      ? new Date(pipeline.last_run).toLocaleString()
+      : "Never",
+    nextRun: pipeline.next_run
+      ? new Date(pipeline.next_run).toLocaleString()
+      : "Not scheduled",
+    steps: 1, // Pipelines are single-step
+    successRate: pipeline.success_rate || 0,
+    schedule: pipeline.schedule || "Manual",
+    createdBy: pipeline.created_by || "System",
+  };
+};
 
 export default function WorkflowsPage() {
-  const router = useRouter()
-  const [workflows, setWorkflows] = useState<Workflow[]>(initialWorkflows)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null)
-  const [workflowToDelete, setWorkflowToDelete] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
+  const [workflowToDelete, setWorkflowToDelete] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     schedule: "",
     template: "",
-  })
+  });
+
+  const loadWorkflows = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const pipelines = await integrationApi.getPipelines();
+      setWorkflows(pipelines.map(mapPipelineToWorkflow));
+    } catch (err) {
+      console.error("Failed to load workflows:", err);
+      setError("Failed to load workflows");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadWorkflows();
+  }, [loadWorkflows]);
 
   const filteredWorkflows = workflows.filter((workflow) => {
-    const matchesSearch = workflow.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      workflow.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || workflow.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+    const matchesSearch =
+      workflow.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      workflow.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || workflow.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const stats = {
     total: workflows.length,
-    running: workflows.filter(w => w.status === "running").length,
-    failed: workflows.filter(w => w.status === "failed").length,
-    avgSuccessRate: workflows.length > 0 ? Math.round(workflows.reduce((acc, w) => acc + w.successRate, 0) / workflows.length) : 0,
-  }
+    running: workflows.filter((w) => w.status === "running").length,
+    failed: workflows.filter((w) => w.status === "failed").length,
+    avgSuccessRate:
+      workflows.length > 0
+        ? Math.round(
+            workflows.reduce((acc, w) => acc + w.successRate, 0) /
+              workflows.length
+          )
+        : 0,
+  };
 
   const handleCreateOrUpdateWorkflow = () => {
-    if (!formData.name.trim()) return
+    if (!formData.name.trim()) return;
 
     // Store workflow data in sessionStorage and navigate to builder
-    sessionStorage.setItem("new-workflow-template", JSON.stringify({
-      name: formData.name,
-      description: formData.description,
-      schedule: formData.schedule,
-      template: formData.template || "blank",
-    }))
+    sessionStorage.setItem(
+      "new-workflow-template",
+      JSON.stringify({
+        name: formData.name,
+        description: formData.description,
+        schedule: formData.schedule,
+        template: formData.template || "blank",
+      })
+    );
 
     // Navigate to builder
-    router.push("/data-transformation/workflows/new/builder")
-  }
+    router.push("/data-transformation/workflows/new/builder");
+  };
 
   const handleCreateOrUpdateWorkflowOld = async () => {
-    if (!formData.name.trim() || !formData.schedule) return
+    if (!formData.name.trim() || !formData.schedule) return;
 
-    setIsLoading(true)
+    setIsLoading(true);
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     if (editingWorkflow) {
       // Update existing workflow
-      setWorkflows(workflows =>
-        workflows.map(w =>
+      setWorkflows((workflows) =>
+        workflows.map((w) =>
           w.id === editingWorkflow.id
             ? {
                 ...w,
@@ -208,7 +222,7 @@ export default function WorkflowsPage() {
               }
             : w
         )
-      )
+      );
     } else {
       // Create new workflow
       const newWorkflow: Workflow = {
@@ -218,43 +232,46 @@ export default function WorkflowsPage() {
         status: "idle",
         lastRun: "Never",
         nextRun: "Not scheduled",
-        steps: formData.template === "blank" ? 0 : Math.floor(Math.random() * 8) + 3,
+        steps:
+          formData.template === "blank" ? 0 : Math.floor(Math.random() * 8) + 3,
         successRate: 0,
         schedule: formData.schedule,
         createdBy: "You",
-      }
-      setWorkflows([...workflows, newWorkflow])
+      };
+      setWorkflows([...workflows, newWorkflow]);
     }
 
-    setIsLoading(false)
-    setIsCreateDialogOpen(false)
-    resetForm()
-  }
+    setIsLoading(false);
+    setIsCreateDialogOpen(false);
+    resetForm();
+  };
 
   const handleEditWorkflow = (workflow: Workflow) => {
     // Navigate to builder page for this workflow
-    router.push(`/data-transformation/workflows/${workflow.id}/builder`)
-  }
+    router.push(`/data-transformation/workflows/${workflow.id}/builder`);
+  };
 
   const handleDeleteWorkflow = async () => {
-    if (!workflowToDelete) return
+    if (!workflowToDelete) return;
 
-    setIsLoading(true)
+    setIsLoading(true);
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
-    setWorkflows(workflows => workflows.filter(w => w.id !== workflowToDelete))
-    setIsLoading(false)
-    setWorkflowToDelete(null)
-  }
+    setWorkflows((workflows) =>
+      workflows.filter((w) => w.id !== workflowToDelete)
+    );
+    setIsLoading(false);
+    setWorkflowToDelete(null);
+  };
 
   const handleTogglePlayPause = async (id: string) => {
-    setIsLoading(true)
+    setIsLoading(true);
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 600))
+    await new Promise((resolve) => setTimeout(resolve, 600));
 
-    setWorkflows(workflows =>
-      workflows.map(w =>
+    setWorkflows((workflows) =>
+      workflows.map((w) =>
         w.id === id
           ? {
               ...w,
@@ -264,14 +281,14 @@ export default function WorkflowsPage() {
             }
           : w
       )
-    )
-    setIsLoading(false)
-  }
+    );
+    setIsLoading(false);
+  };
 
   const handleDuplicateWorkflow = async (workflow: Workflow) => {
-    setIsLoading(true)
+    setIsLoading(true);
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
     const duplicatedWorkflow: Workflow = {
       ...workflow,
@@ -280,10 +297,10 @@ export default function WorkflowsPage() {
       status: "idle",
       lastRun: "Never",
       nextRun: "Not scheduled",
-    }
-    setWorkflows([...workflows, duplicatedWorkflow])
-    setIsLoading(false)
-  }
+    };
+    setWorkflows([...workflows, duplicatedWorkflow]);
+    setIsLoading(false);
+  };
 
   const resetForm = () => {
     setFormData({
@@ -291,9 +308,9 @@ export default function WorkflowsPage() {
       description: "",
       schedule: "",
       template: "",
-    })
-    setEditingWorkflow(null)
-  }
+    });
+    setEditingWorkflow(null);
+  };
 
   return (
     <>
@@ -314,26 +331,38 @@ export default function WorkflowsPage() {
       <div className="grid gap-2 md:grid-cols-4">
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Total</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Total
+            </div>
             <div className="text-xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Running</div>
-            <div className="text-xl font-bold text-blue-500">{stats.running}</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Running
+            </div>
+            <div className="text-xl font-bold text-blue-500">
+              {stats.running}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Failed</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Failed
+            </div>
             <div className="text-xl font-bold text-red-500">{stats.failed}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Avg Success</div>
-            <div className="text-xl font-bold text-green-500">{stats.avgSuccessRate}%</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Avg Success
+            </div>
+            <div className="text-xl font-bold text-green-500">
+              {stats.avgSuccessRate}%
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -381,8 +410,13 @@ export default function WorkflowsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <IconGitBranch className="h-4 w-4 text-muted-foreground" />
-                        <h3 className="font-semibold text-sm">{workflow.name}</h3>
-                        <Badge variant={statusConfig[workflow.status].variant} className="text-xs">
+                        <h3 className="font-semibold text-sm">
+                          {workflow.name}
+                        </h3>
+                        <Badge
+                          variant={statusConfig[workflow.status].variant}
+                          className="text-xs"
+                        >
                           {statusConfig[workflow.status].label}
                         </Badge>
                       </div>
@@ -444,12 +478,19 @@ export default function WorkflowsPage() {
                       )}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={isLoading}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            disabled={isLoading}
+                          >
                             <IconDotsVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditWorkflow(workflow)}>
+                          <DropdownMenuItem
+                            onClick={() => handleEditWorkflow(workflow)}
+                          >
                             <IconCode className="mr-2 h-4 w-4" />
                             Edit Workflow
                           </DropdownMenuItem>
@@ -457,7 +498,9 @@ export default function WorkflowsPage() {
                             <IconClock className="mr-2 h-4 w-4" />
                             View History
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDuplicateWorkflow(workflow)}>
+                          <DropdownMenuItem
+                            onClick={() => handleDuplicateWorkflow(workflow)}
+                          >
                             <IconCopy className="mr-2 h-4 w-4" />
                             Duplicate
                           </DropdownMenuItem>
@@ -485,15 +528,21 @@ export default function WorkflowsPage() {
         open={isCreateDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
-            setIsCreateDialogOpen(false)
-            resetForm()
+            setIsCreateDialogOpen(false);
+            resetForm();
           }
         }}
         modal
       >
-        <DialogContent className="max-w-2xl" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+        <DialogContent
+          className="max-w-2xl"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
-            <DialogTitle>{editingWorkflow ? "Edit Workflow" : "Create Workflow"}</DialogTitle>
+            <DialogTitle>
+              {editingWorkflow ? "Edit Workflow" : "Create Workflow"}
+            </DialogTitle>
             <DialogDescription>
               {editingWorkflow
                 ? "Update the workflow configuration."
@@ -507,7 +556,9 @@ export default function WorkflowsPage() {
                 id="workflow-name"
                 placeholder="e.g., Customer Data ETL"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
               />
             </div>
             <div className="grid gap-2">
@@ -517,13 +568,20 @@ export default function WorkflowsPage() {
                 placeholder="Describe what this workflow does..."
                 rows={3}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="schedule-type">Schedule Type</Label>
-                <Select value={formData.schedule} onValueChange={(value) => setFormData({ ...formData, schedule: value })}>
+                <Select
+                  value={formData.schedule}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, schedule: value })
+                  }
+                >
                   <SelectTrigger id="schedule-type">
                     <SelectValue placeholder="Select schedule" />
                   </SelectTrigger>
@@ -540,16 +598,27 @@ export default function WorkflowsPage() {
               {!editingWorkflow && (
                 <div className="grid gap-2">
                   <Label htmlFor="template">Template</Label>
-                  <Select value={formData.template} onValueChange={(value) => setFormData({ ...formData, template: value })}>
+                  <Select
+                    value={formData.template}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, template: value })
+                    }
+                  >
                     <SelectTrigger id="template">
                       <SelectValue placeholder="Start from template" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="blank">Blank Workflow</SelectItem>
                       <SelectItem value="etl">ETL Pipeline</SelectItem>
-                      <SelectItem value="data-quality">Data Quality Check</SelectItem>
-                      <SelectItem value="aggregation">Data Aggregation</SelectItem>
-                      <SelectItem value="streaming">Stream Processing</SelectItem>
+                      <SelectItem value="data-quality">
+                        Data Quality Check
+                      </SelectItem>
+                      <SelectItem value="aggregation">
+                        Data Aggregation
+                      </SelectItem>
+                      <SelectItem value="streaming">
+                        Stream Processing
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -560,8 +629,8 @@ export default function WorkflowsPage() {
             <Button
               variant="outline"
               onClick={() => {
-                setIsCreateDialogOpen(false)
-                resetForm()
+                setIsCreateDialogOpen(false);
+                resetForm();
               }}
               disabled={isLoading}
             >
@@ -578,17 +647,24 @@ export default function WorkflowsPage() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!workflowToDelete} onOpenChange={(open) => !open && setWorkflowToDelete(null)}>
+      <AlertDialog
+        open={!!workflowToDelete}
+        onOpenChange={(open) => !open && setWorkflowToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this workflow. This action cannot be undone.
+              This will permanently delete this workflow. This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteWorkflow} disabled={isLoading}>
+            <AlertDialogAction
+              onClick={handleDeleteWorkflow}
+              disabled={isLoading}
+            >
               {isLoading ? (
                 <>
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -602,5 +678,5 @@ export default function WorkflowsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }

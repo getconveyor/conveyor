@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react";
 import {
   IconShare,
   IconLayoutDashboard,
@@ -18,16 +18,24 @@ import {
   IconLockOpen,
   IconSearch,
   IconFilter,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+  IconLoader2,
+  IconAlertCircle,
+} from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -36,38 +44,39 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { analyticsApi, Dashboard, Report } from "@/lib/api/analytics";
 
-type ContentType = "dashboard" | "report" | "workbook" | "all"
-type AccessLevel = "view" | "edit" | "admin"
+type ContentType = "dashboard" | "report" | "workbook" | "all";
+type AccessLevel = "view" | "edit" | "admin";
 
 interface SharedContent {
-  id: string
-  name: string
-  type: "dashboard" | "report" | "workbook"
-  owner: string
+  id: string;
+  name: string;
+  type: "dashboard" | "report" | "workbook";
+  owner: string;
   sharedWith: {
-    type: "user" | "team" | "public"
-    name: string
-    email?: string
-    access: AccessLevel
-  }[]
-  sharedAt: string
-  lastAccessed: string
-  views: number
-  accessType: "link" | "direct"
+    type: "user" | "team" | "public";
+    name: string;
+    email?: string;
+    access: AccessLevel;
+  }[];
+  sharedAt: string;
+  lastAccessed: string;
+  views: number;
+  accessType: "link" | "direct";
 }
 
 const mockSharedContent: SharedContent[] = [
@@ -78,8 +87,18 @@ const mockSharedContent: SharedContent[] = [
     owner: "Sarah Johnson",
     sharedWith: [
       { type: "team", name: "Sales Team", access: "view" },
-      { type: "user", name: "John Doe", email: "john@company.com", access: "edit" },
-      { type: "user", name: "Jane Smith", email: "jane@company.com", access: "view" },
+      {
+        type: "user",
+        name: "John Doe",
+        email: "john@company.com",
+        access: "edit",
+      },
+      {
+        type: "user",
+        name: "Jane Smith",
+        email: "jane@company.com",
+        access: "view",
+      },
     ],
     sharedAt: "2024-01-10",
     lastAccessed: "2 hours ago",
@@ -105,9 +124,7 @@ const mockSharedContent: SharedContent[] = [
     name: "Customer Analysis Workbook",
     type: "workbook",
     owner: "Emily Rodriguez",
-    sharedWith: [
-      { type: "public", name: "Anyone with link", access: "view" },
-    ],
+    sharedWith: [{ type: "public", name: "Anyone with link", access: "view" }],
     sharedAt: "2024-01-05",
     lastAccessed: "3 days ago",
     views: 482,
@@ -119,7 +136,12 @@ const mockSharedContent: SharedContent[] = [
     type: "dashboard",
     owner: "David Kim",
     sharedWith: [
-      { type: "user", name: "Alex Brown", email: "alex@company.com", access: "admin" },
+      {
+        type: "user",
+        name: "Alex Brown",
+        email: "alex@company.com",
+        access: "admin",
+      },
       { type: "team", name: "Product Team", access: "edit" },
     ],
     sharedAt: "2024-01-03",
@@ -134,56 +156,158 @@ const mockSharedContent: SharedContent[] = [
     owner: "Lisa Wang",
     sharedWith: [
       { type: "team", name: "Marketing Team", access: "edit" },
-      { type: "user", name: "Chris Lee", email: "chris@company.com", access: "view" },
+      {
+        type: "user",
+        name: "Chris Lee",
+        email: "chris@company.com",
+        access: "view",
+      },
     ],
     sharedAt: "2024-01-01",
     lastAccessed: "1 week ago",
     views: 193,
     accessType: "direct",
   },
-]
+];
+
+const mapDashboardToSharedContent = (dashboard: Dashboard): SharedContent => ({
+  id: dashboard.id,
+  name: dashboard.name,
+  type: "dashboard",
+  owner: dashboard.owner_name || "Unknown",
+  sharedWith: dashboard.is_public
+    ? [
+        {
+          type: "public" as const,
+          name: "Anyone with link",
+          access: "view" as AccessLevel,
+        },
+      ]
+    : [],
+  sharedAt: dashboard.created_at
+    ? new Date(dashboard.created_at).toISOString().split("T")[0]
+    : "Unknown",
+  lastAccessed: dashboard.last_viewed_at
+    ? new Date(dashboard.last_viewed_at).toLocaleString()
+    : "Never",
+  views: dashboard.view_count || 0,
+  accessType: dashboard.is_public ? "link" : "direct",
+});
+
+const mapReportToSharedContent = (report: Report): SharedContent => ({
+  id: report.id,
+  name: report.name,
+  type: "report",
+  owner: report.owner_name || "Unknown",
+  sharedWith: [],
+  sharedAt: report.created_at
+    ? new Date(report.created_at).toISOString().split("T")[0]
+    : "Unknown",
+  lastAccessed: report.last_delivered_at
+    ? new Date(report.last_delivered_at).toLocaleString()
+    : "Never",
+  views: 0,
+  accessType: "direct",
+});
 
 export default function SharedContentPage() {
-  const [content, setContent] = useState<SharedContent[]>(mockSharedContent)
-  const [filterType, setFilterType] = useState<ContentType>("all")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedContent, setSelectedContent] = useState<SharedContent | null>(null)
-  const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false)
+  const [content, setContent] = useState<SharedContent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<ContentType>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedContent, setSelectedContent] = useState<SharedContent | null>(
+    null
+  );
+  const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
+
+  const loadContent = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const [dashboards, reports] = await Promise.all([
+        analyticsApi.getDashboards({ public: true }),
+        analyticsApi.getReports(),
+      ]);
+
+      const sharedContent: SharedContent[] = [
+        ...dashboards.map(mapDashboardToSharedContent),
+        ...reports.map(mapReportToSharedContent),
+      ];
+      setContent(sharedContent);
+    } catch (err) {
+      console.error("Failed to load shared content:", err);
+      setError("Failed to load shared content");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadContent();
+  }, [loadContent]);
 
   const filteredContent = content.filter((item) => {
-    const matchesType = filterType === "all" || item.type === filterType
+    const matchesType = filterType === "all" || item.type === filterType;
     const matchesSearch =
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.owner.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesType && matchesSearch
-  })
+      item.owner.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesType && matchesSearch;
+  });
 
   const getTypeIcon = (type: string) => {
     switch (type) {
       case "dashboard":
-        return IconLayoutDashboard
+        return IconLayoutDashboard;
       case "report":
-        return IconFileText
+        return IconFileText;
       case "workbook":
-        return IconBook
+        return IconBook;
       default:
-        return IconShare
+        return IconShare;
     }
-  }
+  };
 
   const getAccessBadge = (access: AccessLevel) => {
     switch (access) {
       case "admin":
-        return { variant: "default" as const, label: "Admin" }
+        return { variant: "default" as const, label: "Admin" };
       case "edit":
-        return { variant: "secondary" as const, label: "Can Edit" }
+        return { variant: "secondary" as const, label: "Can Edit" };
       case "view":
-        return { variant: "outline" as const, label: "View Only" }
+        return { variant: "outline" as const, label: "View Only" };
     }
-  }
+  };
 
   const revokeAccess = (contentId: string) => {
-    setContent(content.filter((c) => c.id !== contentId))
+    setContent(content.filter((c) => c.id !== contentId));
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="border-destructive">
+        <CardContent className="flex items-center gap-2 py-4">
+          <IconAlertCircle className="h-5 w-5 text-destructive" />
+          <span className="text-destructive">{error}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadContent}
+            className="ml-auto"
+          >
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -208,7 +332,10 @@ export default function SharedContentPage() {
             className="pl-9"
           />
         </div>
-        <Tabs value={filterType} onValueChange={(v) => setFilterType(v as ContentType)}>
+        <Tabs
+          value={filterType}
+          onValueChange={(v) => setFilterType(v as ContentType)}
+        >
           <TabsList>
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="dashboard">Dashboards</TabsTrigger>
@@ -221,7 +348,7 @@ export default function SharedContentPage() {
       {/* Shared Content List */}
       <div className="space-y-4">
         {filteredContent.map((item) => {
-          const TypeIcon = getTypeIcon(item.type)
+          const TypeIcon = getTypeIcon(item.type);
           return (
             <Card key={item.id}>
               <CardHeader>
@@ -259,8 +386,8 @@ export default function SharedContentPage() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {
-                          setSelectedContent(item)
-                          setPermissionsDialogOpen(true)
+                          setSelectedContent(item);
+                          setPermissionsDialogOpen(true);
                         }}
                       >
                         <IconSettings className="h-4 w-4 mr-2" />
@@ -289,7 +416,7 @@ export default function SharedContentPage() {
                     <h4 className="text-sm font-medium mb-3">Shared with</h4>
                     <div className="space-y-2">
                       {item.sharedWith.map((share, index) => {
-                        const accessInfo = getAccessBadge(share.access)
+                        const accessInfo = getAccessBadge(share.access);
                         return (
                           <div
                             key={index}
@@ -315,17 +442,24 @@ export default function SharedContentPage() {
                                 </Avatar>
                               )}
                               <div>
-                                <p className="text-sm font-medium">{share.name}</p>
+                                <p className="text-sm font-medium">
+                                  {share.name}
+                                </p>
                                 {share.email && (
-                                  <p className="text-xs text-muted-foreground">{share.email}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {share.email}
+                                  </p>
                                 )}
                               </div>
                             </div>
-                            <Badge variant={accessInfo.variant} className="text-xs">
+                            <Badge
+                              variant={accessInfo.variant}
+                              className="text-xs"
+                            >
                               {accessInfo.label}
                             </Badge>
                           </div>
-                        )
+                        );
                       })}
                     </div>
                   </div>
@@ -351,7 +485,7 @@ export default function SharedContentPage() {
                 </div>
               </CardContent>
             </Card>
-          )
+          );
         })}
       </div>
 
@@ -360,7 +494,9 @@ export default function SharedContentPage() {
           <CardContent className="flex items-center justify-center h-[300px]">
             <div className="text-center">
               <IconShare className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-20" />
-              <h3 className="text-lg font-semibold mb-2">No shared content found</h3>
+              <h3 className="text-lg font-semibold mb-2">
+                No shared content found
+              </h3>
               <p className="text-sm text-muted-foreground">
                 {searchQuery
                   ? "Try adjusting your search query"
@@ -372,7 +508,10 @@ export default function SharedContentPage() {
       )}
 
       {/* Permissions Dialog */}
-      <Dialog open={permissionsDialogOpen} onOpenChange={setPermissionsDialogOpen}>
+      <Dialog
+        open={permissionsDialogOpen}
+        onOpenChange={setPermissionsDialogOpen}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Manage Permissions</DialogTitle>
@@ -385,7 +524,10 @@ export default function SharedContentPage() {
             <div className="space-y-2">
               <Label>Add people or teams</Label>
               <div className="flex gap-2">
-                <Input placeholder="Enter email or team name" className="flex-1" />
+                <Input
+                  placeholder="Enter email or team name"
+                  className="flex-1"
+                />
                 <Select defaultValue="view">
                   <SelectTrigger className="w-[140px]">
                     <SelectValue />
@@ -405,7 +547,7 @@ export default function SharedContentPage() {
               <Label>Who has access</Label>
               <div className="max-h-[300px] overflow-y-auto space-y-2">
                 {selectedContent?.sharedWith.map((share, index) => {
-                  const accessInfo = getAccessBadge(share.access)
+                  const accessInfo = getAccessBadge(share.access);
                   return (
                     <div
                       key={index}
@@ -429,7 +571,9 @@ export default function SharedContentPage() {
                         <div>
                           <p className="text-sm font-medium">{share.name}</p>
                           {share.email && (
-                            <p className="text-xs text-muted-foreground">{share.email}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {share.email}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -449,7 +593,7 @@ export default function SharedContentPage() {
                         </Button>
                       </div>
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -492,7 +636,10 @@ export default function SharedContentPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPermissionsDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setPermissionsDialogOpen(false)}
+            >
               Close
             </Button>
             <Button>Save Changes</Button>
@@ -500,5 +647,5 @@ export default function SharedContentPage() {
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

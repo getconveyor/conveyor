@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react";
 import {
   IconPlus,
   IconSearch,
@@ -14,25 +14,25 @@ import {
   IconAlertCircle,
   IconLoader2,
   IconPlayerPause,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+} from "@tabler/icons-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -40,7 +40,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,113 +50,115 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { integrationApi, PipelineRun } from "@/lib/api/integration";
 
-type JobStatus = "running" | "completed" | "failed" | "queued"
+type JobStatus = "running" | "completed" | "failed" | "queued";
 
 interface Job {
-  id: string
-  name: string
-  workflow: string
-  status: JobStatus
-  startTime: string
-  duration: string
-  recordsProcessed: string
-  progress: number
+  id: string;
+  name: string;
+  workflow: string;
+  status: JobStatus;
+  startTime: string;
+  duration: string;
+  recordsProcessed: string;
+  progress: number;
 }
 
-const initialJobs: Job[] = [
-  {
-    id: "1",
-    name: "Customer ETL Run #1247",
-    workflow: "Customer Data ETL",
-    status: "running",
-    startTime: "2 minutes ago",
-    duration: "2m 15s",
-    recordsProcessed: "45,231",
-    progress: 67,
-  },
-  {
-    id: "2",
-    name: "Sales Analytics #892",
-    workflow: "Sales Analytics Pipeline",
-    status: "completed",
-    startTime: "15 minutes ago",
-    duration: "8m 42s",
-    recordsProcessed: "128,456",
-    progress: 100,
-  },
-  {
-    id: "3",
-    name: "Data Quality Check #156",
-    workflow: "Daily Data Quality Check",
-    status: "failed",
-    startTime: "2 hours ago",
-    duration: "1m 23s",
-    recordsProcessed: "2,145",
-    progress: 15,
-  },
-  {
-    id: "4",
-    name: "Event Processing #5623",
-    workflow: "Real-time Event Processing",
-    status: "running",
-    startTime: "Just now",
-    duration: "Continuous",
-    recordsProcessed: "1.2M",
-    progress: 100,
-  },
-  {
-    id: "5",
-    name: "Weekly Report #45",
-    workflow: "Weekly Report Generation",
-    status: "queued",
-    startTime: "Scheduled",
-    duration: "-",
-    recordsProcessed: "-",
-    progress: 0,
-  },
-]
+const mapPipelineRunToJob = (run: PipelineRun): Job => {
+  const status: JobStatus =
+    run.status === "running"
+      ? "running"
+      : run.status === "success"
+      ? "completed"
+      : run.status === "failed"
+      ? "failed"
+      : "queued";
 
-const statusConfig: Record<JobStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  return {
+    id: run.id,
+    name: `Run ${run.id.slice(0, 8)}`,
+    workflow: run.pipeline_name || "Unknown Pipeline",
+    status,
+    startTime: run.start_time
+      ? new Date(run.start_time).toLocaleString()
+      : "Scheduled",
+    duration: run.duration
+      ? `${Math.floor(run.duration / 60)}m ${run.duration % 60}s`
+      : "-",
+    recordsProcessed: run.records_processed
+      ? run.records_processed.toLocaleString()
+      : "-",
+    progress: status === "completed" ? 100 : status === "running" ? 50 : 0,
+  };
+};
+
+const statusConfig: Record<
+  JobStatus,
+  {
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+  }
+> = {
   running: { label: "Running", variant: "default" },
   completed: { label: "Completed", variant: "outline" },
   failed: { label: "Failed", variant: "destructive" },
   queued: { label: "Queued", variant: "secondary" },
-}
+};
 
 export default function JobsPage() {
-  const [jobs, setJobs] = useState<Job[]>(initialJobs)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [isRunJobDialogOpen, setIsRunJobDialogOpen] = useState(false)
-  const [jobToCancel, setJobToCancel] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [selectedWorkflow, setSelectedWorkflow] = useState("")
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isRunJobDialogOpen, setIsRunJobDialogOpen] = useState(false);
+  const [jobToCancel, setJobToCancel] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedWorkflow, setSelectedWorkflow] = useState("");
+
+  const loadJobs = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const runs = await integrationApi.getPipelineRuns();
+      setJobs(runs.map(mapPipelineRunToJob));
+    } catch (err) {
+      console.error("Failed to load jobs:", err);
+      setError("Failed to load jobs");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadJobs();
+  }, [loadJobs]);
 
   const filteredJobs = jobs.filter((job) => {
-    const matchesSearch = job.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.workflow.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || job.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+    const matchesSearch =
+      job.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.workflow.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "all" || job.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const stats = {
     total: jobs.length,
-    running: jobs.filter(j => j.status === "running").length,
-    completed: jobs.filter(j => j.status === "completed").length,
-    failed: jobs.filter(j => j.status === "failed").length,
-  }
+    running: jobs.filter((j) => j.status === "running").length,
+    completed: jobs.filter((j) => j.status === "completed").length,
+    failed: jobs.filter((j) => j.status === "failed").length,
+  };
 
   const handleRunJob = async () => {
-    if (!selectedWorkflow) return
+    if (!selectedWorkflow) return;
 
-    setIsLoading(true)
+    setIsLoading(true);
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    const jobNumber = jobs.length + 1
+    const jobNumber = jobs.length + 1;
     const newJob: Job = {
       id: Date.now().toString(),
       name: `${selectedWorkflow} Run #${jobNumber}`,
@@ -166,23 +168,23 @@ export default function JobsPage() {
       duration: "0s",
       recordsProcessed: "0",
       progress: 0,
-    }
+    };
 
-    setJobs([newJob, ...jobs])
-    setIsLoading(false)
-    setIsRunJobDialogOpen(false)
-    setSelectedWorkflow("")
-  }
+    setJobs([newJob, ...jobs]);
+    setIsLoading(false);
+    setIsRunJobDialogOpen(false);
+    setSelectedWorkflow("");
+  };
 
   const handleCancelJob = async () => {
-    if (!jobToCancel) return
+    if (!jobToCancel) return;
 
-    setIsLoading(true)
+    setIsLoading(true);
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
-    setJobs(jobs =>
-      jobs.map(j =>
+    setJobs((jobs) =>
+      jobs.map((j) =>
         j.id === jobToCancel
           ? {
               ...j,
@@ -191,10 +193,10 @@ export default function JobsPage() {
             }
           : j
       )
-    )
-    setIsLoading(false)
-    setJobToCancel(null)
-  }
+    );
+    setIsLoading(false);
+    setJobToCancel(null);
+  };
 
   return (
     <>
@@ -215,25 +217,37 @@ export default function JobsPage() {
       <div className="grid gap-2 md:grid-cols-4">
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Total</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Total
+            </div>
             <div className="text-xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Running</div>
-            <div className="text-xl font-bold text-blue-500">{stats.running}</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Running
+            </div>
+            <div className="text-xl font-bold text-blue-500">
+              {stats.running}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Completed</div>
-            <div className="text-xl font-bold text-green-500">{stats.completed}</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Completed
+            </div>
+            <div className="text-xl font-bold text-green-500">
+              {stats.completed}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Failed</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Failed
+            </div>
             <div className="text-xl font-bold text-red-500">{stats.failed}</div>
           </CardContent>
         </Card>
@@ -283,7 +297,10 @@ export default function JobsPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <IconTerminal className="h-4 w-4 text-muted-foreground" />
                         <h3 className="font-semibold text-sm">{job.name}</h3>
-                        <Badge variant={statusConfig[job.status].variant} className="text-xs">
+                        <Badge
+                          variant={statusConfig[job.status].variant}
+                          className="text-xs"
+                        >
                           {statusConfig[job.status].label}
                         </Badge>
                       </div>
@@ -293,7 +310,9 @@ export default function JobsPage() {
                       {job.status === "running" && (
                         <div className="mb-2">
                           <div className="flex items-center justify-between text-xs mb-1">
-                            <span className="text-muted-foreground">Progress</span>
+                            <span className="text-muted-foreground">
+                              Progress
+                            </span>
                             <span className="font-medium">{job.progress}%</span>
                           </div>
                           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -319,12 +338,15 @@ export default function JobsPage() {
                         </div>
                         <div>
                           <p className="text-muted-foreground">Status</p>
-                          <p className="font-medium">{statusConfig[job.status].label}</p>
+                          <p className="font-medium">
+                            {statusConfig[job.status].label}
+                          </p>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      {(job.status === "running" || job.status === "queued") && (
+                      {(job.status === "running" ||
+                        job.status === "queued") && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -344,7 +366,12 @@ export default function JobsPage() {
                       )}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={isLoading}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            disabled={isLoading}
+                          >
                             <IconDotsVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -363,7 +390,8 @@ export default function JobsPage() {
                               View Error
                             </DropdownMenuItem>
                           )}
-                          {(job.status === "completed" || job.status === "failed") && (
+                          {(job.status === "completed" ||
+                            job.status === "failed") && (
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem>
@@ -388,13 +416,17 @@ export default function JobsPage() {
         open={isRunJobDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
-            setIsRunJobDialogOpen(false)
-            setSelectedWorkflow("")
+            setIsRunJobDialogOpen(false);
+            setSelectedWorkflow("");
           }
         }}
         modal
       >
-        <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+        <DialogContent
+          className="max-w-md"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>Run Job</DialogTitle>
             <DialogDescription>
@@ -404,16 +436,29 @@ export default function JobsPage() {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="workflow">Workflow</Label>
-              <Select value={selectedWorkflow} onValueChange={setSelectedWorkflow}>
+              <Select
+                value={selectedWorkflow}
+                onValueChange={setSelectedWorkflow}
+              >
                 <SelectTrigger id="workflow">
                   <SelectValue placeholder="Select workflow" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Customer Data ETL">Customer Data ETL</SelectItem>
-                  <SelectItem value="Sales Analytics Pipeline">Sales Analytics Pipeline</SelectItem>
-                  <SelectItem value="Real-time Event Processing">Real-time Event Processing</SelectItem>
-                  <SelectItem value="Daily Data Quality Check">Daily Data Quality Check</SelectItem>
-                  <SelectItem value="Weekly Report Generation">Weekly Report Generation</SelectItem>
+                  <SelectItem value="Customer Data ETL">
+                    Customer Data ETL
+                  </SelectItem>
+                  <SelectItem value="Sales Analytics Pipeline">
+                    Sales Analytics Pipeline
+                  </SelectItem>
+                  <SelectItem value="Real-time Event Processing">
+                    Real-time Event Processing
+                  </SelectItem>
+                  <SelectItem value="Daily Data Quality Check">
+                    Daily Data Quality Check
+                  </SelectItem>
+                  <SelectItem value="Weekly Report Generation">
+                    Weekly Report Generation
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -422,14 +467,17 @@ export default function JobsPage() {
             <Button
               variant="outline"
               onClick={() => {
-                setIsRunJobDialogOpen(false)
-                setSelectedWorkflow("")
+                setIsRunJobDialogOpen(false);
+                setSelectedWorkflow("");
               }}
               disabled={isLoading}
             >
               Cancel
             </Button>
-            <Button onClick={handleRunJob} disabled={!selectedWorkflow || isLoading}>
+            <Button
+              onClick={handleRunJob}
+              disabled={!selectedWorkflow || isLoading}
+            >
               {isLoading ? (
                 <>
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -447,16 +495,22 @@ export default function JobsPage() {
       </Dialog>
 
       {/* Cancel Job Confirmation Dialog */}
-      <AlertDialog open={!!jobToCancel} onOpenChange={(open) => !open && setJobToCancel(null)}>
+      <AlertDialog
+        open={!!jobToCancel}
+        onOpenChange={(open) => !open && setJobToCancel(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel Job?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will stop the job execution. The job will be marked as failed.
+              This will stop the job execution. The job will be marked as
+              failed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isLoading}>Keep Running</AlertDialogCancel>
+            <AlertDialogCancel disabled={isLoading}>
+              Keep Running
+            </AlertDialogCancel>
             <AlertDialogAction onClick={handleCancelJob} disabled={isLoading}>
               {isLoading ? (
                 <>
@@ -471,5 +525,5 @@ export default function JobsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }

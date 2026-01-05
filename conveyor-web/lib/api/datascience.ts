@@ -401,6 +401,76 @@ export const dataScienceApi = {
     );
   },
 
+  // Model Serving
+  async deployModelVersion(id: string): Promise<{
+    detail: string;
+    deployment_key: string;
+    endpoint: string;
+  }> {
+    return apiClient.post(
+      `/api/data-science/versions/${id}/deploy/`,
+      {},
+      getAuthOptions()
+    );
+  },
+
+  async undeployModelVersion(id: string): Promise<{ detail: string }> {
+    return apiClient.post(
+      `/api/data-science/versions/${id}/undeploy/`,
+      {},
+      getAuthOptions()
+    );
+  },
+
+  async predict(
+    versionId: string,
+    data: number[] | number[][] | Record<string, any>
+  ): Promise<{
+    model: string;
+    version: number;
+    predictions: any[];
+    timestamp: string;
+  }> {
+    return apiClient.post(
+      `/api/data-science/versions/${versionId}/predict/`,
+      { data },
+      getAuthOptions()
+    );
+  },
+
+  async batchPredict(
+    versionId: string,
+    batch: any[][]
+  ): Promise<{
+    model: string;
+    version: number;
+    predictions: any[];
+    batch_size: number;
+    timestamp: string;
+  }> {
+    return apiClient.post(
+      `/api/data-science/versions/${versionId}/batch_predict/`,
+      { batch },
+      getAuthOptions()
+    );
+  },
+
+  async getServingInfo(versionId: string): Promise<{
+    model_id: string;
+    model_name: string;
+    version: number;
+    is_deployed: boolean;
+    deployed_at: string | null;
+    framework: string;
+    endpoint: string | null;
+    batch_endpoint: string | null;
+  }> {
+    return apiClient.get(
+      `/api/data-science/versions/${versionId}/serving_info/`,
+      getAuthOptions()
+    );
+  },
+
   // Feature Groups
   async getFeatureGroups(params?: {
     entity_type?: string;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import {
   IconArrowsExchange,
   IconTransform,
@@ -32,37 +33,81 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
+import { monitoringApi, SystemOverview } from "@/lib/api/monitoring";
+import { streamingApi, StreamDashboard } from "@/lib/api/streaming";
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
 
 export default function Page() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [monitoringOverview, setMonitoringOverview] =
+    useState<SystemOverview | null>(null);
+  const [streamDashboard, setStreamDashboard] =
+    useState<StreamDashboard | null>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [monitoring, streaming] = await Promise.all([
+        monitoringApi.getSystemOverview(),
+        streamingApi.getDashboard(),
+      ]);
+      setMonitoringOverview(monitoring);
+      setStreamDashboard(streaming);
+    } catch (err) {
+      console.error("Failed to fetch dashboard data:", err);
+      setError("Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
   const platformStats = [
     {
       title: "Active Pipelines",
-      value: "24",
-      change: "+12%",
+      value: loading ? "-" : String(monitoringOverview?.total_pipelines || 0),
+      change: `${monitoringOverview?.running_pipelines || 0} running`,
       icon: IconArrowsExchange,
       trend: "up",
     },
     {
       title: "Data Processed",
-      value: "1.2TB",
-      change: "+8%",
+      value: loading
+        ? "-"
+        : formatBytes(monitoringOverview?.storage_used_bytes || 0),
+      change: `${(
+        monitoringOverview?.records_processed || 0
+      ).toLocaleString()} records`,
       icon: IconDatabase,
       trend: "up",
     },
     {
       title: "Running Jobs",
-      value: "8",
-      change: "-3%",
+      value: loading ? "-" : String(monitoringOverview?.running_pipelines || 0),
+      change: `${monitoringOverview?.failed_pipelines || 0} failed`,
       icon: IconClock,
-      trend: "down",
+      trend: monitoringOverview?.failed_pipelines ? "down" : "up",
     },
     {
       title: "Active Alerts",
-      value: "3",
-      change: "+2",
+      value: loading ? "-" : String(streamDashboard?.active_alerts || 0),
+      change: "Requires attention",
       icon: IconAlertTriangle,
-      trend: "up",
+      trend: (streamDashboard?.active_alerts || 0) > 0 ? "up" : "down",
     },
   ];
 
@@ -260,14 +305,20 @@ export default function Page() {
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p
-                className={`text-xs ${
-                  stat.trend === "up" ? "text-green-500" : "text-red-500"
-                }`}
-              >
-                {stat.change} from last month
-              </p>
+              {loading ? (
+                <Skeleton className="h-8 w-full" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{stat.value}</div>
+                  <p
+                    className={`text-xs ${
+                      stat.trend === "up" ? "text-green-500" : "text-red-500"
+                    }`}
+                  >
+                    {stat.change}
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         ))}

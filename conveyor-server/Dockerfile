@@ -9,9 +9,12 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (including build tools for psutil)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    libc-dev \
+    linux-libc-dev \
+    python3-dev \
     postgresql-client \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*

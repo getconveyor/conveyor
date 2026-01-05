@@ -227,6 +227,30 @@ export const monitoringApi = {
       getAuthOptions()
     );
   },
+
+  // Global Search
+  async globalSearch(params: {
+    q: string;
+    types?: string;
+    limit?: number;
+  }): Promise<{
+    query: string;
+    total_results: number;
+    results: Array<{
+      id: string;
+      type: string;
+      name: string;
+      description: string;
+      url: string;
+      relevance_score: number;
+      [key: string]: any;
+    }>;
+  }> {
+    return apiClient.get("/api/monitoring/search/", {
+      ...getAuthOptions(),
+      params,
+    });
+  },
 };
 
 export default monitoringApi;
