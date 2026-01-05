@@ -1,3 +1,5 @@
+"use client";
+
 import {
   IconArrowsExchange,
   IconTransform,
@@ -19,10 +21,18 @@ import {
   IconVideo,
   IconSchool,
   IconRocket,
-} from "@tabler/icons-react"
-import Link from "next/link"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+  IconLayoutDashboard,
+} from "@tabler/icons-react";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/page-header";
 
 export default function Page() {
   const platformStats = [
@@ -54,7 +64,7 @@ export default function Page() {
       icon: IconAlertTriangle,
       trend: "up",
     },
-  ]
+  ];
 
   const quickLinks = [
     {
@@ -105,12 +115,13 @@ export default function Page() {
       color: "text-cyan-500",
       bgColor: "bg-cyan-500/10",
     },
-  ]
+  ];
 
   const tutorials = [
     {
       title: "Getting Started",
-      description: "Learn the basics of the platform and create your first pipeline",
+      description:
+        "Learn the basics of the platform and create your first pipeline",
       icon: IconRocket,
       duration: "10 min",
       type: "Tutorial",
@@ -144,7 +155,7 @@ export default function Page() {
       url: "#",
       color: "text-orange-500",
     },
-  ]
+  ];
 
   const platformSections = [
     {
@@ -228,30 +239,33 @@ export default function Page() {
       color: "text-yellow-500",
       bgColor: "bg-yellow-500/10",
     },
-  ]
+  ];
 
   return (
-    <>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Platform Overview</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Monitor and manage your data platform
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Platform Overview"
+        description="Monitor and manage your data platform"
+        icon={IconLayoutDashboard}
+      />
 
       {/* Key Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {platformStats.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {stat.title}
+              </CardTitle>
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
-              <p className={`text-xs ${stat.trend === "up" ? "text-green-500" : "text-red-500"}`}>
+              <p
+                className={`text-xs ${
+                  stat.trend === "up" ? "text-green-500" : "text-red-500"
+                }`}
+              >
                 {stat.change} from last month
               </p>
             </CardContent>
@@ -268,12 +282,16 @@ export default function Page() {
               <Card className="hover:shadow-md transition-all hover:border-primary cursor-pointer">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${link.bgColor}`}>
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-lg ${link.bgColor}`}
+                    >
                       <link.icon className={`h-5 w-5 ${link.color}`} />
                     </div>
                     <div>
                       <p className="font-semibold text-sm">{link.title}</p>
-                      <p className="text-xs text-muted-foreground">{link.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {link.description}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -293,25 +311,38 @@ export default function Page() {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {tutorials.map((tutorial) => (
-            <Card key={tutorial.title} className="hover:shadow-md transition-shadow">
+            <Card
+              key={tutorial.title}
+              className="hover:shadow-md transition-shadow"
+            >
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${tutorial.color} bg-opacity-10`}>
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-lg ${tutorial.color} bg-opacity-10`}
+                    >
                       <tutorial.icon className={`h-5 w-5 ${tutorial.color}`} />
                     </div>
                     <div>
-                      <CardTitle className="text-base">{tutorial.title}</CardTitle>
+                      <CardTitle className="text-base">
+                        {tutorial.title}
+                      </CardTitle>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-xs px-2 py-0.5 rounded-full bg-opacity-10 ${tutorial.color}`}>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full bg-opacity-10 ${tutorial.color}`}
+                        >
                           {tutorial.type}
                         </span>
-                        <span className="text-xs text-muted-foreground">{tutorial.duration}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {tutorial.duration}
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
-                <CardDescription className="mt-2">{tutorial.description}</CardDescription>
+                <CardDescription className="mt-2">
+                  {tutorial.description}
+                </CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 <Button asChild variant="ghost" size="sm" className="w-full">
@@ -330,10 +361,15 @@ export default function Page() {
         <h2 className="text-2xl font-semibold mb-4">Platform Services</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {platformSections.map((section) => (
-            <Card key={section.title} className="hover:shadow-md transition-shadow">
+            <Card
+              key={section.title}
+              className="hover:shadow-md transition-shadow"
+            >
               <CardHeader>
                 <div className="flex items-center gap-3 mb-2">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${section.bgColor}`}>
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-lg ${section.bgColor}`}
+                  >
                     <section.icon className={`h-5 w-5 ${section.color}`} />
                   </div>
                   <div>
@@ -345,8 +381,13 @@ export default function Page() {
               <CardContent>
                 <div className="space-y-1 mb-4">
                   {Object.entries(section.stats).map(([key, value]) => (
-                    <div key={key} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground capitalize">{key}</span>
+                    <div
+                      key={key}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="text-muted-foreground capitalize">
+                        {key}
+                      </span>
                       <span className="font-medium">{value}</span>
                     </div>
                   ))}
@@ -400,19 +441,28 @@ export default function Page() {
                 color: "text-indigo-500",
               },
             ].map((activity, index) => (
-              <div key={index} className="flex items-start gap-4 pb-4 border-b last:border-0 last:pb-0">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${activity.color} bg-opacity-10`}>
+              <div
+                key={index}
+                className="flex items-start gap-4 pb-4 border-b last:border-0 last:pb-0"
+              >
+                <div
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg ${activity.color} bg-opacity-10`}
+                >
                   <activity.icon className={`h-4 w-4 ${activity.color}`} />
                 </div>
                 <div className="flex-1 space-y-1">
-                  <p className="text-sm font-medium leading-none">{activity.title}</p>
-                  <p className="text-sm text-muted-foreground">{activity.time}</p>
+                  <p className="text-sm font-medium leading-none">
+                    {activity.title}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {activity.time}
+                  </p>
                 </div>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
-    </>
-  )
+    </div>
+  );
 }

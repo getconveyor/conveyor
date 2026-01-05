@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react";
 import {
   IconBell,
   IconCheck,
@@ -10,136 +10,200 @@ import {
   IconClock,
   IconTrash,
   IconDots,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
+  IconRefresh,
+} from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
+import { monitoringApi, Alert } from "@/lib/api/monitoring";
+import { formatDistanceToNow } from "date-fns";
 
 interface Notification {
-  id: string
-  type: "success" | "warning" | "error" | "info"
-  title: string
-  message: string
-  timestamp: string
-  read: boolean
+  id: string;
+  type: "success" | "warning" | "error" | "info";
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  originalAlert?: Alert;
 }
 
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    type: "error",
-    title: "Workflow Failed",
-    message: "ETL Pipeline - Daily Sales failed due to connection timeout",
-    timestamp: "2 minutes ago",
-    read: false,
-  },
-  {
-    id: "2",
-    type: "success",
-    title: "Workflow Completed",
-    message: "Data Quality Check completed successfully",
-    timestamp: "15 minutes ago",
-    read: false,
-  },
-  {
-    id: "3",
-    type: "warning",
-    title: "Alert Triggered",
-    message: "High Error Rate alert triggered - Error rate above 5%",
-    timestamp: "1 hour ago",
-    read: false,
-  },
-  {
-    id: "4",
-    type: "success",
-    title: "Dashboard Updated",
-    message: "Sales Analytics dashboard refreshed with latest data",
-    timestamp: "2 hours ago",
-    read: true,
-  },
-  {
-    id: "5",
-    type: "info",
-    title: "Scheduled Maintenance",
-    message: "System maintenance scheduled for tomorrow at 2:00 AM UTC",
-    timestamp: "3 hours ago",
-    read: true,
-  },
-  {
-    id: "6",
-    type: "success",
-    title: "Workflow Completed",
-    message: "Customer Data Sync completed successfully",
-    timestamp: "5 hours ago",
-    read: true,
-  },
-]
+// Convert Alert severity to notification type
+function alertToNotificationType(
+  severity: Alert["severity"]
+): Notification["type"] {
+  switch (severity) {
+    case "critical":
+    case "error":
+      return "error";
+    case "warning":
+      return "warning";
+    case "info":
+      return "info";
+    default:
+      return "info";
+  }
+}
+
+// Convert Alert status to read state (acknowledged/resolved = read)
+function alertToReadState(status: Alert["status"]): boolean {
+  return (
+    status === "acknowledged" || status === "resolved" || status === "dismissed"
+  );
+}
+
+// Convert Alert to Notification
+function alertToNotification(alert: Alert): Notification {
+  return {
+    id: alert.id,
+    type: alertToNotificationType(alert.severity),
+    title: alert.title,
+    message: alert.description,
+    timestamp: formatDistanceToNow(new Date(alert.created_at), {
+      addSuffix: true,
+    }),
+    read: alertToReadState(alert.status),
+    originalAlert: alert,
+  };
+}
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications)
-  const [workflowNotifs, setWorkflowNotifs] = useState(true)
-  const [alertNotifs, setAlertNotifs] = useState(true)
-  const [emailNotifs, setEmailNotifs] = useState(true)
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [workflowNotifs, setWorkflowNotifs] = useState(true);
+  const [alertNotifs, setAlertNotifs] = useState(true);
+  const [emailNotifs, setEmailNotifs] = useState(true);
 
-  const unreadCount = notifications.filter((n) => !n.read).length
+  const fetchNotifications = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      // Fetch alerts from monitoring API
+      const alerts = await monitoringApi.getAlerts();
+      const notifs = alerts.map(alertToNotification);
+      setNotifications(notifs);
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
+      setError("Failed to load notifications");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const getTypeIcon = (type: string) => {
     switch (type) {
       case "success":
-        return <IconCircleCheck className="h-5 w-5 text-green-500" />
+        return <IconCircleCheck className="h-5 w-5 text-green-500" />;
       case "warning":
-        return <IconAlertTriangle className="h-5 w-5 text-yellow-500" />
+        return <IconAlertTriangle className="h-5 w-5 text-yellow-500" />;
       case "error":
-        return <IconX className="h-5 w-5 text-red-500" />
+        return <IconX className="h-5 w-5 text-red-500" />;
       case "info":
-        return <IconBell className="h-5 w-5 text-blue-500" />
+        return <IconBell className="h-5 w-5 text-blue-500" />;
       default:
-        return <IconBell className="h-5 w-5 text-gray-500" />
+        return <IconBell className="h-5 w-5 text-gray-500" />;
     }
-  }
+  };
 
   const getTypeBadge = (type: string) => {
     switch (type) {
       case "success":
-        return <Badge variant="outline" className="text-green-600 text-xs">Success</Badge>
+        return (
+          <Badge
+            variant="outline"
+            className="text-green-600 border-green-600 text-xs"
+          >
+            Success
+          </Badge>
+        );
       case "warning":
-        return <Badge variant="outline" className="text-yellow-600 text-xs">Warning</Badge>
+        return (
+          <Badge
+            variant="outline"
+            className="text-yellow-600 border-yellow-600 text-xs"
+          >
+            Warning
+          </Badge>
+        );
       case "error":
-        return <Badge variant="destructive" className="text-xs">Error</Badge>
+        return (
+          <Badge variant="destructive" className="text-xs">
+            Error
+          </Badge>
+        );
       case "info":
-        return <Badge variant="outline" className="text-blue-600 text-xs">Info</Badge>
+        return (
+          <Badge variant="outline" className="text-blue-600 text-xs">
+            Info
+          </Badge>
+        );
       default:
-        return null
+        return null;
     }
-  }
+  };
 
-  const markAsRead = (id: string) => {
-    setNotifications(
-      notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
-    )
-  }
+  const markAsRead = async (id: string) => {
+    try {
+      // Acknowledge the alert on the backend
+      await monitoringApi.acknowledgeAlert(id);
+      setNotifications(
+        notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+    } catch (err) {
+      console.error("Failed to acknowledge alert:", err);
+    }
+  };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map((n) => ({ ...n, read: true })))
-  }
+  const markAllAsRead = async () => {
+    try {
+      // Acknowledge all unread alerts
+      const unreadAlerts = notifications.filter((n) => !n.read);
+      await Promise.all(
+        unreadAlerts.map((n) => monitoringApi.acknowledgeAlert(n.id))
+      );
+      setNotifications(notifications.map((n) => ({ ...n, read: true })));
+    } catch (err) {
+      console.error("Failed to acknowledge all alerts:", err);
+    }
+  };
 
-  const deleteNotification = (id: string) => {
-    setNotifications(notifications.filter((n) => n.id !== id))
-  }
+  const deleteNotification = async (id: string) => {
+    try {
+      // Dismiss the alert on the backend
+      await monitoringApi.dismissAlert(id);
+      setNotifications(notifications.filter((n) => n.id !== id));
+    } catch (err) {
+      console.error("Failed to dismiss alert:", err);
+    }
+  };
 
-  const unreadNotifications = notifications.filter((n) => !n.read)
-  const readNotifications = notifications.filter((n) => n.read)
+  const unreadNotifications = notifications.filter((n) => !n.read);
+  const readNotifications = notifications.filter((n) => n.read);
 
   return (
     <>
@@ -150,13 +214,33 @@ export default function NotificationsPage() {
             Manage your notifications and preferences
           </p>
         </div>
-        {unreadCount > 0 && (
-          <Button variant="outline" onClick={markAllAsRead}>
-            <IconCheck className="h-4 w-4 mr-2" />
-            Mark All as Read
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={fetchNotifications}
+            disabled={loading}
+          >
+            <IconRefresh
+              className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+            />
+            Refresh
           </Button>
-        )}
+          {unreadCount > 0 && (
+            <Button variant="outline" onClick={markAllAsRead}>
+              <IconCheck className="h-4 w-4 mr-2" />
+              Mark All as Read
+            </Button>
+          )}
+        </div>
       </div>
+
+      {error && (
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <p className="text-destructive">{error}</p>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="all" className="space-y-4">
         <TabsList>
@@ -174,14 +258,28 @@ export default function NotificationsPage() {
           <Card>
             <CardHeader>
               <CardTitle>All Notifications</CardTitle>
-              <CardDescription>
-                View all your notifications
-              </CardDescription>
+              <CardDescription>View all your notifications</CardDescription>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[600px]">
                 <div className="space-y-2">
-                  {notifications.length === 0 ? (
+                  {loading ? (
+                    <>
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <div
+                          key={i}
+                          className="flex items-start gap-4 p-4 rounded-lg border"
+                        >
+                          <Skeleton className="h-5 w-5 rounded-full" />
+                          <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-1/3" />
+                            <Skeleton className="h-4 w-2/3" />
+                            <Skeleton className="h-3 w-20" />
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  ) : notifications.length === 0 ? (
                     <div className="text-center py-12">
                       <IconBell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                       <p className="text-sm text-muted-foreground">
@@ -223,14 +321,18 @@ export default function NotificationsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             {!notification.read && (
-                              <DropdownMenuItem onClick={() => markAsRead(notification.id)}>
+                              <DropdownMenuItem
+                                onClick={() => markAsRead(notification.id)}
+                              >
                                 <IconCheck className="h-4 w-4 mr-2" />
                                 Mark as Read
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem
                               className="text-destructive"
-                              onClick={() => deleteNotification(notification.id)}
+                              onClick={() =>
+                                deleteNotification(notification.id)
+                              }
                             >
                               <IconTrash className="h-4 w-4 mr-2" />
                               Delete
@@ -254,7 +356,9 @@ export default function NotificationsPage() {
               <CardDescription>
                 {unreadCount === 0
                   ? "No unread notifications"
-                  : `You have ${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`}
+                  : `You have ${unreadCount} unread notification${
+                      unreadCount === 1 ? "" : "s"
+                    }`}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -297,13 +401,17 @@ export default function NotificationsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => markAsRead(notification.id)}>
+                            <DropdownMenuItem
+                              onClick={() => markAsRead(notification.id)}
+                            >
                               <IconCheck className="h-4 w-4 mr-2" />
                               Mark as Read
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive"
-                              onClick={() => deleteNotification(notification.id)}
+                              onClick={() =>
+                                deleteNotification(notification.id)
+                              }
                             >
                               <IconTrash className="h-4 w-4 mr-2" />
                               Delete
@@ -336,7 +444,10 @@ export default function NotificationsPage() {
                     Get notified when workflows complete or fail
                   </p>
                 </div>
-                <Switch checked={workflowNotifs} onCheckedChange={setWorkflowNotifs} />
+                <Switch
+                  checked={workflowNotifs}
+                  onCheckedChange={setWorkflowNotifs}
+                />
               </div>
 
               <Separator />
@@ -348,7 +459,10 @@ export default function NotificationsPage() {
                     Receive notifications when alerts are triggered
                   </p>
                 </div>
-                <Switch checked={alertNotifs} onCheckedChange={setAlertNotifs} />
+                <Switch
+                  checked={alertNotifs}
+                  onCheckedChange={setAlertNotifs}
+                />
               </div>
 
               <Separator />
@@ -360,7 +474,10 @@ export default function NotificationsPage() {
                     Send notification summaries to your email
                   </p>
                 </div>
-                <Switch checked={emailNotifs} onCheckedChange={setEmailNotifs} />
+                <Switch
+                  checked={emailNotifs}
+                  onCheckedChange={setEmailNotifs}
+                />
               </div>
 
               <Separator />
@@ -435,5 +552,5 @@ export default function NotificationsPage() {
         </TabsContent>
       </Tabs>
     </>
-  )
+  );
 }

@@ -71,6 +71,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PageHeader } from "@/components/page-header";
 
 type SourceStatus = "active" | "inactive" | "error" | "testing";
 type SourceCategory = "api" | "database" | "cloud" | "file";
@@ -439,21 +440,22 @@ export default function SourcesPage() {
   };
 
   return (
-    <>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">
-            Data Sources/Source Connections
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your configured data source connections
-          </p>
-        </div>
-        <Button onClick={() => setIsCatalogOpen(true)}>
-          <IconPlus className="mr-2 h-4 w-4" />
-          Add Source
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Data Sources"
+        description="Manage your configured data source connections"
+        icon={IconDatabase}
+        breadcrumbs={[
+          { label: "Data Integration", href: "/data-integration" },
+          { label: "Data Sources" },
+        ]}
+        actions={
+          <Button onClick={() => setIsCatalogOpen(true)}>
+            <IconPlus className="mr-2 h-4 w-4" />
+            Add Source
+          </Button>
+        }
+      />
 
       {/* Stats Cards */}
       <div className="grid gap-2 md:grid-cols-4">
@@ -1439,6 +1441,6 @@ export default function SourcesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

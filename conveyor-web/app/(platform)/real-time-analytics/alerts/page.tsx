@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react";
 import {
   IconPlus,
   IconAlertTriangle,
@@ -12,17 +12,25 @@ import {
   IconTrash,
   IconCircleCheck,
   IconClock,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+  IconRefresh,
+} from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -31,136 +39,220 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  monitoringApi,
+  Alert as MonitoringAlert,
+  AlertSummary,
+} from "@/lib/api/monitoring";
+import { formatDistanceToNow } from "date-fns";
 
 interface Alert {
-  id: string
-  name: string
-  condition: string
-  severity: "critical" | "warning" | "info"
-  status: "active" | "triggered" | "paused"
-  lastTriggered?: string
-  triggerCount: number
-  enabled: boolean
+  id: string;
+  name: string;
+  condition: string;
+  severity: "critical" | "warning" | "info" | "error";
+  status: "active" | "acknowledged" | "resolved" | "dismissed";
+  lastTriggered?: string;
+  triggerCount: number;
+  enabled: boolean;
+  originalAlert?: MonitoringAlert;
 }
 
-const mockAlerts: Alert[] = [
-  {
-    id: "1",
-    name: "High Error Rate",
-    condition: "Error rate > 5% for 5 minutes",
-    severity: "critical",
-    status: "triggered",
-    lastTriggered: "2 minutes ago",
-    triggerCount: 3,
-    enabled: true,
-  },
-  {
-    id: "2",
-    name: "Low Conversion Rate",
-    condition: "Conversion rate < 2% for 15 minutes",
-    severity: "warning",
-    status: "active",
-    lastTriggered: "1 hour ago",
-    triggerCount: 12,
-    enabled: true,
-  },
-  {
-    id: "3",
-    name: "API Response Time",
-    condition: "Avg response time > 500ms",
-    severity: "warning",
-    status: "active",
-    lastTriggered: "3 hours ago",
-    triggerCount: 5,
-    enabled: true,
-  },
-  {
-    id: "4",
-    name: "System Memory Usage",
-    condition: "Memory usage > 85%",
-    severity: "critical",
-    status: "paused",
-    lastTriggered: "1 day ago",
-    triggerCount: 1,
-    enabled: false,
-  },
-  {
-    id: "5",
-    name: "Traffic Spike",
-    condition: "Traffic > 10,000 users/min",
-    severity: "info",
-    status: "active",
-    lastTriggered: "Never",
-    triggerCount: 0,
-    enabled: true,
-  },
-]
+// Convert MonitoringAlert to local Alert type
+function monitoringAlertToAlert(alert: MonitoringAlert): Alert {
+  return {
+    id: alert.id,
+    name: alert.title,
+    condition: alert.description,
+    severity: alert.severity,
+    status: alert.status,
+    lastTriggered: formatDistanceToNow(new Date(alert.created_at), {
+      addSuffix: true,
+    }),
+    triggerCount: 1, // Would need backend counter for actual count
+    enabled: alert.status === "active",
+    originalAlert: alert,
+  };
+}
 
 export default function RealTimeAlertsPage() {
-  const [alerts, setAlerts] = useState<Alert[]>(mockAlerts)
-  const [filterStatus, setFilterStatus] = useState<string>("all")
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [summary, setSummary] = useState<AlertSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  const fetchAlerts = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [alertsData, summaryData] = await Promise.all([
+        monitoringApi.getAlerts(),
+        monitoringApi.getAlertSummary(),
+      ]);
+      setAlerts(alertsData.map(monitoringAlertToAlert));
+      setSummary(summaryData);
+    } catch (err) {
+      console.error("Failed to fetch alerts:", err);
+      setError("Failed to load alerts");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAlerts();
+  }, [fetchAlerts]);
 
   const filteredAlerts = alerts.filter((alert) => {
-    if (filterStatus === "all") return true
-    return alert.status === filterStatus
-  })
+    if (filterStatus === "all") return true;
+    return alert.status === filterStatus;
+  });
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "critical":
-        return "text-red-500"
+        return "text-red-500";
       case "warning":
-        return "text-yellow-500"
+        return "text-yellow-500";
       case "info":
-        return "text-blue-500"
+        return "text-blue-500";
       default:
-        return "text-gray-500"
+        return "text-gray-500";
     }
-  }
+  };
 
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
       case "critical":
-        return "destructive"
+        return "destructive";
       case "warning":
-        return "secondary"
+        return "secondary";
       case "info":
-        return "outline"
+        return "outline";
       default:
-        return "secondary"
+        return "secondary";
     }
-  }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "triggered":
-        return "destructive"
       case "active":
-        return "outline"
-      case "paused":
-        return "secondary"
+        return "destructive";
+      case "acknowledged":
+        return "outline";
+      case "resolved":
+        return "secondary";
+      case "dismissed":
+        return "secondary";
       default:
-        return "secondary"
+        return "secondary";
     }
+  };
+
+  const toggleAlert = async (id: string, alert: Alert) => {
+    try {
+      if (alert.status === "active") {
+        await monitoringApi.acknowledgeAlert(id);
+        setAlerts(
+          alerts.map((a) =>
+            a.id === id ? { ...a, enabled: false, status: "acknowledged" } : a
+          )
+        );
+      } else {
+        // For acknowledged alerts, resolve them
+        await monitoringApi.resolveAlert(id);
+        setAlerts(
+          alerts.map((a) =>
+            a.id === id ? { ...a, enabled: true, status: "resolved" } : a
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Failed to toggle alert:", err);
+    }
+  };
+
+  const dismissAlert = async (id: string) => {
+    try {
+      await monitoringApi.dismissAlert(id);
+      setAlerts(alerts.filter((a) => a.id !== id));
+    } catch (err) {
+      console.error("Failed to dismiss alert:", err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Real-time Alerts</h1>
+            <p className="text-sm text-muted-foreground">
+              Monitor and configure automated alert rules
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <CardContent className="pt-6">
+                <Skeleton className="h-16 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </>
+    );
   }
 
-  const toggleAlert = (id: string) => {
-    setAlerts(
-      alerts.map((a) => (a.id === id ? { ...a, enabled: !a.enabled, status: a.enabled ? "paused" : "active" as any } : a))
-    )
+  if (error) {
+    return (
+      <>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Real-time Alerts</h1>
+            <p className="text-sm text-muted-foreground">
+              Monitor and configure automated alert rules
+            </p>
+          </div>
+        </div>
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <p className="text-destructive">{error}</p>
+            <Button variant="outline" onClick={fetchAlerts} className="mt-4">
+              <IconRefresh className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </>
+    );
   }
 
   return (
@@ -239,10 +331,15 @@ export default function RealTimeAlertsPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setCreateDialogOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button onClick={() => setCreateDialogOpen(false)}>Create Alert</Button>
+              <Button onClick={() => setCreateDialogOpen(false)}>
+                Create Alert
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -255,9 +352,13 @@ export default function RealTimeAlertsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Alerts</p>
-                <p className="text-2xl font-bold">{alerts.length}</p>
+                <p className="text-2xl font-bold">
+                  {summary?.total || alerts.length}
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {alerts.filter((a) => a.enabled).length} active
+                  {summary?.active ||
+                    alerts.filter((a) => a.status === "active").length}{" "}
+                  active
                 </p>
               </div>
               <IconBell className="h-8 w-8 text-blue-500 opacity-20" />
@@ -269,11 +370,14 @@ export default function RealTimeAlertsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Triggered</p>
+                <p className="text-sm text-muted-foreground">Critical</p>
                 <p className="text-2xl font-bold text-red-500">
-                  {alerts.filter((a) => a.status === "triggered").length}
+                  {summary?.by_severity?.critical ||
+                    alerts.filter((a) => a.severity === "critical").length}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">Needs attention</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Needs attention
+                </p>
               </div>
               <IconAlertTriangle className="h-8 w-8 text-red-500 opacity-20" />
             </div>
@@ -284,11 +388,16 @@ export default function RealTimeAlertsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">This Hour</p>
-                <p className="text-2xl font-bold">8</p>
-                <p className="text-xs text-muted-foreground mt-1">Trigger events</p>
+                <p className="text-sm text-muted-foreground">Warning</p>
+                <p className="text-2xl font-bold text-yellow-500">
+                  {summary?.by_severity?.warning ||
+                    alerts.filter((a) => a.severity === "warning").length}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Should review
+                </p>
               </div>
-              <IconClock className="h-8 w-8 text-purple-500 opacity-20" />
+              <IconClock className="h-8 w-8 text-yellow-500 opacity-20" />
             </div>
           </CardContent>
         </Card>
@@ -297,11 +406,16 @@ export default function RealTimeAlertsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Resolution Rate</p>
-                <p className="text-2xl font-bold">94%</p>
-                <p className="text-xs text-muted-foreground mt-1">Last 24 hours</p>
+                <p className="text-sm text-muted-foreground">Info</p>
+                <p className="text-2xl font-bold text-blue-500">
+                  {summary?.by_severity?.info ||
+                    alerts.filter((a) => a.severity === "info").length}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Informational
+                </p>
               </div>
-              <IconCircleCheck className="h-8 w-8 text-green-500 opacity-20" />
+              <IconCircleCheck className="h-8 w-8 text-blue-500 opacity-20" />
             </div>
           </CardContent>
         </Card>
@@ -312,9 +426,9 @@ export default function RealTimeAlertsPage() {
         <Tabs value={filterStatus} onValueChange={setFilterStatus}>
           <TabsList>
             <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="triggered">Triggered</TabsTrigger>
             <TabsTrigger value="active">Active</TabsTrigger>
-            <TabsTrigger value="paused">Paused</TabsTrigger>
+            <TabsTrigger value="acknowledged">Acknowledged</TabsTrigger>
+            <TabsTrigger value="resolved">Resolved</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -336,25 +450,34 @@ export default function RealTimeAlertsPage() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1 space-y-3">
                         <div className="flex items-center gap-3">
-                          <IconAlertTriangle className={`h-5 w-5 ${getSeverityColor(alert.severity)}`} />
+                          <IconAlertTriangle
+                            className={`h-5 w-5 ${getSeverityColor(
+                              alert.severity
+                            )}`}
+                          />
                           <div>
                             <h4 className="font-semibold">{alert.name}</h4>
-                            <p className="text-sm text-muted-foreground">{alert.condition}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {alert.condition}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4 ml-8">
-                          <Badge variant={getSeverityBadge(alert.severity)} className="text-xs">
+                          <Badge
+                            variant={getSeverityBadge(alert.severity)}
+                            className="text-xs"
+                          >
                             {alert.severity}
                           </Badge>
-                          <Badge variant={getStatusBadge(alert.status)} className="text-xs">
+                          <Badge
+                            variant={getStatusBadge(alert.status)}
+                            className="text-xs"
+                          >
                             {alert.status}
                           </Badge>
-                          <div className="text-xs text-muted-foreground">
-                            Triggered {alert.triggerCount} times
-                          </div>
                           {alert.lastTriggered && (
                             <div className="text-xs text-muted-foreground">
-                              Last: {alert.lastTriggered}
+                              Created: {alert.lastTriggered}
                             </div>
                           )}
                         </div>
@@ -363,17 +486,26 @@ export default function RealTimeAlertsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => toggleAlert(alert.id)}
+                          onClick={() => toggleAlert(alert.id, alert)}
+                          disabled={
+                            alert.status === "resolved" ||
+                            alert.status === "dismissed"
+                          }
                         >
-                          {alert.enabled ? (
+                          {alert.status === "active" ? (
                             <>
                               <IconBellOff className="h-3 w-3 mr-2" />
-                              Disable
+                              Acknowledge
+                            </>
+                          ) : alert.status === "acknowledged" ? (
+                            <>
+                              <IconCircleCheck className="h-3 w-3 mr-2" />
+                              Resolve
                             </>
                           ) : (
                             <>
-                              <IconBell className="h-3 w-3 mr-2" />
-                              Enable
+                              <IconCircleCheck className="h-3 w-3 mr-2" />
+                              Resolved
                             </>
                           )}
                         </Button>
@@ -384,18 +516,21 @@ export default function RealTimeAlertsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => toggleAlert(alert.id, alert)}
+                            >
                               <IconEdit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <IconSettings className="h-4 w-4 mr-2" />
-                              Configure
+                              {alert.status === "active"
+                                ? "Acknowledge"
+                                : "Resolve"}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => dismissAlert(alert.id)}
+                            >
                               <IconTrash className="h-4 w-4 mr-2" />
-                              Delete
+                              Dismiss
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -409,5 +544,5 @@ export default function RealTimeAlertsPage() {
         </CardContent>
       </Card>
     </>
-  )
+  );
 }

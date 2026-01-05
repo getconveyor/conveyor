@@ -64,11 +64,11 @@ urlpatterns = [
     path('api/transformation/', include('transformation.urls')),
     path('api/data-lake/', include('data_lake.urls')),
     path('api/lakehouse/', include('warehouse.urls')),
-    # path('api/', include('streaming.urls')),
-    # path('api/', include('analytics.urls')),
-    # path('api/', include('data_science.urls')),
-    # path('api/', include('governance.urls')),
-    # path('api/', include('monitoring.urls')),
+    path('api/streaming/', include('streaming.urls')),
+    path('api/analytics/', include('analytics.urls')),
+    path('api/data-science/', include('data_science.urls')),
+    path('api/governance/', include('governance.urls')),
+    path('api/monitoring/', include('monitoring.urls')),
 
     # DRF Browsable API auth (for development)
     path('api-auth/', include('rest_framework.urls')),

@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   IconSearch,
   IconArrowRight,
@@ -12,171 +12,193 @@ import {
   IconSettings,
   IconHelp,
   IconClock,
-} from "@tabler/icons-react"
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
+  IconFile,
+  IconBrain,
+  IconActivity,
+  IconTag,
+  IconBook,
+  IconLoader2,
+} from "@tabler/icons-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from "@/contexts/auth-context";
 
 interface SearchResult {
-  id: string
-  title: string
-  description: string
-  category: "workflows" | "dashboards" | "notebooks" | "data-sources" | "settings" | "help"
-  path: string
+  id: string;
+  type: string;
+  name: string;
+  description: string;
+  url: string;
+  relevance_score?: number;
+  status?: string;
+  connector_type?: string;
+  model_type?: string;
+  file_type?: string;
+  stream_type?: string;
+  asset_type?: string;
 }
 
-const mockResults: SearchResult[] = [
-  {
-    id: "1",
-    title: "ETL Pipeline - Daily Sales",
-    description: "Extract, transform, and load daily sales data",
-    category: "workflows",
-    path: "/data-transformation/workflows/1",
-  },
-  {
-    id: "2",
-    title: "Sales Analytics Dashboard",
-    description: "Real-time sales metrics and KPIs",
-    category: "dashboards",
-    path: "/data-analytics/dashboards/1",
-  },
-  {
-    id: "3",
-    title: "Customer Data Cleanup",
-    description: "Python notebook for cleaning customer data",
-    category: "notebooks",
-    path: "/data-transformation/notebooks/1",
-  },
-  {
-    id: "4",
-    title: "PostgreSQL Production",
-    description: "Main production database connection",
-    category: "data-sources",
-    path: "/data-sources/postgresql/1",
-  },
-  {
-    id: "5",
-    title: "Data Quality Check",
-    description: "Automated data validation workflow",
-    category: "workflows",
-    path: "/data-transformation/workflows/2",
-  },
-  {
-    id: "6",
-    title: "Revenue Dashboard",
-    description: "Monthly and yearly revenue tracking",
-    category: "dashboards",
-    path: "/data-analytics/dashboards/2",
-  },
-  {
-    id: "7",
-    title: "Getting Started Guide",
-    description: "Quick start guide for new users",
-    category: "help",
-    path: "/help",
-  },
-  {
-    id: "8",
-    title: "Account Settings",
-    description: "Manage your account preferences",
-    category: "settings",
-    path: "/settings",
-  },
-]
+interface SearchResponse {
+  query: string;
+  total_results: number;
+  results: SearchResult[];
+}
 
 const recentSearches = [
   { query: "Sales dashboard", timestamp: "2 hours ago" },
   { query: "ETL workflow", timestamp: "Yesterday" },
   { query: "PostgreSQL", timestamp: "3 days ago" },
-]
+];
 
 interface GlobalSearchProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
-  const [query, setQuery] = useState("")
-  const [results, setResults] = useState<SearchResult[]>([])
-  const router = useRouter()
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const { token, currentWorkspace } = useAuth();
 
+  // Debounced search function
+  const performSearch = useCallback(
+    async (searchQuery: string) => {
+      if (!searchQuery.trim() || !token) {
+        setResults([]);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        };
+
+        if (currentWorkspace?.id) {
+          headers["X-Workspace-ID"] = currentWorkspace.id;
+        }
+
+        const response = await fetch(
+          `${
+            process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+          }/api/monitoring/search/?q=${encodeURIComponent(searchQuery)}`,
+          { headers }
+        );
+
+        if (!response.ok) {
+          throw new Error("Search failed");
+        }
+
+        const data: SearchResponse = await response.json();
+        setResults(data.results);
+      } catch (err) {
+        console.error("Search error:", err);
+        setError("Search failed. Please try again.");
+        setResults([]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [token, currentWorkspace?.id]
+  );
+
+  // Debounce search
   useEffect(() => {
-    if (query.trim().length > 0) {
-      const filtered = mockResults.filter(
-        (result) =>
-          result.title.toLowerCase().includes(query.toLowerCase()) ||
-          result.description.toLowerCase().includes(query.toLowerCase()) ||
-          result.category.toLowerCase().includes(query.toLowerCase())
-      )
-      setResults(filtered)
-    } else {
-      setResults([])
-    }
-  }, [query])
+    const timeoutId = setTimeout(() => {
+      performSearch(query);
+    }, 300);
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case "workflows":
-        return <IconPlaylist className="h-4 w-4" />
-      case "dashboards":
-        return <IconChartLine className="h-4 w-4" />
-      case "notebooks":
-        return <IconCode className="h-4 w-4" />
-      case "data-sources":
-        return <IconDatabase className="h-4 w-4" />
-      case "settings":
-        return <IconSettings className="h-4 w-4" />
-      case "help":
-        return <IconHelp className="h-4 w-4" />
+    return () => clearTimeout(timeoutId);
+  }, [query, performSearch]);
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "pipeline":
+        return <IconPlaylist className="h-4 w-4" />;
+      case "dashboard":
+        return <IconChartLine className="h-4 w-4" />;
+      case "query":
+        return <IconCode className="h-4 w-4" />;
+      case "source":
+        return <IconDatabase className="h-4 w-4" />;
+      case "transformation":
+        return <IconSettings className="h-4 w-4" />;
+      case "model":
+        return <IconBrain className="h-4 w-4" />;
+      case "file":
+        return <IconFile className="h-4 w-4" />;
+      case "stream":
+        return <IconActivity className="h-4 w-4" />;
+      case "asset":
+        return <IconTag className="h-4 w-4" />;
+      case "glossary":
+        return <IconBook className="h-4 w-4" />;
       default:
-        return <IconSearch className="h-4 w-4" />
+        return <IconSearch className="h-4 w-4" />;
     }
-  }
+  };
 
-  const getCategoryLabel = (category: string) => {
-    switch (category) {
-      case "workflows":
-        return "Workflow"
-      case "dashboards":
-        return "Dashboard"
-      case "notebooks":
-        return "Notebook"
-      case "data-sources":
-        return "Data Source"
-      case "settings":
-        return "Settings"
-      case "help":
-        return "Help"
-      default:
-        return category
-    }
-  }
+  const getTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      pipeline: "Pipeline",
+      dashboard: "Dashboard",
+      query: "Query",
+      source: "Data Source",
+      transformation: "Transformation",
+      model: "ML Model",
+      file: "File",
+      stream: "Stream",
+      asset: "Data Asset",
+      glossary: "Glossary",
+    };
+    return labels[type] || type;
+  };
 
-  const handleResultClick = (path: string) => {
-    router.push(path)
-    onOpenChange(false)
-    setQuery("")
-  }
+  const getTypeColor = (type: string) => {
+    const colors: Record<string, string> = {
+      pipeline: "text-purple-500",
+      dashboard: "text-blue-500",
+      query: "text-cyan-500",
+      source: "text-green-500",
+      transformation: "text-orange-500",
+      model: "text-pink-500",
+      file: "text-yellow-500",
+      stream: "text-red-500",
+      asset: "text-indigo-500",
+      glossary: "text-teal-500",
+    };
+    return colors[type] || "text-muted-foreground";
+  };
+
+  const handleResultClick = (url: string) => {
+    router.push(url);
+    onOpenChange(false);
+    setQuery("");
+  };
 
   const handleRecentSearch = (searchQuery: string) => {
-    setQuery(searchQuery)
-  }
+    setQuery(searchQuery);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault()
-        onOpenChange(true)
+        e.preventDefault();
+        onOpenChange(true);
       }
-    }
+    };
 
-    document.addEventListener("keydown", handleKeyDown)
-    return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [onOpenChange])
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -224,21 +246,27 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                 <div className="grid grid-cols-2 gap-2">
                   <div
                     className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted cursor-pointer transition-colors"
-                    onClick={() => handleResultClick("/data-transformation/workflows")}
+                    onClick={() =>
+                      handleResultClick("/data-transformation/workflows")
+                    }
                   >
                     <IconPlaylist className="h-4 w-4 text-purple-500" />
                     <span className="text-sm">Workflows</span>
                   </div>
                   <div
                     className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted cursor-pointer transition-colors"
-                    onClick={() => handleResultClick("/data-analytics/dashboards")}
+                    onClick={() =>
+                      handleResultClick("/data-analytics/dashboards")
+                    }
                   >
                     <IconChartLine className="h-4 w-4 text-blue-500" />
                     <span className="text-sm">Dashboards</span>
                   </div>
                   <div
                     className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted cursor-pointer transition-colors"
-                    onClick={() => handleResultClick("/data-transformation/notebooks")}
+                    onClick={() =>
+                      handleResultClick("/data-transformation/notebooks")
+                    }
                   >
                     <IconCode className="h-4 w-4 text-green-500" />
                     <span className="text-sm">Notebooks</span>
@@ -253,6 +281,16 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                 </div>
               </div>
             </div>
+          ) : isLoading ? (
+            <div className="p-12 text-center">
+              <IconLoader2 className="h-12 w-12 text-muted-foreground mx-auto mb-3 animate-spin" />
+              <p className="text-sm text-muted-foreground">Searching...</p>
+            </div>
+          ) : error ? (
+            <div className="p-12 text-center">
+              <IconSearch className="h-12 w-12 text-red-500 mx-auto mb-3 opacity-50" />
+              <p className="text-sm text-red-500">{error}</p>
+            </div>
           ) : results.length > 0 ? (
             <div className="p-2">
               <div className="space-y-1">
@@ -260,20 +298,33 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                   <div
                     key={result.id}
                     className="flex items-center justify-between p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors group"
-                    onClick={() => handleResultClick(result.path)}
+                    onClick={() => handleResultClick(result.url)}
                   >
                     <div className="flex items-start gap-3 flex-1">
-                      <div className="mt-0.5 text-muted-foreground">
-                        {getCategoryIcon(result.category)}
+                      <div className={`mt-0.5 ${getTypeColor(result.type)}`}>
+                        {getTypeIcon(result.type)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <p className="font-medium text-sm truncate">
-                            {result.title}
+                            {result.name}
                           </p>
                           <Badge variant="outline" className="text-xs">
-                            {getCategoryLabel(result.category)}
+                            {getTypeLabel(result.type)}
                           </Badge>
+                          {result.status && (
+                            <Badge
+                              variant={
+                                result.status === "active" ||
+                                result.status === "running"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                              className="text-xs"
+                            >
+                              {result.status}
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-xs text-muted-foreground truncate">
                           {result.description}
@@ -305,5 +356,5 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
         )}
       </DialogContent>
     </Dialog>
-  )
+  );
 }

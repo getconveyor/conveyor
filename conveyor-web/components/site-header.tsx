@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
 import {
   IconCreditCard,
   IconHelp,
@@ -12,13 +12,10 @@ import {
   IconKey,
   IconLock,
   IconPalette,
-} from "@tabler/icons-react"
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
+  IconCommand,
+} from "@tabler/icons-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,27 +24,27 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import Link from "next/link"
-import { GlobalSearch } from "@/components/global-search"
-import { useAuth } from "@/contexts/AuthContext"
-import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher"
+} from "@/components/ui/dropdown-menu";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import Link from "next/link";
+import { CommandPalette } from "@/components/command-palette";
+import { useAuth } from "@/contexts/AuthContext";
+import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher";
 
 export function SiteHeader() {
-  const [searchOpen, setSearchOpen] = useState(false)
-  const { user, logout } = useAuth()
+  const [commandOpen, setCommandOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   const handleLogout = async () => {
     try {
-      await logout()
+      await logout();
     } catch (error) {
-      console.error('Logout error:', error)
+      console.error("Logout error:", error);
     }
-  }
+  };
 
-  if (!user) return null
+  if (!user) return null;
 
   return (
     <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
@@ -59,7 +56,25 @@ export function SiteHeader() {
         />
         <WorkspaceSwitcher />
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)}>
+          {/* Command Palette Trigger */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden md:flex items-center gap-2 text-muted-foreground"
+            onClick={() => setCommandOpen(true)}
+          >
+            <IconSearch className="h-4 w-4" />
+            <span className="text-sm">Search...</span>
+            <kbd className="pointer-events-none ml-2 inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+              <span className="text-xs">⌘</span>K
+            </kbd>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            onClick={() => setCommandOpen(true)}
+          >
             <IconSearch className="h-5 w-5" />
             <span className="sr-only">Search</span>
           </Button>
@@ -71,12 +86,12 @@ export function SiteHeader() {
           </Link>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="relative h-9 w-9 rounded-full"
-              >
+              <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src={user.avatar || undefined} alt={user.full_name} />
+                  <AvatarImage
+                    src={user.avatar || undefined}
+                    alt={user.full_name}
+                  />
                   <AvatarFallback>
                     {user.full_name
                       ? user.full_name
@@ -92,7 +107,9 @@ export function SiteHeader() {
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user.full_name || user.username}</p>
+                  <p className="text-sm font-medium leading-none">
+                    {user.full_name || user.username}
+                  </p>
                   <p className="text-xs leading-none text-muted-foreground">
                     {user.email}
                   </p>
@@ -149,7 +166,7 @@ export function SiteHeader() {
           </DropdownMenu>
         </div>
       </div>
-      <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
+      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
     </header>
-  )
+  );
 }

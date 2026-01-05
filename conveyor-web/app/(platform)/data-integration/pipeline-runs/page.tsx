@@ -1,30 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
-  IconSearch,
   IconRefresh,
-  IconTrash,
   IconClock,
   IconDotsVertical,
   IconCircleCheck,
   IconCircleX,
   IconLoader2,
   IconAlertCircle,
-  IconStopwatch,
+  IconHistory,
 } from "@tabler/icons-react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { integrationApi, PipelineRun, Pipeline } from "@/lib/api/integration";
 import { toast } from "sonner";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ColDef } from "ag-grid-community";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -37,7 +29,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -51,6 +42,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatDistanceToNow } from "date-fns";
+import { PageHeader } from "@/components/page-header";
+import { DataGrid } from "@/components/data-grid";
 
 type RunStatus = "pending" | "running" | "success" | "failed" | "cancelled";
 
@@ -93,31 +86,32 @@ export default function PipelineRunsPage() {
   const { currentWorkspace } = useWorkspace();
   const [runs, setRuns] = useState<PipelineRun[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [pipelineFilter, setPipelineFilter] = useState<string>("all");
   const [runToCancel, setRunToCancel] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
-  const filteredRuns = runs.filter((run) => {
-    const matchesSearch =
-      run.pipeline_name?.toLowerCase().includes(searchQuery.toLowerCase()) ??
-      false;
-    const matchesStatus = statusFilter === "all" || run.status === statusFilter;
-    const matchesPipeline =
-      pipelineFilter === "all" || run.pipeline === pipelineFilter;
-    return matchesSearch && matchesStatus && matchesPipeline;
-  });
+  const filteredRuns = useMemo(() => {
+    return runs.filter((run) => {
+      const matchesStatus =
+        statusFilter === "all" || run.status === statusFilter;
+      const matchesPipeline =
+        pipelineFilter === "all" || run.pipeline === pipelineFilter;
+      return matchesStatus && matchesPipeline;
+    });
+  }, [runs, statusFilter, pipelineFilter]);
 
-  const stats = {
-    total: runs.length,
-    running: runs.filter((r) => r.status === "running").length,
-    success: runs.filter((r) => r.status === "success").length,
-    failed: runs.filter((r) => r.status === "failed").length,
-  };
+  const stats = useMemo(
+    () => ({
+      total: runs.length,
+      running: runs.filter((r) => r.status === "running").length,
+      success: runs.filter((r) => r.status === "success").length,
+      failed: runs.filter((r) => r.status === "failed").length,
+    }),
+    [runs]
+  );
 
-  // Load pipeline runs from API
   useEffect(() => {
     if (currentWorkspace) {
       loadRuns();
@@ -127,7 +121,6 @@ export default function PipelineRunsPage() {
 
   async function loadRuns() {
     if (!currentWorkspace) return;
-
     try {
       setIsFetching(true);
       const data = await integrationApi.getPipelineRuns();
@@ -142,27 +135,21 @@ export default function PipelineRunsPage() {
 
   async function loadPipelines() {
     if (!currentWorkspace) return;
-
     try {
       const data = await integrationApi.getPipelines();
       setPipelines(data);
     } catch (error: any) {
       console.error("Failed to load pipelines:", error);
-      toast.error(error.message || "Failed to load pipelines");
     }
   }
 
   const handleCancelRun = async () => {
     if (!runToCancel) return;
-
     setIsLoading(true);
     try {
       await integrationApi.cancelPipelineRun(runToCancel);
       toast.success("Pipeline run cancelled successfully");
-
-      // Reload runs after cancellation
       await loadRuns();
-
       setRunToCancel(null);
     } catch (error: any) {
       console.error("Failed to cancel pipeline run:", error);
@@ -172,264 +159,238 @@ export default function PipelineRunsPage() {
     }
   };
 
-  const formatDuration = (seconds: number | null) => {
+  const formatDuration = useCallback((seconds: number | null) => {
     if (!seconds) return "N/A";
     if (seconds < 60) return `${Math.round(seconds)}s`;
     if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
     return `${Math.round(seconds / 3600)}h`;
-  };
+  }, []);
+
+  const formatBytes = useCallback((bytes: number | null) => {
+    if (!bytes) return "N/A";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+  }, []);
+
+  const columns = useMemo<ColDef<PipelineRun>[]>(
+    () => [
+      {
+        field: "pipeline_name",
+        headerName: "Pipeline",
+        flex: 2,
+        minWidth: 180,
+        cellRenderer: (params: any) => (
+          <div className="flex items-center gap-2">
+            {statusConfig[params.data?.status as RunStatus]?.icon}
+            <span className="font-medium">{params.value || "Unknown"}</span>
+          </div>
+        ),
+      },
+      {
+        field: "status",
+        headerName: "Status",
+        width: 120,
+        cellRenderer: (params: any) => {
+          const status = params.value as RunStatus;
+          const config = statusConfig[status] || statusConfig.pending;
+          return (
+            <Badge variant={config.variant} className="capitalize">
+              {config.label}
+            </Badge>
+          );
+        },
+      },
+      {
+        field: "triggered_by",
+        headerName: "Trigger",
+        width: 120,
+        cellRenderer: (params: any) => (
+          <Badge variant="outline" className="text-xs">
+            {params.value || "manual"}
+          </Badge>
+        ),
+      },
+      {
+        field: "duration",
+        headerName: "Duration",
+        width: 100,
+        valueFormatter: (params) => formatDuration(params.value),
+      },
+      {
+        field: "records_processed",
+        headerName: "Records",
+        width: 100,
+        type: "numericColumn",
+        valueFormatter: (params) => (params.value || 0).toLocaleString(),
+      },
+      {
+        field: "bytes_processed",
+        headerName: "Data Size",
+        width: 110,
+        valueFormatter: (params) => formatBytes(params.value),
+      },
+      {
+        field: "start_time",
+        headerName: "Started",
+        width: 150,
+        cellRenderer: (params: any) => (
+          <span className="text-xs text-muted-foreground">
+            {params.value
+              ? formatDistanceToNow(new Date(params.value), { addSuffix: true })
+              : "N/A"}
+          </span>
+        ),
+      },
+      {
+        field: "end_time",
+        headerName: "Completed",
+        width: 150,
+        cellRenderer: (params: any) => (
+          <span className="text-xs text-muted-foreground">
+            {params.value
+              ? formatDistanceToNow(new Date(params.value), { addSuffix: true })
+              : "In Progress"}
+          </span>
+        ),
+      },
+      {
+        colId: "actions",
+        headerName: "",
+        width: 80,
+        sortable: false,
+        filter: false,
+        cellRenderer: (params: any) => {
+          const run = params.data as PipelineRun;
+          return (
+            <div className="flex items-center gap-1">
+              {run.status === "running" && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive"
+                  onClick={() => setRunToCancel(run.id)}
+                  title="Cancel run"
+                >
+                  <IconCircleX className="h-4 w-4" />
+                </Button>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <IconDotsVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem disabled>View Details</DropdownMenuItem>
+                  <DropdownMenuItem disabled>View Logs</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          );
+        },
+      },
+    ],
+    [formatDuration, formatBytes]
+  );
 
   return (
-    <>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Pipeline Runs</h1>
-          <p className="text-sm text-muted-foreground">
-            View and manage pipeline execution history
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Pipeline Runs"
+        description="View and manage pipeline execution history"
+        icon={IconHistory}
+        breadcrumbs={[
+          { label: "Data Integration", href: "/data-integration" },
+          { label: "Pipeline Runs" },
+        ]}
+      />
 
       {/* Stats Cards */}
-      <div className="grid gap-2 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
-              Total
+          <CardContent className="pt-4 pb-4">
+            <div className="text-sm font-medium text-muted-foreground">
+              Total Runs
             </div>
-            <div className="text-xl font-bold">{stats.total}</div>
+            <div className="text-3xl font-bold mt-1">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+          <CardContent className="pt-4 pb-4">
+            <div className="text-sm font-medium text-muted-foreground">
               Running
             </div>
-            <div className="text-xl font-bold text-blue-500">
+            <div className="text-3xl font-bold mt-1 text-blue-500">
               {stats.running}
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+          <CardContent className="pt-4 pb-4">
+            <div className="text-sm font-medium text-muted-foreground">
               Success
             </div>
-            <div className="text-xl font-bold text-green-500">
+            <div className="text-3xl font-bold mt-1 text-green-500">
               {stats.success}
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+          <CardContent className="pt-4 pb-4">
+            <div className="text-sm font-medium text-muted-foreground">
               Failed
             </div>
-            <div className="text-xl font-bold text-red-500">{stats.failed}</div>
+            <div className="text-3xl font-bold mt-1 text-red-500">
+              {stats.failed}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div className="flex-1 max-w-sm">
-              <div className="relative">
-                <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search pipeline runs..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Select value={pipelineFilter} onValueChange={setPipelineFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Pipeline" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Pipelines</SelectItem>
-                  {pipelines.map((pipeline) => (
-                    <SelectItem key={pipeline.id} value={pipeline.id}>
-                      {pipeline.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="running">Running</SelectItem>
-                  <SelectItem value="success">Success</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={loadRuns}
-                disabled={isFetching}
-              >
-                <IconRefresh
-                  className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
-                />
-              </Button>
-            </div>
+      {/* Data Grid */}
+      <DataGrid
+        data={filteredRuns}
+        columns={columns}
+        loading={isFetching}
+        onRefresh={loadRuns}
+        pagination
+        pageSize={20}
+        height={500}
+        quickFilterPlaceholder="Search pipeline runs..."
+        exportFileName="pipeline-runs"
+        emptyMessage="No pipeline runs found. Run a pipeline to see execution history."
+        toolbar={
+          <div className="flex items-center gap-2">
+            <Select value={pipelineFilter} onValueChange={setPipelineFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Pipeline" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Pipelines</SelectItem>
+                {pipelines.map((pipeline) => (
+                  <SelectItem key={pipeline.id} value={pipeline.id}>
+                    {pipeline.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="running">Running</SelectItem>
+                <SelectItem value="success">Success</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </CardHeader>
-        <CardContent className="pt-2">
-          {isFetching && runs.length === 0 ? (
-            <div className="flex items-center justify-center py-8 text-muted-foreground">
-              <IconLoader2 className="h-6 w-6 animate-spin mr-2" />
-              Loading pipeline runs...
-            </div>
-          ) : filteredRuns.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <IconStopwatch className="h-12 w-12 mb-2 opacity-50" />
-              <p className="text-sm">No pipeline runs found</p>
-              <p className="text-xs mt-1">
-                Run a pipeline to see execution history
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredRuns.map((run) => (
-                <Card key={run.id}>
-                  <CardContent className="p-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <div className="flex items-center gap-2">
-                            {statusConfig[run.status].icon}
-                            <h3 className="font-semibold text-sm">
-                              {run.pipeline_name || "Unknown"}
-                            </h3>
-                          </div>
-                          <Badge
-                            variant={statusConfig[run.status].variant}
-                            className="text-xs"
-                          >
-                            {statusConfig[run.status].label}
-                          </Badge>
-                          {run.triggered_by && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs bg-gray-50"
-                            >
-                              {run.triggered_by}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs mb-2">
-                          <div>
-                            <p className="text-muted-foreground">Duration</p>
-                            <p className="font-medium">
-                              {formatDuration(run.duration)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Records</p>
-                            <p className="font-medium">
-                              {run.records_processed || 0}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Bytes</p>
-                            <p className="font-medium">
-                              {run.bytes_processed
-                                ? `${(
-                                    run.bytes_processed /
-                                    1024 /
-                                    1024
-                                  ).toFixed(2)} MB`
-                                : "N/A"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Started</p>
-                            <p className="font-medium">
-                              {run.start_time
-                                ? formatDistanceToNow(
-                                    new Date(run.start_time),
-                                    { addSuffix: true }
-                                  )
-                                : "N/A"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Completed</p>
-                            <p className="font-medium">
-                              {run.end_time
-                                ? formatDistanceToNow(new Date(run.end_time), {
-                                    addSuffix: true,
-                                  })
-                                : "In Progress"}
-                            </p>
-                          </div>
-                        </div>
-                        {run.errors && Object.keys(run.errors).length > 0 && (
-                          <div className="mt-2 p-2 bg-red-50 rounded border border-red-200">
-                            <p className="text-xs font-medium text-red-700">
-                              Errors:
-                            </p>
-                            <p className="text-xs text-red-600 mt-1">
-                              {JSON.stringify(run.errors).substring(0, 100)}...
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {run.status === "running" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 px-2 text-destructive"
-                            onClick={() => setRunToCancel(run.id)}
-                            disabled={isLoading}
-                            title="Cancel run"
-                          >
-                            {isLoading ? (
-                              <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <IconCircleX className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
-                        )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              disabled={isLoading}
-                            >
-                              <IconDotsVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem disabled>
-                              <IconStopwatch className="mr-2 h-4 w-4" />
-                              View Details (Coming Soon)
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        }
+      />
 
       {/* Cancel Run Dialog */}
       <AlertDialog
@@ -463,6 +424,6 @@ export default function PipelineRunsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState, useEffect } from "react";
 import {
   IconPlus,
   IconFileText,
@@ -18,16 +18,24 @@ import {
   IconFileSpreadsheet,
   IconFileTypePdf,
   IconFileTypeCsv,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+  IconLoader2,
+  IconAlertCircle,
+} from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -36,167 +44,171 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { analyticsApi, Report as APIReport } from "@/lib/api/analytics";
+import { toast } from "sonner";
 
 interface Report {
-  id: string
-  name: string
-  description: string
-  type: "scheduled" | "ad-hoc" | "template"
-  category: string
-  format: "pdf" | "excel" | "csv"
-  schedule?: string
-  lastRun?: string
-  nextRun?: string
-  createdBy: string
-  recipients?: string[]
-  size?: string
+  id: string;
+  name: string;
+  description: string;
+  type: "scheduled" | "ad-hoc" | "template";
+  category: string;
+  format: "pdf" | "excel" | "csv" | "html";
+  schedule?: string;
+  lastRun?: string;
+  nextRun?: string;
+  createdBy: string;
+  recipients?: string[];
+  size?: string;
 }
 
-const mockReports: Report[] = [
-  {
-    id: "1",
-    name: "Monthly Sales Summary",
-    description: "Comprehensive monthly sales performance report",
-    type: "scheduled",
-    category: "Sales",
-    format: "pdf",
-    schedule: "Monthly on 1st",
-    lastRun: "2024-01-01",
-    nextRun: "2024-02-01",
-    createdBy: "Sarah Johnson",
-    recipients: ["sales@company.com"],
-    size: "2.4 MB",
-  },
-  {
-    id: "2",
-    name: "Customer Retention Analysis",
-    description: "Detailed analysis of customer retention metrics",
-    type: "scheduled",
-    category: "Analytics",
-    format: "excel",
-    schedule: "Weekly on Monday",
-    lastRun: "2024-01-15",
-    nextRun: "2024-01-22",
-    createdBy: "Michael Chen",
-    recipients: ["analytics@company.com"],
-    size: "1.8 MB",
-  },
-  {
-    id: "3",
-    name: "Q4 Revenue Report",
-    description: "Quarterly revenue breakdown by product and region",
-    type: "ad-hoc",
-    category: "Finance",
-    format: "pdf",
-    lastRun: "2024-01-10",
-    createdBy: "Emily Rodriguez",
-    size: "3.2 MB",
-  },
-  {
-    id: "4",
-    name: "Inventory Status",
-    description: "Current inventory levels and stock alerts",
-    type: "scheduled",
-    category: "Operations",
-    format: "csv",
-    schedule: "Daily at 9:00 AM",
-    lastRun: "2024-01-15",
-    nextRun: "2024-01-16",
-    createdBy: "David Kim",
-    recipients: ["ops@company.com", "warehouse@company.com"],
-    size: "524 KB",
-  },
-  {
-    id: "5",
-    name: "Marketing Campaign Performance",
-    description: "Campaign metrics, ROI, and conversion rates",
-    type: "ad-hoc",
-    category: "Marketing",
-    format: "excel",
-    lastRun: "2024-01-12",
-    createdBy: "Lisa Wang",
-    size: "1.1 MB",
-  },
-  {
-    id: "6",
-    name: "Sales Dashboard Template",
-    description: "Customizable sales metrics dashboard template",
-    type: "template",
-    category: "Sales",
-    format: "pdf",
-    createdBy: "System",
-  },
-  {
-    id: "7",
-    name: "Executive Summary Template",
-    description: "High-level KPI summary for leadership",
-    type: "template",
-    category: "Executive",
-    format: "pdf",
-    createdBy: "System",
-  },
-]
+// Transform API response to component format
+function transformReport(apiReport: APIReport): Report {
+  return {
+    id: apiReport.id,
+    name: apiReport.name,
+    description: apiReport.description || "",
+    type: apiReport.schedule ? "scheduled" : "ad-hoc",
+    category: apiReport.source_type || "General",
+    format: apiReport.format || "pdf",
+    schedule: apiReport.schedule || undefined,
+    lastRun: apiReport.last_generated_at || undefined,
+    nextRun: apiReport.next_run_at || undefined,
+    createdBy: apiReport.owner_name || "Unknown",
+    recipients: apiReport.delivery_config?.recipients || [],
+  };
+}
 
 export default function ReportsPage() {
-  const [reports, setReports] = useState<Report[]>(mockReports)
-  const [filterType, setFilterType] = useState<"all" | "scheduled" | "ad-hoc" | "template">("all")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [reports, setReports] = useState<Report[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<
+    "all" | "scheduled" | "ad-hoc" | "template"
+  >("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     category: "",
     format: "pdf" as "pdf" | "excel" | "csv",
     type: "ad-hoc" as "scheduled" | "ad-hoc",
-  })
+  });
+
+  // Fetch reports on mount
+  useEffect(() => {
+    fetchReports();
+  }, []);
+
+  const fetchReports = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const apiReports = await analyticsApi.getReports();
+      setReports(apiReports.map(transformReport));
+    } catch (err) {
+      console.error("Failed to fetch reports:", err);
+      setError("Failed to load reports. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredReports = reports.filter((report) => {
-    const matchesType = filterType === "all" || report.type === filterType
+    const matchesType = filterType === "all" || report.type === filterType;
     const matchesSearch =
       report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      report.description.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesType && matchesSearch
-  })
+      report.description.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesType && matchesSearch;
+  });
 
-  const handleCreateReport = () => {
-    setCreateDialogOpen(false)
-    setFormData({
-      name: "",
-      description: "",
-      category: "",
-      format: "pdf",
-      type: "ad-hoc",
-    })
-  }
+  const handleCreateReport = async () => {
+    if (!formData.name.trim()) {
+      toast.error("Report name is required");
+      return;
+    }
 
-  const deleteReport = (id: string) => {
-    setReports(reports.filter((r) => r.id !== id))
-  }
+    try {
+      setCreating(true);
+      const newReport = await analyticsApi.createReport({
+        name: formData.name,
+        description: formData.description,
+        format: formData.format,
+        source_type: "custom",
+      });
+      toast.success("Report created successfully");
+      setReports([...reports, transformReport(newReport)]);
+      setCreateDialogOpen(false);
+      setFormData({
+        name: "",
+        description: "",
+        category: "",
+        format: "pdf",
+        type: "ad-hoc",
+      });
+    } catch (err) {
+      console.error("Failed to create report:", err);
+      toast.error("Failed to create report");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const deleteReport = async (id: string) => {
+    try {
+      await analyticsApi.deleteReport(id);
+      setReports(reports.filter((r) => r.id !== id));
+      toast.success("Report deleted");
+    } catch (err) {
+      console.error("Failed to delete report:", err);
+      toast.error("Failed to delete report");
+    }
+  };
 
   const getFormatIcon = (format: string) => {
     switch (format) {
       case "pdf":
-        return IconFileTypePdf
+        return IconFileTypePdf;
       case "excel":
-        return IconFileSpreadsheet
+        return IconFileSpreadsheet;
       case "csv":
-        return IconFileTypeCsv
+        return IconFileTypeCsv;
       default:
-        return IconFileText
+        return IconFileText;
     }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <IconAlertCircle className="h-12 w-12 text-destructive" />
+        <p className="text-muted-foreground">{error}</p>
+        <Button onClick={fetchReports}>Try Again</Button>
+      </div>
+    );
   }
 
   return (
@@ -229,7 +241,9 @@ export default function ReportsPage() {
                   id="report-name"
                   placeholder="e.g., Monthly Sales Report"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-2">
@@ -238,12 +252,19 @@ export default function ReportsPage() {
                   id="report-description"
                   placeholder="Describe what this report contains"
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
-                <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, category: value })
+                  }
+                >
                   <SelectTrigger id="category">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
@@ -260,7 +281,12 @@ export default function ReportsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="format">Format</Label>
-                  <Select value={formData.format} onValueChange={(value: any) => setFormData({ ...formData, format: value })}>
+                  <Select
+                    value={formData.format}
+                    onValueChange={(value: any) =>
+                      setFormData({ ...formData, format: value })
+                    }
+                  >
                     <SelectTrigger id="format">
                       <SelectValue />
                     </SelectTrigger>
@@ -273,7 +299,12 @@ export default function ReportsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="type">Type</Label>
-                  <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
+                  <Select
+                    value={formData.type}
+                    onValueChange={(value: any) =>
+                      setFormData({ ...formData, type: value })
+                    }
+                  >
                     <SelectTrigger id="type">
                       <SelectValue />
                     </SelectTrigger>
@@ -286,7 +317,10 @@ export default function ReportsPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setCreateDialogOpen(false)}
+              >
                 Cancel
               </Button>
               <Button onClick={handleCreateReport}>Create Report</Button>
@@ -319,7 +353,7 @@ export default function ReportsPage() {
       {/* Reports Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredReports.map((report) => {
-          const FormatIcon = getFormatIcon(report.format)
+          const FormatIcon = getFormatIcon(report.format);
           return (
             <Card key={report.id} className="hover:shadow-md transition-shadow">
               <CardHeader>
@@ -327,7 +361,9 @@ export default function ReportsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
                       <FormatIcon className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                      <CardTitle className="text-lg truncate">{report.name}</CardTitle>
+                      <CardTitle className="text-lg truncate">
+                        {report.name}
+                      </CardTitle>
                     </div>
                     <CardDescription className="line-clamp-2">
                       {report.description}
@@ -335,7 +371,11 @@ export default function ReportsPage() {
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="flex-shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="flex-shrink-0"
+                      >
                         <IconDots className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -440,7 +480,7 @@ export default function ReportsPage() {
                 </div>
               </CardContent>
             </Card>
-          )
+          );
         })}
       </div>
 
@@ -466,5 +506,5 @@ export default function ReportsPage() {
         </Card>
       )}
     </>
-  )
+  );
 }

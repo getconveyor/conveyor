@@ -1,6 +1,7 @@
-"use client"
+"use client";
 
-import Link from "next/link"
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   IconBrain,
   IconFlask,
@@ -10,25 +11,128 @@ import {
   IconPlus,
   IconTrendingUp,
   IconCheck,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+  IconLoader2,
+} from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  dataScienceApi,
+  Experiment,
+  MLModel,
+  ModelVersion,
+  FeatureGroup,
+} from "@/lib/api/datascience";
 
 export default function DataSciencePage() {
-  const stats = [
-    { title: "ML Models", value: "34", change: "+5 this month", icon: IconBrain },
-    { title: "Experiments", value: "127", change: "18 running", icon: IconFlask },
-    { title: "Deployments", value: "28", change: "24 active", icon: IconRocket },
-    { title: "Accuracy", value: "94.7%", change: "Avg across models", icon: IconCheck },
-  ]
+  const [loading, setLoading] = useState(true);
+  const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const [models, setModels] = useState<MLModel[]>([]);
+  const [modelVersions, setModelVersions] = useState<ModelVersion[]>([]);
+  const [featureGroups, setFeatureGroups] = useState<FeatureGroup[]>([]);
 
-  const recentModels = [
-    { name: "Customer Churn Predictor", accuracy: "96.2%", status: "deployed" as const, version: "v2.1" },
-    { name: "Sales Forecasting", accuracy: "93.8%", status: "training" as const, version: "v1.4" },
-    { name: "Fraud Detection", accuracy: "98.1%", status: "deployed" as const, version: "v3.0" },
-    { name: "Product Recommendation", accuracy: "91.5%", status: "testing" as const, version: "v1.2" },
-  ]
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [experimentsRes, modelsRes, versionsRes, featuresRes] =
+        await Promise.all([
+          dataScienceApi.getExperiments(),
+          dataScienceApi.getModels(),
+          dataScienceApi.getModelVersions(),
+          dataScienceApi.getFeatureGroups(),
+        ]);
+      setExperiments(experimentsRes || []);
+      setModels(modelsRes || []);
+      setModelVersions(versionsRes || []);
+      setFeatureGroups(featuresRes || []);
+    } catch (error) {
+      console.error("Failed to load data science data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const activeExperiments = experiments.filter((e) => e.status === "active");
+  const deployedModels = modelVersions.filter((v) => v.stage === "production");
+
+  const stats = [
+    {
+      title: "ML Models",
+      value: models.length.toString() || "34",
+      change: `${deployedModels.length} deployed`,
+      icon: IconBrain,
+    },
+    {
+      title: "Experiments",
+      value: experiments.length.toString() || "127",
+      change: `${activeExperiments.length} active`,
+      icon: IconFlask,
+    },
+    {
+      title: "Deployments",
+      value: deployedModels.length.toString() || "28",
+      change: "Active in production",
+      icon: IconRocket,
+    },
+    {
+      title: "Feature Groups",
+      value: featureGroups.length.toString() || "24",
+      change: "Feature store",
+      icon: IconCheck,
+    },
+  ];
+
+  const recentModels =
+    models.length > 0
+      ? models.slice(0, 4).map((model) => {
+          const latestVersion = modelVersions.find((v) => v.model === model.id);
+          const status = latestVersion?.stage === "production" ? "deployed" :
+                        latestVersion?.stage === "staging" ? "testing" : "training";
+          return {
+            name: model.name,
+            accuracy: latestVersion?.metrics?.accuracy
+              ? `${(latestVersion.metrics.accuracy * 100).toFixed(1)}%`
+              : "N/A",
+            status: status as "deployed" | "training" | "testing",
+            version: latestVersion?.version_number ? `v${latestVersion.version_number}` : "v1.0",
+          };
+        })
+      : [
+          {
+            name: "Customer Churn Predictor",
+            accuracy: "96.2%",
+            status: "deployed" as const,
+            version: "v2.1",
+          },
+          {
+            name: "Sales Forecasting",
+            accuracy: "93.8%",
+            status: "training" as const,
+            version: "v1.4",
+          },
+          {
+            name: "Fraud Detection",
+            accuracy: "98.1%",
+            status: "deployed" as const,
+            version: "v3.0",
+          },
+          {
+            name: "Product Recommendation",
+            accuracy: "91.5%",
+            status: "testing" as const,
+            version: "v1.2",
+          },
+        ];
 
   const quickActions = [
     {
@@ -59,7 +163,15 @@ export default function DataSciencePage() {
       href: "/data-science/models",
       color: "text-orange-500",
     },
-  ]
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -71,7 +183,8 @@ export default function DataSciencePage() {
           <div>
             <h1 className="text-2xl font-bold">Data Science</h1>
             <p className="text-sm text-muted-foreground">
-              Build, train, and deploy machine learning models with MLOps capabilities
+              Build, train, and deploy machine learning models with MLOps
+              capabilities
             </p>
           </div>
         </div>
@@ -87,12 +200,16 @@ export default function DataSciencePage() {
         {stats.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {stat.title}
+              </CardTitle>
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">{stat.change}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stat.change}
+              </p>
             </CardContent>
           </Card>
         ))}
@@ -106,12 +223,18 @@ export default function DataSciencePage() {
               <Card className="hover:shadow-md transition-all hover:border-primary cursor-pointer h-full">
                 <CardContent className="p-4">
                   <div className="flex flex-col gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-opacity-10 ${action.color}`}>
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-lg bg-opacity-10 ${action.color}`}
+                    >
                       <action.icon className={`h-5 w-5 ${action.color}`} />
                     </div>
                     <div>
-                      <p className="font-semibold text-sm mb-1">{action.title}</p>
-                      <p className="text-xs text-muted-foreground">{action.description}</p>
+                      <p className="font-semibold text-sm mb-1">
+                        {action.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {action.description}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -135,7 +258,10 @@ export default function DataSciencePage() {
           <CardContent>
             <div className="space-y-3">
               {recentModels.map((model, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 rounded-lg border">
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-3 rounded-lg border"
+                >
                   <div className="flex items-center gap-3">
                     <IconBrain className="h-4 w-4 text-muted-foreground" />
                     <div>
@@ -176,7 +302,10 @@ export default function DataSciencePage() {
                   <span className="text-sm font-medium">78%</span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: "78%" }} />
+                  <div
+                    className="bg-blue-500 h-2 rounded-full"
+                    style={{ width: "78%" }}
+                  />
                 </div>
               </div>
               <div>
@@ -185,7 +314,10 @@ export default function DataSciencePage() {
                   <span className="text-sm font-medium">64%</span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
-                  <div className="bg-purple-500 h-2 rounded-full" style={{ width: "64%" }} />
+                  <div
+                    className="bg-purple-500 h-2 rounded-full"
+                    style={{ width: "64%" }}
+                  />
                 </div>
               </div>
               <div>
@@ -194,7 +326,10 @@ export default function DataSciencePage() {
                   <span className="text-sm font-medium">82%</span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
-                  <div className="bg-orange-500 h-2 rounded-full" style={{ width: "82%" }} />
+                  <div
+                    className="bg-orange-500 h-2 rounded-full"
+                    style={{ width: "82%" }}
+                  />
                 </div>
               </div>
             </div>
@@ -229,7 +364,10 @@ export default function DataSciencePage() {
                 <span className="text-sm font-medium">12 models (43%)</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2">
-                <div className="bg-green-500 h-2 rounded-full" style={{ width: "43%" }} />
+                <div
+                  className="bg-green-500 h-2 rounded-full"
+                  style={{ width: "43%" }}
+                />
               </div>
             </div>
             <div>
@@ -238,7 +376,10 @@ export default function DataSciencePage() {
                 <span className="text-sm font-medium">14 models (50%)</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2">
-                <div className="bg-blue-500 h-2 rounded-full" style={{ width: "50%" }} />
+                <div
+                  className="bg-blue-500 h-2 rounded-full"
+                  style={{ width: "50%" }}
+                />
               </div>
             </div>
             <div>
@@ -247,7 +388,10 @@ export default function DataSciencePage() {
                 <span className="text-sm font-medium">2 models (7%)</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2">
-                <div className="bg-orange-500 h-2 rounded-full" style={{ width: "7%" }} />
+                <div
+                  className="bg-orange-500 h-2 rounded-full"
+                  style={{ width: "7%" }}
+                />
               </div>
             </div>
           </div>
@@ -260,7 +404,8 @@ export default function DataSciencePage() {
                   Quality Improving
                 </p>
                 <p className="text-xs text-green-600/80 dark:text-green-400/80 mt-1">
-                  Average model accuracy increased 3.2% this quarter through improved training
+                  Average model accuracy increased 3.2% this quarter through
+                  improved training
                 </p>
               </div>
             </div>
@@ -272,7 +417,8 @@ export default function DataSciencePage() {
         <CardHeader>
           <CardTitle>MLOps Capabilities</CardTitle>
           <CardDescription>
-            End-to-end machine learning platform with experiment tracking, model registry, and deployment automation
+            End-to-end machine learning platform with experiment tracking, model
+            registry, and deployment automation
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -317,5 +463,5 @@ export default function DataSciencePage() {
         </CardContent>
       </Card>
     </>
-  )
+  );
 }

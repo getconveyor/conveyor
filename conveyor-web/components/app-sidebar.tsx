@@ -49,6 +49,10 @@ const data = {
           url: "/data-integration/pipelines",
         },
         {
+          title: "Pipeline Builder",
+          url: "/data-integration/pipelines/builder",
+        },
+        {
           title: "Data Sources",
           url: "/data-integration/data-sources",
         },
@@ -109,6 +113,10 @@ const data = {
         {
           title: "SQL Editor (Trino)",
           url: "/lakehouse/sql-editor",
+        },
+        {
+          title: "SQL Editor V2",
+          url: "/lakehouse/sql-editor-v2",
         },
         {
           title: "Bronze Layer",

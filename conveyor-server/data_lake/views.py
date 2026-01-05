@@ -206,16 +206,120 @@ class FileViewSet(viewsets.ModelViewSet):
     def preview(self, request, pk=None):
         """Preview file contents (first few rows)"""
         file_obj = self.get_object()
+        workspace_id = request.headers.get('X-Workspace-ID')
+        max_rows = int(request.query_params.get('rows', 100))
 
-        # TODO: Implement file preview based on format
-        # For now, return metadata
+        preview_data = []
+        columns = []
+        error = None
+
+        try:
+            # Get file content from storage
+            file_content = storage.get_file(
+                object_name=file_obj.name,
+                workspace_id=workspace_id
+            )
+
+            if file_obj.format == 'csv':
+                import csv
+                import io
+                
+                # Read CSV content
+                content = file_content.read().decode('utf-8')
+                reader = csv.reader(io.StringIO(content))
+                rows = list(reader)
+                
+                if rows:
+                    columns = rows[0]
+                    preview_data = rows[1:max_rows+1]
+
+            elif file_obj.format == 'json':
+                import json
+                
+                content = file_content.read().decode('utf-8')
+                data = json.loads(content)
+                
+                if isinstance(data, list) and data:
+                    if isinstance(data[0], dict):
+                        columns = list(data[0].keys())
+                        preview_data = [list(row.values()) for row in data[:max_rows]]
+                    else:
+                        columns = ['value']
+                        preview_data = [[item] for item in data[:max_rows]]
+                elif isinstance(data, dict):
+                    columns = list(data.keys())
+                    preview_data = [list(data.values())]
+
+            elif file_obj.format == 'parquet':
+                try:
+                    import pyarrow.parquet as pq
+                    import tempfile
+                    import os
+                    
+                    # Save to temp file and read with pyarrow
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.parquet') as tmp:
+                        tmp.write(file_content.read())
+                        tmp_path = tmp.name
+                    
+                    table = pq.read_table(tmp_path)
+                    df = table.to_pandas()
+                    os.unlink(tmp_path)
+                    
+                    columns = df.columns.tolist()
+                    preview_data = df.head(max_rows).values.tolist()
+                except ImportError:
+                    error = "Parquet preview requires pyarrow package"
+
+            elif file_obj.format in ['jsonl', 'ndjson']:
+                import json
+                
+                content = file_content.read().decode('utf-8')
+                lines = content.strip().split('\n')
+                
+                for line in lines[:max_rows]:
+                    if line.strip():
+                        row = json.loads(line)
+                        if isinstance(row, dict):
+                            if not columns:
+                                columns = list(row.keys())
+                            preview_data.append([row.get(col) for col in columns])
+
+            elif file_obj.format == 'tsv':
+                import csv
+                import io
+                
+                content = file_content.read().decode('utf-8')
+                reader = csv.reader(io.StringIO(content), delimiter='\t')
+                rows = list(reader)
+                
+                if rows:
+                    columns = rows[0]
+                    preview_data = rows[1:max_rows+1]
+
+            else:
+                # Try to read as plain text for unknown formats
+                content = file_content.read()
+                try:
+                    text = content.decode('utf-8')
+                    lines = text.split('\n')[:max_rows]
+                    columns = ['content']
+                    preview_data = [[line] for line in lines]
+                except UnicodeDecodeError:
+                    error = f"Cannot preview binary file format: {file_obj.format}"
+
+        except Exception as e:
+            logger.error(f"Failed to preview file: {str(e)}")
+            error = str(e)
+
         return Response({
             'id': str(file_obj.id),
             'name': file_obj.name,
             'format': file_obj.format,
             'rows': file_obj.rows,
-            'columns': file_obj.columns,
-            'preview_data': []  # TODO: Fetch actual data
+            'columns': columns if not error else file_obj.columns,
+            'preview_data': preview_data,
+            'preview_rows': len(preview_data),
+            'error': error
         })
 
 

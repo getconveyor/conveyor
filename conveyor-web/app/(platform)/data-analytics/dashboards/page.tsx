@@ -1,7 +1,8 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   IconPlus,
   IconLayoutDashboard,
@@ -17,16 +18,24 @@ import {
   IconStarFilled,
   IconLayoutGrid,
   IconLayoutList,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+  IconLoader2,
+  IconAlertCircle,
+} from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -35,131 +44,166 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { analyticsApi, Dashboard as APIDashboard } from "@/lib/api/analytics";
+import { toast } from "sonner";
 
 interface Dashboard {
-  id: string
-  name: string
-  description: string
-  createdBy: string
-  createdAt: string
-  lastModified: string
-  widgets: number
-  views: number
-  shared: boolean
-  favorite: boolean
-  tags: string[]
+  id: string;
+  name: string;
+  description: string;
+  createdBy: string;
+  createdAt: string;
+  lastModified: string;
+  widgets: number;
+  views: number;
+  shared: boolean;
+  favorite: boolean;
+  tags: string[];
 }
 
-const mockDashboards: Dashboard[] = [
-  {
-    id: "1",
-    name: "Sales Performance",
-    description: "Key metrics and trends for sales team performance",
-    createdBy: "Sarah Johnson",
-    createdAt: "2024-01-15",
-    lastModified: "2 hours ago",
-    widgets: 8,
-    views: 1247,
-    shared: true,
-    favorite: true,
-    tags: ["sales", "revenue"],
-  },
-  {
-    id: "2",
-    name: "Customer Analytics",
-    description: "Customer behavior, retention, and lifetime value analysis",
-    createdBy: "Michael Chen",
-    createdAt: "2024-01-10",
-    lastModified: "1 day ago",
-    widgets: 12,
-    views: 892,
-    shared: true,
-    favorite: false,
-    tags: ["customers", "analytics"],
-  },
-  {
-    id: "3",
-    name: "Operations Overview",
-    description: "Operational efficiency metrics and KPIs",
-    createdBy: "Emily Rodriguez",
-    createdAt: "2024-01-08",
-    lastModified: "3 days ago",
-    widgets: 6,
-    views: 634,
-    shared: false,
-    favorite: true,
-    tags: ["operations"],
-  },
-  {
-    id: "4",
-    name: "Marketing Campaigns",
-    description: "Campaign performance tracking and ROI analysis",
-    createdBy: "David Kim",
-    createdAt: "2024-01-05",
-    lastModified: "5 days ago",
-    widgets: 10,
-    views: 521,
-    shared: true,
-    favorite: false,
-    tags: ["marketing", "campaigns"],
-  },
-  {
-    id: "5",
-    name: "Product Metrics",
-    description: "Product usage, adoption, and feature analytics",
-    createdBy: "Lisa Wang",
-    createdAt: "2024-01-03",
-    lastModified: "1 week ago",
-    widgets: 9,
-    views: 445,
-    shared: false,
-    favorite: false,
-    tags: ["product", "usage"],
-  },
-  {
-    id: "6",
-    name: "Executive Summary",
-    description: "High-level business metrics for leadership team",
-    createdBy: "James Mitchell",
-    createdAt: "2023-12-28",
-    lastModified: "2 weeks ago",
-    widgets: 15,
-    views: 1893,
-    shared: true,
-    favorite: true,
-    tags: ["executive", "summary"],
-  },
-]
+// Transform API response to component format
+function transformDashboard(apiDashboard: APIDashboard): Dashboard {
+  return {
+    id: apiDashboard.id,
+    name: apiDashboard.name,
+    description: apiDashboard.description || "",
+    createdBy:
+      apiDashboard.owner_name || apiDashboard.created_by_name || "Unknown",
+    createdAt: apiDashboard.created_at,
+    lastModified: formatRelativeTime(apiDashboard.updated_at),
+    widgets: apiDashboard.widget_count || 0,
+    views: apiDashboard.view_count || 0,
+    shared: apiDashboard.is_public,
+    favorite: false, // Would need user preferences API
+    tags: [], // Would need tags from API
+  };
+}
+
+function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffHours < 1) return "just now";
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+  return date.toLocaleDateString();
+}
 
 export default function DashboardsPage() {
-  const [dashboards, setDashboards] = useState<Dashboard[]>(mockDashboards)
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [dashboards, setDashboards] = useState<Dashboard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-  })
+  });
+  const router = useRouter();
 
-  const handleCreateDashboard = () => {
-    // In a real app, this would create the dashboard and navigate to builder
-    setCreateDialogOpen(false)
-    setFormData({ name: "", description: "" })
-  }
+  // Fetch dashboards on mount
+  useEffect(() => {
+    fetchDashboards();
+  }, []);
+
+  const fetchDashboards = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const apiDashboards = await analyticsApi.getDashboards();
+      setDashboards(apiDashboards.map(transformDashboard));
+    } catch (err) {
+      console.error("Failed to fetch dashboards:", err);
+      setError("Failed to load dashboards. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateDashboard = async () => {
+    if (!formData.name.trim()) {
+      toast.error("Dashboard name is required");
+      return;
+    }
+
+    try {
+      setCreating(true);
+      const newDashboard = await analyticsApi.createDashboard({
+        name: formData.name,
+        description: formData.description,
+      });
+      toast.success("Dashboard created successfully");
+      setCreateDialogOpen(false);
+      setFormData({ name: "", description: "" });
+      // Navigate to builder
+      router.push(`/data-analytics/dashboards/${newDashboard.id}/builder`);
+    } catch (err) {
+      console.error("Failed to create dashboard:", err);
+      toast.error("Failed to create dashboard");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDuplicate = async (dashboard: Dashboard) => {
+    try {
+      const duplicated = await analyticsApi.duplicateDashboard(
+        dashboard.id,
+        `${dashboard.name} (Copy)`
+      );
+      toast.success("Dashboard duplicated");
+      setDashboards([...dashboards, transformDashboard(duplicated)]);
+    } catch (err) {
+      console.error("Failed to duplicate dashboard:", err);
+      toast.error("Failed to duplicate dashboard");
+    }
+  };
 
   const toggleFavorite = (id: string) => {
+    // TODO: Implement favorites API
     setDashboards(
       dashboards.map((d) => (d.id === id ? { ...d, favorite: !d.favorite } : d))
-    )
+    );
+  };
+
+  const deleteDashboard = async (id: string) => {
+    try {
+      await analyticsApi.deleteDashboard(id);
+      setDashboards(dashboards.filter((d) => d.id !== id));
+      toast.success("Dashboard deleted");
+    } catch (err) {
+      console.error("Failed to delete dashboard:", err);
+      toast.error("Failed to delete dashboard");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
-  const deleteDashboard = (id: string) => {
-    setDashboards(dashboards.filter((d) => d.id !== id))
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <IconAlertCircle className="h-12 w-12 text-destructive" />
+        <p className="text-muted-foreground">{error}</p>
+        <Button onClick={fetchDashboards}>Try Again</Button>
+      </div>
+    );
   }
 
   return (
@@ -172,7 +216,10 @@ export default function DashboardsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "list")}>
+          <Tabs
+            value={viewMode}
+            onValueChange={(v) => setViewMode(v as "grid" | "list")}
+          >
             <TabsList>
               <TabsTrigger value="grid">
                 <IconLayoutGrid className="h-4 w-4" />
@@ -204,7 +251,9 @@ export default function DashboardsPage() {
                     id="name"
                     placeholder="e.g., Sales Performance"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -213,15 +262,25 @@ export default function DashboardsPage() {
                     id="description"
                     placeholder="Describe the purpose of this dashboard"
                     value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setCreateDialogOpen(false)}
+                >
                   Cancel
                 </Button>
-                <Button onClick={handleCreateDashboard}>Create Dashboard</Button>
+                <Button onClick={handleCreateDashboard} disabled={creating}>
+                  {creating && (
+                    <IconLoader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  Create Dashboard
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -231,13 +290,18 @@ export default function DashboardsPage() {
       {viewMode === "grid" ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {dashboards.map((dashboard) => (
-            <Card key={dashboard.id} className="hover:shadow-md transition-shadow">
+            <Card
+              key={dashboard.id}
+              className="hover:shadow-md transition-shadow"
+            >
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <IconLayoutDashboard className="h-5 w-5 text-blue-500" />
-                      <CardTitle className="text-lg">{dashboard.name}</CardTitle>
+                      <CardTitle className="text-lg">
+                        {dashboard.name}
+                      </CardTitle>
                     </div>
                     <CardDescription className="mt-2 line-clamp-2">
                       {dashboard.description}
@@ -263,18 +327,24 @@ export default function DashboardsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
-                          <Link href={`/data-analytics/dashboards/${dashboard.id}`}>
+                          <Link
+                            href={`/data-analytics/dashboards/${dashboard.id}`}
+                          >
                             <IconEye className="h-4 w-4 mr-2" />
                             View Dashboard
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                          <Link href={`/data-analytics/dashboards/${dashboard.id}/builder`}>
+                          <Link
+                            href={`/data-analytics/dashboards/${dashboard.id}/builder`}
+                          >
                             <IconEdit className="h-4 w-4 mr-2" />
                             Edit Dashboard
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDuplicate(dashboard)}
+                        >
                           <IconCopy className="h-4 w-4 mr-2" />
                           Duplicate
                         </DropdownMenuItem>
@@ -381,7 +451,11 @@ export default function DashboardsPage() {
                   <div className="flex items-center gap-2">
                     <div className="flex flex-wrap gap-1">
                       {dashboard.tags.slice(0, 2).map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
+                        <Badge
+                          key={tag}
+                          variant="secondary"
+                          className="text-xs"
+                        >
                           {tag}
                         </Badge>
                       ))}
@@ -394,13 +468,17 @@ export default function DashboardsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
-                          <Link href={`/data-analytics/dashboards/${dashboard.id}`}>
+                          <Link
+                            href={`/data-analytics/dashboards/${dashboard.id}`}
+                          >
                             <IconEye className="h-4 w-4 mr-2" />
                             View Dashboard
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                          <Link href={`/data-analytics/dashboards/${dashboard.id}/builder`}>
+                          <Link
+                            href={`/data-analytics/dashboards/${dashboard.id}/builder`}
+                          >
                             <IconEdit className="h-4 w-4 mr-2" />
                             Edit Dashboard
                           </Link>
@@ -431,5 +509,5 @@ export default function DashboardsPage() {
         </Card>
       )}
     </>
-  )
+  );
 }
