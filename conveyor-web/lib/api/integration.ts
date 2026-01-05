@@ -402,6 +402,7 @@ export const integrationApi = {
   async cancelPipelineRun(id: string): Promise<void> {
     return apiClient.post(
       `/api/integration/pipeline-runs/${id}/cancel/`,
+      {},
       getAuthOptions()
     );
   },
@@ -445,6 +446,7 @@ export const integrationApi = {
   async enableSchedule(id: string): Promise<void> {
     return apiClient.post(
       `/api/integration/schedules/${id}/enable/`,
+      {},
       getAuthOptions()
     );
   },
@@ -452,6 +454,7 @@ export const integrationApi = {
   async disableSchedule(id: string): Promise<void> {
     return apiClient.post(
       `/api/integration/schedules/${id}/disable/`,
+      {},
       getAuthOptions()
     );
   },

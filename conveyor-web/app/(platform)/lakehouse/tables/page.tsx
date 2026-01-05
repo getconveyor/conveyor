@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { listTables, IcebergTable } from "@/lib/api/lakehouse";
+import { getCatalogs, Catalog } from "@/lib/api/warehouse";
 import {
   IconTable,
   IconRefresh,
@@ -23,13 +24,6 @@ import {
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 
-interface LakehouseCatalog {
-  name: string;
-  connector: string;
-  is_system: boolean;
-  is_default: boolean;
-}
-
 export default function TablesPage() {
   const { token, currentWorkspace } = useAuth();
   const [tables, setTables] = useState<IcebergTable[]>([]);
@@ -38,44 +32,28 @@ export default function TablesPage() {
   const [layerFilter, setLayerFilter] = useState<string>("all");
 
   // Catalog state
-  const [catalogs, setCatalogs] = useState<LakehouseCatalog[]>([]);
+  const [catalogs, setCatalogs] = useState<Catalog[]>([]);
   const [selectedCatalog, setSelectedCatalog] = useState<string>("iceberg");
   const [isFetchingCatalogs, setIsFetchingCatalogs] = useState(false);
 
   // Fetch available catalogs
   useEffect(() => {
-    const fetchCatalogs = async () => {
-      if (!token || !currentWorkspace) return;
-
+    const fetchCatalogsData = async () => {
       setIsFetchingCatalogs(true);
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/warehouse/catalogs/`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "X-Workspace-ID": currentWorkspace.id,
-            },
-          }
+        const allCatalogs = await getCatalogs();
+        // Filter to only show Iceberg catalogs (not system catalogs)
+        const icebergCatalogs = allCatalogs.filter(
+          (c) => c.connector === "iceberg" && !c.is_system
         );
+        setCatalogs(icebergCatalogs);
 
-        if (response.ok) {
-          const data = await response.json();
-          // Filter to only show Iceberg catalogs (not system catalogs)
-          const icebergCatalogs = (data.catalogs || []).filter(
-            (c: LakehouseCatalog) => c.connector === "iceberg" && !c.is_system
-          );
-          setCatalogs(icebergCatalogs);
-
-          // Set default catalog if available
-          const defaultCatalog = icebergCatalogs.find(
-            (c: LakehouseCatalog) => c.is_default
-          );
-          if (defaultCatalog) {
-            setSelectedCatalog(defaultCatalog.name);
-          } else if (icebergCatalogs.length > 0) {
-            setSelectedCatalog(icebergCatalogs[0].name);
-          }
+        // Set default catalog if available
+        const defaultCatalog = icebergCatalogs.find((c) => c.is_default);
+        if (defaultCatalog) {
+          setSelectedCatalog(defaultCatalog.name);
+        } else if (icebergCatalogs.length > 0) {
+          setSelectedCatalog(icebergCatalogs[0].name);
         }
       } catch (error) {
         console.error("Failed to fetch catalogs:", error);
@@ -84,8 +62,8 @@ export default function TablesPage() {
       }
     };
 
-    fetchCatalogs();
-  }, [token, currentWorkspace]);
+    fetchCatalogsData();
+  }, []);
 
   useEffect(() => {
     loadTables();

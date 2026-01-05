@@ -36,7 +36,7 @@ const data = {
       icon: IconInnerShadowTop,
     },
     {
-      title: "Data Engineering",
+      title: "Data Integration",
       url: "/data-integration",
       icon: IconArrowsExchange,
       items: [
@@ -64,6 +64,13 @@ const data = {
           title: "Run History",
           url: "/data-integration/pipeline-runs",
         },
+      ],
+    },
+    {
+      title: "Data Transformation",
+      url: "/data-transformation",
+      icon: IconTransform,
+      items: [
         {
           title: "Notebooks",
           url: "/data-transformation/notebooks",
@@ -71,6 +78,10 @@ const data = {
         {
           title: "Workflows",
           url: "/data-transformation/workflows",
+        },
+        {
+          title: "Jobs",
+          url: "/data-transformation/jobs",
         },
         {
           title: "Repository",

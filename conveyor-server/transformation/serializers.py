@@ -34,9 +34,9 @@ class TransformationSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'rules', 'rules_count'
         ]
         read_only_fields = [
-            'id', 'created_at', 'updated_at', 'created_by_details',
-            'pipeline_details', 'rules', 'rules_count', 'last_run',
-            'records_processed', 'avg_execution_time'
+            'id', 'workspace', 'created_at', 'updated_at', 'created_by',
+            'created_by_details', 'pipeline_details', 'rules', 'rules_count',
+            'last_run', 'records_processed', 'avg_execution_time'
         ]
 
     def get_rules_count(self, obj):
@@ -146,8 +146,8 @@ class NotebookSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'created_at', 'updated_at', 'created_by_details',
-            'created_by_name', 'last_executed', 'status'
+            'id', 'workspace', 'created_at', 'updated_at', 'created_by',
+            'created_by_details', 'created_by_name', 'last_executed', 'status'
         ]
 
 

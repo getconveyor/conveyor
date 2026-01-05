@@ -26,7 +26,7 @@ export interface CatalogActionResponse {
  */
 export async function getCatalogs(): Promise<Catalog[]> {
   const response = await apiClient.get<CatalogsResponse>(
-    "/api/warehouse/catalogs/",
+    "/api/lakehouse/catalogs/",
     getAuthOptions()
   );
   return response.catalogs || [];
@@ -39,7 +39,7 @@ export async function createCatalog(
   data: CreateCatalogRequest
 ): Promise<CatalogActionResponse> {
   return apiClient.post<CatalogActionResponse>(
-    "/api/warehouse/catalogs/",
+    "/api/lakehouse/catalogs/",
     data,
     getAuthOptions()
   );
@@ -52,7 +52,7 @@ export async function deleteCatalog(
   catalogName: string
 ): Promise<CatalogActionResponse> {
   return apiClient.delete<CatalogActionResponse>(
-    `/api/warehouse/catalogs/${catalogName}/`,
+    `/api/lakehouse/catalogs/${catalogName}/`,
     getAuthOptions()
   );
 }

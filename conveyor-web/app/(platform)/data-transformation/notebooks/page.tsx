@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   IconPlus,
   IconSearch,
@@ -56,6 +57,7 @@ import { transformationApi, Notebook } from "@/lib/api/transformation";
 import { toast } from "sonner";
 
 export default function NotebooksPage() {
+  const router = useRouter();
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [languageFilter, setLanguageFilter] = useState<string>("all");
@@ -333,7 +335,13 @@ export default function NotebooksPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            router.push(
+                              `/data-transformation/notebooks/${notebook.id}`
+                            )
+                          }
+                        >
                           <IconCode className="mr-2 h-4 w-4" />
                           Open Notebook
                         </DropdownMenuItem>

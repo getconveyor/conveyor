@@ -859,7 +859,7 @@ class StreamDashboardViewSet(viewsets.ViewSet):
         if workspace_id:
             pipelines = pipelines.filter(workspace_id=workspace_id)
             sources = sources.filter(workspace_id=workspace_id)
-            alerts = alerts.filter(workspace_id=workspace_id)
+            alerts = alerts.filter(pipeline__workspace_id=workspace_id)
         
         # Calculate total throughput and avg latency from running pipelines
         running = pipelines.filter(status='running')
@@ -882,7 +882,7 @@ class StreamDashboardViewSet(viewsets.ViewSet):
             'active_sources': sources.filter(status='active').count(),
             'total_throughput': total_throughput,
             'avg_latency_ms': total_latency / latency_count if latency_count > 0 else 0,
-            'active_alerts': alerts.filter(is_active=True).count(),
+            'active_alerts': alerts.filter(status='active').count(),
         }
         
         serializer = StreamDashboardSerializer(data)

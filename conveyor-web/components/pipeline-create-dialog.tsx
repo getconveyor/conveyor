@@ -49,6 +49,7 @@ import {
   SourceSchema,
   CreatePipelineData,
 } from "@/lib/api/integration";
+import { getCatalogs, Catalog } from "@/lib/api/warehouse";
 import { cn } from "@/lib/utils";
 
 interface PipelineCreateDialogProps {
@@ -64,13 +65,6 @@ interface SelectedStream {
   name: string;
   schema?: string;
   tableName: string; // Lakehouse table name
-}
-
-interface LakehouseCatalog {
-  name: string;
-  connector: string;
-  is_system: boolean;
-  is_default: boolean;
 }
 
 export function PipelineCreateDialog({
@@ -92,7 +86,7 @@ export function PipelineCreateDialog({
   const [schedule, setSchedule] = useState("");
 
   // Catalog state
-  const [catalogs, setCatalogs] = useState<LakehouseCatalog[]>([]);
+  const [catalogs, setCatalogs] = useState<Catalog[]>([]);
   const [isFetchingCatalogs, setIsFetchingCatalogs] = useState(false);
 
   // Schema discovery state
@@ -119,50 +113,34 @@ export function PipelineCreateDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch available catalogs when dialog opens
-  const fetchCatalogs = useCallback(async () => {
-    if (!token || !currentWorkspace) return;
-
+  const fetchCatalogsData = useCallback(async () => {
     setIsFetchingCatalogs(true);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/warehouse/catalogs/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "X-Workspace-ID": currentWorkspace.id,
-          },
-        }
+      const allCatalogs = await getCatalogs();
+      // Filter to only show Iceberg catalogs (not system catalogs)
+      const icebergCatalogs = allCatalogs.filter(
+        (c) => c.connector === "iceberg" && !c.is_system
       );
+      setCatalogs(icebergCatalogs);
 
-      if (response.ok) {
-        const data = await response.json();
-        // Filter to only show Iceberg catalogs (not system catalogs)
-        const icebergCatalogs = (data.catalogs || []).filter(
-          (c: LakehouseCatalog) => c.connector === "iceberg" && !c.is_system
-        );
-        setCatalogs(icebergCatalogs);
-
-        // Set default catalog if available
-        const defaultCatalog = icebergCatalogs.find(
-          (c: LakehouseCatalog) => c.is_default
-        );
-        if (defaultCatalog) {
-          setCatalog(defaultCatalog.name);
-        } else if (icebergCatalogs.length > 0) {
-          setCatalog(icebergCatalogs[0].name);
-        }
+      // Set default catalog if available
+      const defaultCatalog = icebergCatalogs.find((c) => c.is_default);
+      if (defaultCatalog) {
+        setCatalog(defaultCatalog.name);
+      } else if (icebergCatalogs.length > 0) {
+        setCatalog(icebergCatalogs[0].name);
       }
     } catch (error) {
       console.error("Failed to fetch catalogs:", error);
     } finally {
       setIsFetchingCatalogs(false);
     }
-  }, [token, currentWorkspace]);
+  }, []);
 
   // Reset form when dialog opens/closes
   useEffect(() => {
     if (open) {
-      fetchCatalogs();
+      fetchCatalogsData();
     } else {
       setStep("config");
       setName("");
@@ -179,7 +157,7 @@ export function PipelineCreateDialog({
       setSearchQuery("");
       setSyncMode("selected");
     }
-  }, [open, fetchCatalogs]);
+  }, [open, fetchCatalogsData]);
 
   // Discover schema when source changes
   const handleDiscoverSchema = useCallback(async () => {

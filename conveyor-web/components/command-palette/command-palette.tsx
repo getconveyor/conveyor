@@ -66,15 +66,15 @@ const navigationItems: CommandItem[] = [
     shortcut: ["g", "d"],
     keywords: ["home", "overview"],
   },
-  // Data Engineering
+  // Data Integration
   {
-    id: "data-engineering",
-    title: "Go to Data Engineering",
+    id: "data-integration",
+    title: "Go to Data Integration",
     icon: IconArrowsExchange,
     category: "navigation",
     href: "/data-integration",
-    shortcut: ["g", "e"],
-    keywords: ["etl", "integration", "pipelines"],
+    shortcut: ["g", "i"],
+    keywords: ["etl", "integration", "pipelines", "connections"],
   },
   {
     id: "pipelines",
@@ -109,6 +109,16 @@ const navigationItems: CommandItem[] = [
     category: "navigation",
     href: "/data-integration/pipeline-runs",
     keywords: ["history", "executions"],
+  },
+  // Data Transformation
+  {
+    id: "data-transformation",
+    title: "Go to Data Transformation",
+    icon: IconTransform,
+    category: "navigation",
+    href: "/data-transformation",
+    shortcut: ["g", "t"],
+    keywords: ["transform", "notebooks", "workflows"],
   },
   {
     id: "notebooks",
