@@ -29,7 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import Link from "next/link";
 import { CommandPalette } from "@/components/command-palette";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/auth-context";
 import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher";
 
 export function SiteHeader() {

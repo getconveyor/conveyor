@@ -24,7 +24,7 @@ import {
   Source,
 } from "@/lib/api/integration";
 import { toast } from "sonner";
-import { ColDef } from "ag-grid-community";
+import { ColDef, ICellRendererParams } from "ag-grid-community";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +65,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/page-header";
 import { DataGrid } from "@/components/data-grid";
+import { useAriaLabels } from "@/hooks/use-aria-labels";
 
 type PipelineStatus = "active" | "paused" | "error" | "running" | "idle";
 
@@ -84,6 +85,7 @@ const statusConfig: Record<
 
 export default function PipelinesPage() {
   const { currentWorkspace } = useWorkspace();
+  const ariaLabels = useAriaLabels();
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -132,9 +134,10 @@ export default function PipelinesPage() {
       setIsFetching(true);
       const data = await integrationApi.getPipelines();
       setPipelines(data);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to load pipelines:", error);
-      toast.error(error.message || "Failed to load pipelines");
+      const message = error instanceof Error ? error.message : "Failed to load pipelines";
+      toast.error(message);
     } finally {
       setIsFetching(false);
     }
@@ -145,7 +148,7 @@ export default function PipelinesPage() {
     try {
       const data = await integrationApi.getSources();
       setSources(data);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to load sources:", error);
     }
   }
@@ -193,9 +196,9 @@ export default function PipelinesPage() {
       await loadPipelines();
       setIsCreateDialogOpen(false);
       resetForm();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to save pipeline:", error);
-      toast.error(error.message || "Failed to save pipeline");
+      toast.error(error instanceof Error ? error.message : "Failed to save pipeline");
     } finally {
       setIsLoading(false);
     }
@@ -225,9 +228,9 @@ export default function PipelinesPage() {
       toast.success("Pipeline deleted successfully");
       await loadPipelines();
       setPipelineToDelete(null);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to delete pipeline:", error);
-      toast.error(error.message || "Failed to delete pipeline");
+      toast.error(error instanceof Error ? error.message : "Failed to delete pipeline");
     } finally {
       setIsLoading(false);
     }
@@ -238,8 +241,8 @@ export default function PipelinesPage() {
       await integrationApi.triggerPipeline(id);
       toast.success("Pipeline triggered successfully");
       loadPipelines();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to trigger pipeline");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to trigger pipeline");
     }
   }, []);
 
@@ -248,8 +251,8 @@ export default function PipelinesPage() {
       await integrationApi.pausePipeline(id);
       toast.success("Pipeline paused successfully");
       loadPipelines();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to pause pipeline");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to pause pipeline");
     }
   }, []);
 
@@ -258,8 +261,8 @@ export default function PipelinesPage() {
       await integrationApi.resumePipeline(id);
       toast.success("Pipeline resumed successfully");
       loadPipelines();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to resume pipeline");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to resume pipeline");
     }
   }, []);
 
@@ -267,8 +270,8 @@ export default function PipelinesPage() {
     try {
       const stats = await integrationApi.getPipelineStats(id);
       toast.message(JSON.stringify(stats, null, 2));
-    } catch (error: any) {
-      toast.error(error.message || "Failed to fetch stats");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to fetch stats");
     }
   }, []);
 
@@ -292,7 +295,7 @@ export default function PipelinesPage() {
         headerName: "Pipeline",
         flex: 2,
         minWidth: 200,
-        cellRenderer: (params: any) => (
+        cellRenderer: (params: ICellRendererParams<Pipeline>) => (
           <div className="flex flex-col py-2">
             <span className="font-medium">{params.value}</span>
             {params.data?.description && (
@@ -307,11 +310,15 @@ export default function PipelinesPage() {
         field: "status",
         headerName: "Status",
         width: 120,
-        cellRenderer: (params: any) => {
+        cellRenderer: (params: ICellRendererParams<Pipeline>) => {
           const status = params.value as PipelineStatus;
           const config = statusConfig[status] || statusConfig.idle;
           return (
-            <Badge variant={config.variant} className="capitalize">
+            <Badge
+              variant={config.variant}
+              className="capitalize"
+              aria-label={ariaLabels.getStatusLabel(status)}
+            >
               {config.label}
             </Badge>
           );
@@ -335,7 +342,7 @@ export default function PipelinesPage() {
         field: "schedule",
         headerName: "Schedule",
         width: 130,
-        cellRenderer: (params: any) => (
+        cellRenderer: (params: ICellRendererParams<Pipeline>) => (
           <span className="font-mono text-xs">{params.value || "Manual"}</span>
         ),
       },
@@ -343,7 +350,7 @@ export default function PipelinesPage() {
         field: "success_rate",
         headerName: "Success Rate",
         width: 120,
-        cellRenderer: (params: any) => {
+        cellRenderer: (params: ICellRendererParams<Pipeline>) => {
           const rate = params.value || 0;
           const color =
             rate >= 90
@@ -358,7 +365,7 @@ export default function PipelinesPage() {
         field: "last_run",
         headerName: "Last Run",
         width: 150,
-        cellRenderer: (params: any) => (
+        cellRenderer: (params: ICellRendererParams<Pipeline>) => (
           <span className="text-xs text-muted-foreground">
             {params.value || "Never"}
           </span>
@@ -376,8 +383,9 @@ export default function PipelinesPage() {
         width: 100,
         sortable: false,
         filter: false,
-        cellRenderer: (params: any) => {
-          const pipeline = params.data as Pipeline;
+        cellRenderer: (params: ICellRendererParams<Pipeline>) => {
+          const pipeline = params.data;
+          if (!pipeline) return null;
           const isPaused = pipeline.status === "paused";
           const isRunning = pipeline.status === "running";
 
@@ -392,6 +400,13 @@ export default function PipelinesPage() {
                   else if (isRunning) handlePausePipeline(pipeline.id);
                   else handleRunPipeline(pipeline.id);
                 }}
+                aria-label={
+                  isPaused
+                    ? ariaLabels.getActionLabel("resume", pipeline.name)
+                    : isRunning
+                    ? ariaLabels.getActionLabel("pause", pipeline.name)
+                    : ariaLabels.getActionLabel("run", pipeline.name)
+                }
               >
                 {isRunning ? (
                   <IconPlayerPause className="h-4 w-4" />
@@ -401,7 +416,12 @@ export default function PipelinesPage() {
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    aria-label={ariaLabels.getRowMenuLabel(pipeline.name)}
+                  >
                     <IconDotsVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -466,12 +486,19 @@ export default function PipelinesPage() {
         ]}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" asChild>
+            <Button
+              variant="outline"
+              asChild
+              aria-label="Open pipeline builder"
+            >
               <Link href="/data-integration/pipelines/builder">
                 Open Builder
               </Link>
             </Button>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Button
+              onClick={() => setIsCreateDialogOpen(true)}
+              aria-label={ariaLabels.getCreateLabel("pipeline")}
+            >
               <IconPlus className="mr-2 h-4 w-4" />
               Create Pipeline
             </Button>
@@ -482,39 +509,41 @@ export default function PipelinesPage() {
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardContent className="pt-4 pb-4">
+          <CardContent className="pt-4 pb-4" role="region" aria-label="Total pipelines statistics">
             <div className="text-sm font-medium text-muted-foreground">
               Total Pipelines
             </div>
-            <div className="text-3xl font-bold mt-1">{stats.total}</div>
+            <div className="text-3xl font-bold mt-1" aria-label={`${stats.total} total pipelines`}>
+              {stats.total}
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-4">
+          <CardContent className="pt-4 pb-4" role="region" aria-label="Running pipelines statistics">
             <div className="text-sm font-medium text-muted-foreground">
               Running
             </div>
-            <div className="text-3xl font-bold mt-1 text-blue-500">
+            <div className="text-3xl font-bold mt-1 text-blue-500" aria-label={`${stats.running} running pipelines`}>
               {stats.running}
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-4">
+          <CardContent className="pt-4 pb-4" role="region" aria-label="Failed pipelines statistics">
             <div className="text-sm font-medium text-muted-foreground">
               Failed
             </div>
-            <div className="text-3xl font-bold mt-1 text-red-500">
+            <div className="text-3xl font-bold mt-1 text-red-500" aria-label={`${stats.failed} failed pipelines`}>
               {stats.failed}
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-4">
+          <CardContent className="pt-4 pb-4" role="region" aria-label="Paused pipelines statistics">
             <div className="text-sm font-medium text-muted-foreground">
               Paused
             </div>
-            <div className="text-3xl font-bold mt-1 text-muted-foreground">
+            <div className="text-3xl font-bold mt-1 text-muted-foreground" aria-label={`${stats.paused} paused pipelines`}>
               {stats.paused}
             </div>
           </CardContent>
@@ -535,7 +564,10 @@ export default function PipelinesPage() {
         emptyMessage="No pipelines found. Create your first pipeline to get started."
         toolbar={
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger
+              className="w-[150px]"
+              aria-label={ariaLabels.getFilterLabel("status")}
+            >
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>

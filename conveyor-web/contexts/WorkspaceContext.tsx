@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { workspaceApi, Workspace, WorkspaceMember } from '@/lib/api/workspace'
-import { useAuth } from './AuthContext'
+import { useAuth } from './auth-context'
 
 interface WorkspaceContextType {
   workspaces: Workspace[]

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/contexts/auth-context'
 import { apiKeyApi, ApiKey } from '@/lib/api/apikey'
 import { ApiKeyRow } from '@/components/apikey/api-key-row'
 import { CreateApiKeyModal } from '@/components/apikey/create-api-key-modal'
