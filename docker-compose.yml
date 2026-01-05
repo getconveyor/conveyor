@@ -102,6 +102,7 @@ services:
       - ./conveyor-server:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/mediafiles
+      - ./trino/catalog:/app/trino-catalogs
     ports:
       - "${SERVER_PORT:-8000}:8000"
     depends_on:
@@ -262,7 +263,7 @@ services:
     ports:
       - "${TRINO_PORT:-8090}:8080"
     volumes:
-      - ./trino/catalog:/etc/trino/catalog:ro
+      - ./trino/catalog:/etc/trino/catalog
       - ./trino/config.properties:/etc/trino/config.properties:ro
     environment:
       # MinIO S3 credentials

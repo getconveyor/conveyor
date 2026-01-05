@@ -146,6 +146,9 @@ export interface Schedule {
   pipeline?: string;
   pipeline_name?: string;
   name: string;
+  schedule_type: ScheduleType;
+  schedule_config: ScheduleConfig;
+  schedule_description?: string;
   cron_expression: string;
   timezone?: string;
   enabled: boolean;
@@ -153,6 +156,59 @@ export interface Schedule {
   next_run: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+// Schedule types for user-friendly configuration
+export type ScheduleType =
+  | "manual"
+  | "hourly"
+  | "daily"
+  | "weekly"
+  | "monthly"
+  | "cron";
+
+export interface ScheduleConfig {
+  // For hourly
+  interval?: number; // Every N hours (1-24)
+
+  // For daily, weekly, monthly
+  hour?: number; // 0-23
+  minute?: number; // 0-59
+
+  // For weekly
+  days?: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
+
+  // For monthly
+  day?: number; // 1-31
+
+  // For cron
+  expression?: string; // Raw cron expression
+}
+
+export interface CreateScheduleData {
+  pipeline: string;
+  name: string;
+  schedule_type: ScheduleType;
+  schedule_config: ScheduleConfig;
+  timezone?: string;
+  enabled?: boolean;
+}
+
+// Schema Discovery Types
+export interface StreamInfo {
+  name: string;
+  schema?: string; // database schema (e.g., 'public')
+  key_properties?: string[];
+  replication_method?: string;
+  row_count?: number;
+}
+
+export interface SourceSchema {
+  source_id: string;
+  connector_type: string;
+  streams: StreamInfo[];
+  schemas: Record<string, any>;
+  timestamp: string;
 }
 
 // API Client
@@ -203,8 +259,8 @@ export const integrationApi = {
     );
   },
 
-  async getSourceSchema(id: string): Promise<any> {
-    return apiClient.get(
+  async getSourceSchema(id: string): Promise<SourceSchema> {
+    return apiClient.get<SourceSchema>(
       `/api/integration/sources/${id}/schema/`,
       getAuthOptions()
     );
@@ -363,11 +419,7 @@ export const integrationApi = {
     return apiClient.get(`/api/integration/schedules/${id}/`, getAuthOptions());
   },
 
-  async createSchedule(data: {
-    pipeline: string;
-    cron_expression: string;
-    name?: string;
-  }): Promise<Schedule> {
+  async createSchedule(data: CreateScheduleData): Promise<Schedule> {
     return apiClient.post(
       "/api/integration/schedules/",
       data,

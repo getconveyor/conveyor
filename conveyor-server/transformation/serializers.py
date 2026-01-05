@@ -140,7 +140,7 @@ class NotebookSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notebook
         fields = [
-            'id', 'workspace', 'name', 'description', 'language', 'kernel',
+            'id', 'workspace', 'name', 'description', 'language', 'kernel', 'framework',
             'content', 'cell_count', 'status', 'last_executed',
             'created_by', 'created_by_name', 'created_by_details',
             'created_at', 'updated_at'
@@ -159,7 +159,7 @@ class NotebookListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notebook
         fields = [
-            'id', 'name', 'description', 'language', 'kernel',
+            'id', 'name', 'description', 'language', 'kernel', 'framework',
             'cell_count', 'status', 'last_executed', 'created_by_name',
             'created_at', 'updated_at'
         ]

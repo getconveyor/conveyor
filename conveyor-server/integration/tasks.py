@@ -75,7 +75,7 @@ def run_pipeline_task(self, pipeline_id: str, triggered_by_user_id: Optional[int
         pipeline_run = PipelineRun.objects.create(
             pipeline=pipeline,
             status='running',
-            started_at=timezone.now(),
+            start_time=timezone.now(),
             celery_task_id=self.request.id,
             current_step='Initializing',
             progress=5,
@@ -426,7 +426,7 @@ def _broadcast_progress(
     # Update pipeline run
     pipeline_run.progress = progress
     pipeline_run.current_step = message
-    pipeline_run.save(update_fields=['progress', 'current_step', 'updated_at'])
+    pipeline_run.save(update_fields=['progress', 'current_step'])
 
     # Broadcast via WebSocket
     from integration.consumers import broadcast_pipeline_update

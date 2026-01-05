@@ -183,7 +183,14 @@ export function PipelineCanvas({
   return (
     <div
       ref={reactFlowWrapper}
-      className={cn("h-full w-full bg-muted/30", className)}
+      className={cn("w-full h-full bg-muted/30", className)}
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        minHeight: "500px",
+        overflow: "hidden",
+      }}
     >
       <ReactFlow
         nodes={nodes}
@@ -200,10 +207,13 @@ export function PipelineCanvas({
         defaultEdgeOptions={defaultEdgeOptions}
         connectionLineType={ConnectionLineType.SmoothStep}
         fitView
+        fitViewOptions={{ padding: 0.2 }}
         snapToGrid
         snapGrid={[20, 20]}
         deleteKeyCode={readOnly ? null : "Delete"}
+        preventScrolling
         className="bg-background"
+        style={{ width: "100%", height: "100%" }}
       >
         {/* Top toolbar */}
         <Panel position="top-left" className="flex gap-2">

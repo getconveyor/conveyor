@@ -36,7 +36,7 @@ const data = {
       icon: IconInnerShadowTop,
     },
     {
-      title: "Data Integration",
+      title: "Data Engineering",
       url: "/data-integration",
       icon: IconArrowsExchange,
       items: [
@@ -45,64 +45,49 @@ const data = {
           url: "/data-integration",
         },
         {
+          title: "Connections",
+          url: "/data-integration/data-sources",
+        },
+        {
+          title: "Connectors",
+          url: "/data-integration/source-connectors",
+        },
+        {
           title: "Pipelines",
           url: "/data-integration/pipelines",
-        },
-        {
-          title: "Pipeline Builder",
-          url: "/data-integration/pipelines/builder",
-        },
-        {
-          title: "Data Sources",
-          url: "/data-integration/data-sources",
         },
         {
           title: "Schedules",
           url: "/data-integration/schedules",
         },
         {
-          title: "Pipeline Runs",
+          title: "Run History",
           url: "/data-integration/pipeline-runs",
-        },
-        {
-          title: "Synced Data",
-          url: "/data-integration/synced-data",
-        },
-        {
-          title: "Source Connectors",
-          url: "/data-integration/source-connectors",
-        },
-      ],
-    },
-    {
-      title: "Data Transformation",
-      url: "/data-transformation",
-      icon: IconTransform,
-      items: [
-        {
-          title: "Overview",
-          url: "/data-transformation",
         },
         {
           title: "Notebooks",
           url: "/data-transformation/notebooks",
         },
         {
-          title: "Jobs",
-          url: "/data-transformation/jobs",
-        },
-        {
           title: "Workflows",
           url: "/data-transformation/workflows",
         },
         {
-          title: "Code Repository",
+          title: "Repository",
           url: "/data-transformation/repository",
+        },
+        {
+          title: "Streaming",
+          url: "/real-time-analytics/streaming",
+        },
+        {
+          title: "Events",
+          url: "/real-time-analytics/events",
         },
       ],
     },
     {
-      title: "Lakehouse",
+      title: "Data Lakehouse",
       url: "/lakehouse",
       icon: IconDatabase,
       items: [
@@ -111,24 +96,8 @@ const data = {
           url: "/lakehouse",
         },
         {
-          title: "SQL Editor (Trino)",
+          title: "SQL Editor",
           url: "/lakehouse/sql-editor",
-        },
-        {
-          title: "SQL Editor V2",
-          url: "/lakehouse/sql-editor-v2",
-        },
-        {
-          title: "Bronze Layer",
-          url: "/lakehouse/bronze",
-        },
-        {
-          title: "Silver Layer",
-          url: "/lakehouse/silver",
-        },
-        {
-          title: "Gold Layer",
-          url: "/lakehouse/gold",
         },
         {
           title: "Table Explorer",
@@ -139,35 +108,12 @@ const data = {
           url: "/lakehouse/history",
         },
         {
+          title: "Catalogs",
+          url: "/lakehouse/catalogs",
+        },
+        {
           title: "Storage Settings",
           url: "/lakehouse/storage",
-        },
-      ],
-    },
-    {
-      title: "Real-Time Analytics",
-      url: "/real-time-analytics",
-      icon: IconWaveSine,
-      items: [
-        {
-          title: "Overview",
-          url: "/real-time-analytics",
-        },
-        {
-          title: "Streaming Jobs",
-          url: "/real-time-analytics/streaming",
-        },
-        {
-          title: "Event Hubs",
-          url: "/real-time-analytics/events",
-        },
-        {
-          title: "Live Dashboards",
-          url: "/real-time-analytics/dashboards",
-        },
-        {
-          title: "Alerts",
-          url: "/real-time-analytics/alerts",
         },
       ],
     },
@@ -183,6 +129,10 @@ const data = {
         {
           title: "Dashboards",
           url: "/data-analytics/dashboards",
+        },
+        {
+          title: "Live Dashboards",
+          url: "/real-time-analytics/dashboards",
         },
         {
           title: "Reports",
@@ -252,6 +202,8 @@ const data = {
         },
       ],
     },
+  ],
+  navSecondary: [
     {
       title: "Monitoring",
       url: "/monitoring",
@@ -275,8 +227,6 @@ const data = {
         },
       ],
     },
-  ],
-  navSecondary: [
     {
       title: "Learning",
       url: "/learning",

@@ -191,9 +191,9 @@ export default function PipelineBuilderPage() {
   }, []);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-var(--header-height)-2rem)]">
+    <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-4">
           <Link href="/data-integration/pipelines">
             <Button variant="ghost" size="icon">
@@ -210,12 +210,13 @@ export default function PipelineBuilderPage() {
       </div>
 
       {/* Builder */}
-      <div className="flex-1 rounded-lg border overflow-hidden">
+      <div className="flex-1 rounded-lg border overflow-hidden min-h-0">
         <PipelineBuilder
           initialNodes={nodes}
           initialEdges={edges}
           onSave={handleSave}
           onRun={handleRun}
+          className="h-full"
         />
       </div>
 

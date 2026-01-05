@@ -690,6 +690,11 @@ class NotebookViewSet(viewsets.ModelViewSet):
         if language:
             queryset = queryset.filter(language=language)
 
+        # Filter by framework if provided
+        framework = self.request.query_params.get('framework')
+        if framework:
+            queryset = queryset.filter(framework=framework)
+
         return queryset
 
     def perform_create(self, serializer):
@@ -707,10 +712,14 @@ class NotebookViewSet(viewsets.ModelViewSet):
             }
             kernel = kernel_map.get(language, 'Python 3.11')
 
+        # Get framework or default to general
+        framework = serializer.validated_data.get('framework', 'general')
+
         serializer.save(
             workspace_id=workspace_id,
             created_by=self.request.user,
             kernel=kernel,
+            framework=framework,
             cell_count=1,  # Start with 1 empty cell
             content={'cells': [{'cell_type': 'code', 'source': '', 'outputs': []}]}
         )

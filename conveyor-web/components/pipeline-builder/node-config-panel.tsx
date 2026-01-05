@@ -39,7 +39,7 @@ export function NodeConfigPanel({
 }: NodeConfigPanelProps) {
   if (!selectedNode) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-6 text-center bg-background border-l">
+      <div className="h-full flex flex-col items-center justify-center p-6 text-center bg-background border-l relative z-10">
         <IconSettings className="h-12 w-12 text-muted-foreground/50 mb-4" />
         <h3 className="font-semibold text-lg">Node Configuration</h3>
         <p className="text-sm text-muted-foreground mt-2">
@@ -53,7 +53,7 @@ export function NodeConfigPanel({
   const nodeData = selectedNode.data as any;
 
   return (
-    <div className="h-full flex flex-col bg-background border-l">
+    <div className="h-full flex flex-col bg-background border-l relative z-10">
       {/* Header */}
       <div className="p-4 border-b">
         <div className="flex items-center gap-3">

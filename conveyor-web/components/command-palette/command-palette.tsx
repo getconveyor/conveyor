@@ -66,6 +66,16 @@ const navigationItems: CommandItem[] = [
     shortcut: ["g", "d"],
     keywords: ["home", "overview"],
   },
+  // Data Engineering
+  {
+    id: "data-engineering",
+    title: "Go to Data Engineering",
+    icon: IconArrowsExchange,
+    category: "navigation",
+    href: "/data-integration",
+    shortcut: ["g", "e"],
+    keywords: ["etl", "integration", "pipelines"],
+  },
   {
     id: "pipelines",
     title: "Go to Pipelines",
@@ -85,8 +95,59 @@ const navigationItems: CommandItem[] = [
     keywords: ["connections", "connectors"],
   },
   {
+    id: "schedules",
+    title: "Go to Schedules",
+    icon: IconClock,
+    category: "navigation",
+    href: "/data-integration/schedules",
+    keywords: ["cron", "automation"],
+  },
+  {
+    id: "pipeline-runs",
+    title: "Go to Pipeline Runs",
+    icon: IconPlaylist,
+    category: "navigation",
+    href: "/data-integration/pipeline-runs",
+    keywords: ["history", "executions"],
+  },
+  {
+    id: "notebooks",
+    title: "Go to Notebooks",
+    icon: IconCode,
+    category: "navigation",
+    href: "/data-transformation/notebooks",
+    shortcut: ["g", "n"],
+    keywords: ["jupyter", "python"],
+  },
+  {
+    id: "workflows",
+    title: "Go to Workflows",
+    icon: IconTransform,
+    category: "navigation",
+    href: "/data-transformation/workflows",
+    shortcut: ["g", "w"],
+    keywords: ["jobs", "transformation"],
+  },
+  {
+    id: "streaming-jobs",
+    title: "Go to Streaming Jobs",
+    icon: IconWaveSine,
+    category: "navigation",
+    href: "/real-time-analytics/streaming",
+    keywords: ["real-time", "stream"],
+  },
+  {
+    id: "event-hubs",
+    title: "Go to Event Hubs",
+    icon: IconWaveSine,
+    category: "navigation",
+    href: "/real-time-analytics/events",
+    keywords: ["kafka", "messaging"],
+  },
+  // Data Lakehouse
+  {
     id: "lakehouse",
-    title: "Go to Lakehouse",
+    title: "Go to Data Lakehouse",
     icon: IconStack,
     category: "navigation",
     href: "/lakehouse",
@@ -103,39 +164,31 @@ const navigationItems: CommandItem[] = [
     keywords: ["query", "trino", "sql"],
   },
   {
-    id: "workflows",
-    title: "Go to Workflows",
-    icon: IconTransform,
+    id: "table-explorer",
+    title: "Go to Table Explorer",
+    icon: IconTable,
     category: "navigation",
-    href: "/data-transformation/workflows",
-    shortcut: ["g", "w"],
-    keywords: ["jobs", "transformation"],
+    href: "/lakehouse/tables",
+    keywords: ["browse", "schema"],
   },
-  {
-    id: "notebooks",
-    title: "Go to Notebooks",
-    icon: IconCode,
-    category: "navigation",
-    href: "/data-transformation/notebooks",
-    shortcut: ["g", "n"],
-    keywords: ["jupyter", "python"],
-  },
+  // Data Analytics
   {
     id: "analytics",
-    title: "Go to Analytics",
+    title: "Go to Data Analytics",
     icon: IconChartBar,
     category: "navigation",
     href: "/data-analytics",
     keywords: ["dashboards", "reports", "bi"],
   },
   {
-    id: "real-time",
-    title: "Go to Real-Time Analytics",
+    id: "live-dashboards",
+    title: "Go to Live Dashboards",
     icon: IconWaveSine,
     category: "navigation",
-    href: "/real-time-analytics",
-    keywords: ["streaming", "events"],
+    href: "/real-time-analytics/dashboards",
+    keywords: ["real-time", "streaming"],
   },
+  // Data Science
   {
     id: "data-science",
     title: "Go to Data Science",
@@ -144,6 +197,7 @@ const navigationItems: CommandItem[] = [
     href: "/data-science",
     keywords: ["ml", "models", "experiments"],
   },
+  // Data Governance
   {
     id: "governance",
     title: "Go to Data Governance",
@@ -152,6 +206,7 @@ const navigationItems: CommandItem[] = [
     href: "/data-governance",
     keywords: ["catalog", "lineage", "quality"],
   },
+  // Monitoring
   {
     id: "monitoring",
     title: "Go to Monitoring",
@@ -160,6 +215,7 @@ const navigationItems: CommandItem[] = [
     href: "/monitoring",
     keywords: ["health", "alerts", "logs"],
   },
+  // Settings
   {
     id: "settings",
     title: "Go to Settings",

@@ -377,7 +377,7 @@ CHANNEL_LAYERS = {
 ENCRYPTION_KEY = config('ENCRYPTION_KEY', default=None)
 
 # API Rate Limiting
-API_RATE_LIMIT = config('API_RATE_LIMIT', default=1000, cast=int)  # requests per hour
+API_RATE_LIMIT = config('API_RATE_LIMIT', default=200000, cast=int)  # requests per hour
 
 # ETL Engine Configuration
 CONVEYOR_ETL = {

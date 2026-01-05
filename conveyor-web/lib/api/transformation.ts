@@ -16,6 +16,13 @@ export interface Notebook {
   description: string;
   language: string;
   kernel: string;
+  framework:
+    | "scikit-learn"
+    | "tensorflow"
+    | "pytorch"
+    | "huggingface"
+    | "xgboost"
+    | "general";
   content: {
     cells: Array<{
       cell_type: string;
@@ -36,12 +43,14 @@ export interface CreateNotebookData {
   name: string;
   description?: string;
   language: string;
+  framework?: string;
 }
 
 export interface UpdateNotebookData {
   name?: string;
   description?: string;
   content?: Notebook["content"];
+  framework?: string;
 }
 
 export interface Transformation {
@@ -131,8 +140,10 @@ export interface DataQualityResult {
 // API Functions
 export const transformationApi = {
   // Notebooks
-  async getNotebooks(language?: string): Promise<Notebook[]> {
-    const params = language ? { language } : {};
+  async getNotebooks(params?: {
+    language?: string;
+    framework?: string;
+  }): Promise<Notebook[]> {
     const response = await apiClient.get<PaginatedResponse<Notebook>>(
       "/api/transformation/notebooks/",
       { ...getAuthOptions(), params }

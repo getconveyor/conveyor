@@ -225,7 +225,7 @@ function NodePaletteItem({ item }: NodePaletteItemProps) {
 
 export function NodePalette() {
   return (
-    <div className="h-full flex flex-col border-r bg-background">
+    <div className="h-full flex flex-col border-r bg-background relative z-10">
       <div className="p-4 border-b">
         <h3 className="font-semibold">Components</h3>
         <p className="text-xs text-muted-foreground">

@@ -13,8 +13,14 @@ import trino
 from django.utils import timezone
 import logging
 import time
+import os
+import re
+import subprocess
 
 logger = logging.getLogger(__name__)
+
+# Path to Trino catalog directory (mounted from host)
+TRINO_CATALOG_PATH = '/app/trino-catalogs'  # We'll mount this in docker-compose
 
 
 class TrinoQueryViewSet(viewsets.ViewSet):
@@ -223,3 +229,174 @@ class QueryHistoryViewSet(viewsets.ReadOnlyModelViewSet):
         query = self.get_object()
         query.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CatalogViewSet(viewsets.ViewSet):
+    """ViewSet for managing Trino Iceberg catalogs (projects)"""
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+
+    def _get_catalog_template(self, catalog_name: str) -> str:
+        """Generate Iceberg catalog properties file content"""
+        return f"""# Iceberg Catalog Configuration for {catalog_name}
+connector.name=iceberg
+
+# Hive Metastore configuration
+iceberg.catalog.type=hive_metastore
+hive.metastore.uri=thrift://hive-metastore:9083
+
+# S3/MinIO configuration
+fs.native-s3.enabled=true
+s3.endpoint=http://minio:9000
+s3.path-style-access=true
+s3.aws-access-key=${{ENV:AWS_ACCESS_KEY_ID}}
+s3.aws-secret-key=${{ENV:AWS_SECRET_ACCESS_KEY}}
+
+# Iceberg table format settings
+iceberg.file-format=PARQUET
+iceberg.compression-codec=SNAPPY
+
+# Performance tuning
+iceberg.max-partitions-per-writer=100
+iceberg.minimum-assigned-split-weight=0.05
+"""
+
+    def _validate_catalog_name(self, name: str) -> tuple[bool, str]:
+        """Validate catalog name"""
+        if not name:
+            return False, "Catalog name is required"
+        if not re.match(r'^[a-z][a-z0-9_]*$', name):
+            return False, "Catalog name must start with a letter and contain only lowercase letters, numbers, and underscores"
+        if len(name) > 50:
+            return False, "Catalog name must be 50 characters or less"
+        if name in ['system', 'information_schema']:
+            return False, "This catalog name is reserved"
+        return True, ""
+
+    def list(self, request):
+        """List all available catalogs"""
+        try:
+            catalogs = []
+            
+            # List catalog files from the mounted directory
+            if os.path.exists(TRINO_CATALOG_PATH):
+                for filename in os.listdir(TRINO_CATALOG_PATH):
+                    if filename.endswith('.properties'):
+                        catalog_name = filename[:-11]  # Remove .properties
+                        file_path = os.path.join(TRINO_CATALOG_PATH, filename)
+                        
+                        # Read the file to check connector type
+                        connector_type = 'unknown'
+                        try:
+                            with open(file_path, 'r') as f:
+                                content = f.read()
+                                if 'connector.name=iceberg' in content:
+                                    connector_type = 'iceberg'
+                                elif 'connector.name=postgresql' in content:
+                                    connector_type = 'postgresql'
+                                elif 'connector.name=mysql' in content:
+                                    connector_type = 'mysql'
+                        except Exception:
+                            pass
+                        
+                        catalogs.append({
+                            'name': catalog_name,
+                            'connector': connector_type,
+                            'file': filename,
+                            'is_system': catalog_name in ['system', 'information_schema'],
+                            'is_default': catalog_name == 'iceberg'
+                        })
+            
+            return Response({
+                'catalogs': sorted(catalogs, key=lambda x: x['name']),
+                'total': len(catalogs)
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to list catalogs: {str(e)}")
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def create(self, request):
+        """Create a new Iceberg catalog"""
+        name = request.data.get('name', '').lower().strip()
+        description = request.data.get('description', '')
+        
+        # Validate name
+        is_valid, error = self._validate_catalog_name(name)
+        if not is_valid:
+            return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if catalog already exists
+        catalog_file = os.path.join(TRINO_CATALOG_PATH, f'{name}.properties')
+        if os.path.exists(catalog_file):
+            return Response({
+                'error': f'Catalog "{name}" already exists'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Create the catalog properties file
+            content = self._get_catalog_template(name)
+            
+            with open(catalog_file, 'w') as f:
+                f.write(content)
+            
+            logger.info(f"Created catalog: {name}")
+            
+            return Response({
+                'name': name,
+                'message': f'Catalog "{name}" created successfully. Restart Trino to activate.',
+                'restart_required': True
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Failed to create catalog {name}: {str(e)}")
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def destroy(self, request, pk=None):
+        """Delete a catalog"""
+        catalog_name = pk
+        
+        if catalog_name in ['iceberg', 'system', 'information_schema', 'postgres']:
+            return Response({
+                'error': 'Cannot delete system or default catalogs'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        catalog_file = os.path.join(TRINO_CATALOG_PATH, f'{catalog_name}.properties')
+        
+        if not os.path.exists(catalog_file):
+            return Response({
+                'error': f'Catalog "{catalog_name}" not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            os.remove(catalog_file)
+            logger.info(f"Deleted catalog: {catalog_name}")
+            
+            return Response({
+                'message': f'Catalog "{catalog_name}" deleted. Restart Trino to apply.',
+                'restart_required': True
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to delete catalog {catalog_name}: {str(e)}")
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'])
+    def restart_trino(self, request):
+        """Restart Trino container to reload catalogs"""
+        try:
+            # This would typically be done via Docker API or a management script
+            # For now, we'll return instructions
+            return Response({
+                'message': 'To reload catalogs, restart the Trino container',
+                'command': 'docker restart conveyor-trino'
+            })
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

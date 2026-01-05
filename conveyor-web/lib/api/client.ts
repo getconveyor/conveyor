@@ -112,7 +112,10 @@ class ApiClient {
             if (tokensStr) {
               const tokens = JSON.parse(tokensStr);
               const updatedTokens = { ...tokens, access: newAccessToken };
-              localStorage.setItem("auth_tokens", JSON.stringify(updatedTokens));
+              localStorage.setItem(
+                "auth_tokens",
+                JSON.stringify(updatedTokens)
+              );
             }
 
             // Update the failed request with new token
@@ -154,6 +157,19 @@ class ApiClient {
 
             return Promise.reject(refreshError);
           }
+        }
+
+        // Handle rate limiting (429) - redirect to rate-limited page
+        if (error.response?.status === 429) {
+          if (
+            typeof window !== "undefined" &&
+            !window.location.pathname.includes("/rate-limited")
+          ) {
+            window.location.href = "/rate-limited";
+          }
+          return Promise.reject(
+            new Error("Rate limit exceeded. Please try again later.")
+          );
         }
 
         // For other errors, return a formatted error message

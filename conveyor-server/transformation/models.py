@@ -211,6 +211,17 @@ class Notebook(models.Model):
     language = models.CharField(max_length=50, choices=LANGUAGE_CHOICES, default='python')
     kernel = models.CharField(max_length=100, default='Python 3.11')
 
+    # ML Framework (for data science notebooks)
+    FRAMEWORK_CHOICES = [
+        ('scikit-learn', 'Scikit-learn'),
+        ('tensorflow', 'TensorFlow'),
+        ('pytorch', 'PyTorch'),
+        ('huggingface', 'HuggingFace'),
+        ('xgboost', 'XGBoost'),
+        ('general', 'General'),
+    ]
+    framework = models.CharField(max_length=50, choices=FRAMEWORK_CHOICES, default='general')
+
     # Notebook content
     content = models.JSONField(default=dict, blank=True)  # Stores notebook cells and metadata
     cell_count = models.IntegerField(default=0)

@@ -15,7 +15,13 @@ import {
   IconLoader2,
 } from "@tabler/icons-react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { integrationApi, Schedule, Pipeline } from "@/lib/api/integration";
+import {
+  integrationApi,
+  Schedule,
+  Pipeline,
+  ScheduleType,
+  ScheduleConfig,
+} from "@/lib/api/integration";
 import { toast } from "sonner";
 import {
   Card,
@@ -60,7 +66,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  ScheduleBuilder,
+  getDefaultScheduleConfig,
+} from "@/components/schedule-builder";
 
 const statusConfig: Record<
   string,
@@ -68,6 +77,15 @@ const statusConfig: Record<
 > = {
   enabled: { label: "Enabled", variant: "default" },
   disabled: { label: "Disabled", variant: "outline" },
+};
+
+const scheduleTypeLabels: Record<ScheduleType, string> = {
+  manual: "Manual",
+  hourly: "Hourly",
+  daily: "Daily",
+  weekly: "Weekly",
+  monthly: "Monthly",
+  cron: "Custom",
 };
 
 export default function SchedulesPage() {
@@ -84,8 +102,9 @@ export default function SchedulesPage() {
 
   const [formData, setFormData] = useState({
     name: "",
-    cron_expression: "",
     pipeline: "",
+    schedule_type: "daily" as ScheduleType,
+    schedule_config: { hour: 9, minute: 0 } as ScheduleConfig,
     timezone: "UTC",
   });
 
@@ -144,12 +163,26 @@ export default function SchedulesPage() {
   }
 
   const handleCreateOrUpdateSchedule = async () => {
-    if (
-      !formData.name.trim() ||
-      !formData.cron_expression ||
-      !formData.pipeline
-    ) {
+    if (!formData.name.trim() || !formData.pipeline) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+
+    // Validate schedule config based on type
+    if (
+      formData.schedule_type === "weekly" &&
+      (!formData.schedule_config.days ||
+        formData.schedule_config.days.length === 0)
+    ) {
+      toast.error("Please select at least one day for weekly schedule");
+      return;
+    }
+
+    if (
+      formData.schedule_type === "cron" &&
+      !formData.schedule_config.expression
+    ) {
+      toast.error("Please enter a cron expression");
       return;
     }
 
@@ -159,8 +192,9 @@ export default function SchedulesPage() {
         // Update existing schedule
         await integrationApi.updateSchedule(editingSchedule.id, {
           name: formData.name,
-          cron_expression: formData.cron_expression,
           pipeline: formData.pipeline,
+          schedule_type: formData.schedule_type,
+          schedule_config: formData.schedule_config,
           timezone: formData.timezone,
         });
         toast.success("Schedule updated successfully");
@@ -168,8 +202,10 @@ export default function SchedulesPage() {
         // Create new schedule
         await integrationApi.createSchedule({
           pipeline: formData.pipeline,
-          cron_expression: formData.cron_expression,
           name: formData.name,
+          schedule_type: formData.schedule_type,
+          schedule_config: formData.schedule_config,
+          timezone: formData.timezone,
         });
         toast.success("Schedule created successfully");
       }
@@ -192,8 +228,9 @@ export default function SchedulesPage() {
     setEditingSchedule(schedule);
     setFormData({
       name: schedule.name,
-      cron_expression: schedule.cron_expression,
       pipeline: schedule.pipeline || "",
+      schedule_type: schedule.schedule_type || "daily",
+      schedule_config: schedule.schedule_config || { hour: 9, minute: 0 },
       timezone: schedule.timezone || "UTC",
     });
     setIsCreateDialogOpen(true);
@@ -242,11 +279,20 @@ export default function SchedulesPage() {
     }
   };
 
+  const handleScheduleTypeChange = (type: ScheduleType) => {
+    setFormData({
+      ...formData,
+      schedule_type: type,
+      schedule_config: getDefaultScheduleConfig(type),
+    });
+  };
+
   const resetForm = () => {
     setFormData({
       name: "",
-      cron_expression: "",
       pipeline: "",
+      schedule_type: "daily",
+      schedule_config: { hour: 9, minute: 0 },
       timezone: "UTC",
     });
     setEditingSchedule(null);
@@ -381,7 +427,8 @@ export default function SchedulesPage() {
                             variant="outline"
                             className="text-blue-500 text-xs"
                           >
-                            Cron
+                            {scheduleTypeLabels[schedule.schedule_type] ||
+                              "Custom"}
                           </Badge>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs ml-6">
@@ -392,21 +439,26 @@ export default function SchedulesPage() {
                             </p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Expression</p>
-                            <p className="font-medium font-mono text-xs">
-                              {schedule.cron_expression}
+                            <p className="text-muted-foreground">Schedule</p>
+                            <p className="font-medium">
+                              {schedule.schedule_description ||
+                                schedule.cron_expression}
                             </p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Next Run</p>
                             <p className="font-medium">
-                              {schedule.next_run || "Not scheduled"}
+                              {schedule.next_run
+                                ? new Date(schedule.next_run).toLocaleString()
+                                : "Not scheduled"}
                             </p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Last Run</p>
                             <p className="font-medium">
-                              {schedule.last_run || "Never"}
+                              {schedule.last_run
+                                ? new Date(schedule.last_run).toLocaleString()
+                                : "Never"}
                             </p>
                           </div>
                         </div>
@@ -497,7 +549,7 @@ export default function SchedulesPage() {
         modal
       >
         <DialogContent
-          className="max-w-2xl"
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
@@ -516,82 +568,57 @@ export default function SchedulesPage() {
               <Label htmlFor="schedule-name">Schedule Name</Label>
               <Input
                 id="schedule-name"
-                placeholder="e.g., Hourly Customer Sync"
+                placeholder="e.g., Daily Customer Sync"
                 value={formData.name}
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="schedule-pipeline">Pipeline</Label>
-                <Select
-                  value={formData.pipeline}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, pipeline: value })
-                  }
-                >
-                  <SelectTrigger id="schedule-pipeline">
-                    <SelectValue placeholder="Select pipeline" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pipelines.length === 0 ? (
-                      <SelectItem value="none" disabled>
-                        No pipelines available
-                      </SelectItem>
-                    ) : (
-                      pipelines.map((pipeline) => (
-                        <SelectItem key={pipeline.id} value={pipeline.id}>
-                          {pipeline.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Select the pipeline to schedule
-                </p>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="timezone">Timezone</Label>
-                <Select
-                  value={formData.timezone}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, timezone: value })
-                  }
-                >
-                  <SelectTrigger id="timezone">
-                    <SelectValue placeholder="Select timezone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UTC">UTC</SelectItem>
-                    <SelectItem value="America/New_York">
-                      America/New York
-                    </SelectItem>
-                    <SelectItem value="America/Los_Angeles">
-                      America/Los Angeles
-                    </SelectItem>
-                    <SelectItem value="Europe/London">Europe/London</SelectItem>
-                    <SelectItem value="Asia/Tokyo">Asia/Tokyo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
             <div className="grid gap-2">
-              <Label htmlFor="cron_expression">Cron Expression</Label>
-              <Input
-                id="cron_expression"
-                placeholder="0 * * * * (every hour)"
-                value={formData.cron_expression}
-                onChange={(e) =>
-                  setFormData({ ...formData, cron_expression: e.target.value })
+              <Label htmlFor="schedule-pipeline">Pipeline</Label>
+              <Select
+                value={formData.pipeline}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, pipeline: value })
+                }
+              >
+                <SelectTrigger id="schedule-pipeline">
+                  <SelectValue placeholder="Select pipeline" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pipelines.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No pipelines available
+                    </SelectItem>
+                  ) : (
+                    pipelines.map((pipeline) => (
+                      <SelectItem key={pipeline.id} value={pipeline.id}>
+                        {pipeline.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Select the pipeline to schedule
+              </p>
+            </div>
+
+            {/* Schedule Builder Component */}
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <ScheduleBuilder
+                scheduleType={formData.schedule_type}
+                scheduleConfig={formData.schedule_config}
+                timezone={formData.timezone}
+                onScheduleTypeChange={handleScheduleTypeChange}
+                onScheduleConfigChange={(config) =>
+                  setFormData({ ...formData, schedule_config: config })
+                }
+                onTimezoneChange={(tz) =>
+                  setFormData({ ...formData, timezone: tz })
                 }
               />
-              <p className="text-xs text-muted-foreground">
-                Cron format: minute hour day month weekday. Example: "0 * * * *"
-                runs every hour
-              </p>
             </div>
           </div>
           <DialogFooter>
@@ -608,10 +635,7 @@ export default function SchedulesPage() {
             <Button
               onClick={handleCreateOrUpdateSchedule}
               disabled={
-                !formData.name.trim() ||
-                !formData.cron_expression ||
-                !formData.pipeline ||
-                isLoading
+                !formData.name.trim() || !formData.pipeline || isLoading
               }
             >
               {isLoading ? (

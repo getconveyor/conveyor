@@ -12,18 +12,15 @@ const publicRoutes = [
 // Define auth routes (redirect to dashboard if already logged in)
 const authRoutes = ["/login", "/register"];
 
-// Define API routes that should bypass middleware
-const apiRoutes = ["/api"];
-
-// Rate limiting configuration (in-memory for edge runtime)
-const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 100; // 100 requests per minute
-
 // Content Security Policy configuration
 const cspDirectives = {
   "default-src": ["'self'"],
-  "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Required for Next.js
+  "script-src": [
+    "'self'",
+    "'unsafe-inline'",
+    "'unsafe-eval'",
+    "https://cdn.jsdelivr.net",
+  ], // Required for Next.js and Monaco Editor
   "style-src": ["'self'", "'unsafe-inline'"], // Required for Tailwind
   "img-src": ["'self'", "data:", "blob:", "https:"],
   "font-src": ["'self'", "data:"],
@@ -33,6 +30,7 @@ const cspDirectives = {
     "ws:", // WebSocket connections
     "wss:",
   ],
+  "worker-src": ["'self'", "blob:"], // Required for Monaco Editor web workers
   "frame-ancestors": ["'none'"],
   "form-action": ["'self'"],
   "base-uri": ["'self'"],
@@ -43,54 +41,6 @@ function generateCSP(): string {
   return Object.entries(cspDirectives)
     .map(([key, values]) => `${key} ${values.join(" ")}`)
     .join("; ");
-}
-
-function getClientIP(request: NextRequest): string {
-  // Try various headers for client IP
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    return forwardedFor.split(",")[0].trim();
-  }
-
-  const realIP = request.headers.get("x-real-ip");
-  if (realIP) {
-    return realIP;
-  }
-
-  // Fallback to a default identifier
-  return "unknown";
-}
-
-function checkRateLimit(clientIP: string): {
-  allowed: boolean;
-  remaining: number;
-} {
-  const now = Date.now();
-  const clientData = rateLimitMap.get(clientIP);
-
-  // Clean up old entries periodically
-  if (rateLimitMap.size > 10000) {
-    for (const [key, value] of rateLimitMap.entries()) {
-      if (now - value.timestamp > RATE_LIMIT_WINDOW_MS) {
-        rateLimitMap.delete(key);
-      }
-    }
-  }
-
-  if (!clientData || now - clientData.timestamp > RATE_LIMIT_WINDOW_MS) {
-    rateLimitMap.set(clientIP, { count: 1, timestamp: now });
-    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1 };
-  }
-
-  if (clientData.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return { allowed: false, remaining: 0 };
-  }
-
-  clientData.count++;
-  return {
-    allowed: true,
-    remaining: RATE_LIMIT_MAX_REQUESTS - clientData.count,
-  };
 }
 
 function addSecurityHeaders(response: NextResponse): NextResponse {
@@ -128,31 +78,15 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const clientIP = getClientIP(request);
 
-  // Skip rate limiting and auth for static files
+  // Skip auth checks for static files and special pages
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/static") ||
+    pathname.startsWith("/rate-limited") ||
     pathname.includes(".")
   ) {
     return NextResponse.next();
-  }
-
-  // Check rate limiting
-  const rateLimit = checkRateLimit(clientIP);
-  if (!rateLimit.allowed) {
-    const response = new NextResponse(
-      JSON.stringify({ error: "Too many requests. Please try again later." }),
-      { status: 429, headers: { "Content-Type": "application/json" } }
-    );
-    response.headers.set("Retry-After", "60");
-    response.headers.set(
-      "X-RateLimit-Limit",
-      RATE_LIMIT_MAX_REQUESTS.toString()
-    );
-    response.headers.set("X-RateLimit-Remaining", "0");
-    return addSecurityHeaders(response);
   }
 
   // Get auth token from cookie
@@ -181,10 +115,6 @@ export function middleware(request: NextRequest) {
   else {
     response = NextResponse.next();
   }
-
-  // Add rate limit headers
-  response.headers.set("X-RateLimit-Limit", RATE_LIMIT_MAX_REQUESTS.toString());
-  response.headers.set("X-RateLimit-Remaining", rateLimit.remaining.toString());
 
   // Add security headers
   return addSecurityHeaders(response);

@@ -66,6 +66,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/page-header";
 import { DataGrid } from "@/components/data-grid";
 import { useAriaLabels } from "@/hooks/use-aria-labels";
+import {
+  PipelineStatsDialog,
+  PipelineStats,
+} from "@/components/pipeline-stats-dialog";
+import { PipelineCreateDialog } from "@/components/pipeline-create-dialog";
 
 type PipelineStatus = "active" | "paused" | "error" | "running" | "idle";
 
@@ -90,10 +95,18 @@ export default function PipelinesPage() {
   const [sources, setSources] = useState<Source[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingPipeline, setEditingPipeline] = useState<Pipeline | null>(null);
   const [pipelineToDelete, setPipelineToDelete] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Stats dialog state
+  const [isStatsDialogOpen, setIsStatsDialogOpen] = useState(false);
+  const [selectedPipelineStats, setSelectedPipelineStats] =
+    useState<PipelineStats | null>(null);
+  const [selectedPipelineName, setSelectedPipelineName] = useState<string>("");
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -136,7 +149,8 @@ export default function PipelinesPage() {
       setPipelines(data);
     } catch (error) {
       console.error("Failed to load pipelines:", error);
-      const message = error instanceof Error ? error.message : "Failed to load pipelines";
+      const message =
+        error instanceof Error ? error.message : "Failed to load pipelines";
       toast.error(message);
     } finally {
       setIsFetching(false);
@@ -194,11 +208,13 @@ export default function PipelinesPage() {
         toast.success("Pipeline created successfully");
       }
       await loadPipelines();
-      setIsCreateDialogOpen(false);
+      setIsEditDialogOpen(false);
       resetForm();
     } catch (error) {
       console.error("Failed to save pipeline:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to save pipeline");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save pipeline"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -217,7 +233,7 @@ export default function PipelinesPage() {
         lakehouseConfig?.table_name || pipeline.config?.table_name || "",
       schedule: pipeline.schedule || "",
     });
-    setIsCreateDialogOpen(true);
+    setIsEditDialogOpen(true);
   }, []);
 
   const handleDeletePipeline = async () => {
@@ -230,7 +246,9 @@ export default function PipelinesPage() {
       setPipelineToDelete(null);
     } catch (error) {
       console.error("Failed to delete pipeline:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to delete pipeline");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete pipeline"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -242,7 +260,9 @@ export default function PipelinesPage() {
       toast.success("Pipeline triggered successfully");
       loadPipelines();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to trigger pipeline");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to trigger pipeline"
+      );
     }
   }, []);
 
@@ -252,7 +272,9 @@ export default function PipelinesPage() {
       toast.success("Pipeline paused successfully");
       loadPipelines();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to pause pipeline");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to pause pipeline"
+      );
     }
   }, []);
 
@@ -262,16 +284,28 @@ export default function PipelinesPage() {
       toast.success("Pipeline resumed successfully");
       loadPipelines();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to resume pipeline");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to resume pipeline"
+      );
     }
   }, []);
 
-  const handleViewStats = useCallback(async (id: string) => {
+  const handleViewStats = useCallback(async (id: string, name: string) => {
+    setSelectedPipelineName(name);
+    setIsStatsDialogOpen(true);
+    setIsLoadingStats(true);
+    setSelectedPipelineStats(null);
+
     try {
       const stats = await integrationApi.getPipelineStats(id);
-      toast.message(JSON.stringify(stats, null, 2));
+      setSelectedPipelineStats(stats);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to fetch stats");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to fetch stats"
+      );
+      setIsStatsDialogOpen(false);
+    } finally {
+      setIsLoadingStats(false);
     }
   }, []);
 
@@ -435,7 +469,7 @@ export default function PipelinesPage() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => handleViewStats(pipeline.id)}
+                    onClick={() => handleViewStats(pipeline.id, pipeline.name)}
                   >
                     <IconTrendingUp className="mr-2 h-4 w-4" />
                     View Stats
@@ -509,41 +543,69 @@ export default function PipelinesPage() {
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardContent className="pt-4 pb-4" role="region" aria-label="Total pipelines statistics">
+          <CardContent
+            className="pt-4 pb-4"
+            role="region"
+            aria-label="Total pipelines statistics"
+          >
             <div className="text-sm font-medium text-muted-foreground">
               Total Pipelines
             </div>
-            <div className="text-3xl font-bold mt-1" aria-label={`${stats.total} total pipelines`}>
+            <div
+              className="text-3xl font-bold mt-1"
+              aria-label={`${stats.total} total pipelines`}
+            >
               {stats.total}
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-4" role="region" aria-label="Running pipelines statistics">
+          <CardContent
+            className="pt-4 pb-4"
+            role="region"
+            aria-label="Running pipelines statistics"
+          >
             <div className="text-sm font-medium text-muted-foreground">
               Running
             </div>
-            <div className="text-3xl font-bold mt-1 text-blue-500" aria-label={`${stats.running} running pipelines`}>
+            <div
+              className="text-3xl font-bold mt-1 text-blue-500"
+              aria-label={`${stats.running} running pipelines`}
+            >
               {stats.running}
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-4" role="region" aria-label="Failed pipelines statistics">
+          <CardContent
+            className="pt-4 pb-4"
+            role="region"
+            aria-label="Failed pipelines statistics"
+          >
             <div className="text-sm font-medium text-muted-foreground">
               Failed
             </div>
-            <div className="text-3xl font-bold mt-1 text-red-500" aria-label={`${stats.failed} failed pipelines`}>
+            <div
+              className="text-3xl font-bold mt-1 text-red-500"
+              aria-label={`${stats.failed} failed pipelines`}
+            >
               {stats.failed}
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-4" role="region" aria-label="Paused pipelines statistics">
+          <CardContent
+            className="pt-4 pb-4"
+            role="region"
+            aria-label="Paused pipelines statistics"
+          >
             <div className="text-sm font-medium text-muted-foreground">
               Paused
             </div>
-            <div className="text-3xl font-bold mt-1 text-muted-foreground" aria-label={`${stats.paused} paused pipelines`}>
+            <div
+              className="text-3xl font-bold mt-1 text-muted-foreground"
+              aria-label={`${stats.paused} paused pipelines`}
+            >
               {stats.paused}
             </div>
           </CardContent>
@@ -582,12 +644,20 @@ export default function PipelinesPage() {
         }
       />
 
-      {/* Create/Edit Pipeline Dialog */}
-      <Dialog
+      {/* New Pipeline Create Dialog with Schema Discovery */}
+      <PipelineCreateDialog
         open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        sources={sources}
+        onSuccess={loadPipelines}
+      />
+
+      {/* Edit Pipeline Dialog (legacy single-table) */}
+      <Dialog
+        open={isEditDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
-            setIsCreateDialogOpen(false);
+            setIsEditDialogOpen(false);
             resetForm();
           }
         }}
@@ -599,13 +669,9 @@ export default function PipelinesPage() {
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
           <DialogHeader>
-            <DialogTitle>
-              {editingPipeline ? "Edit Pipeline" : "Create New Pipeline"}
-            </DialogTitle>
+            <DialogTitle>Edit Pipeline</DialogTitle>
             <DialogDescription>
-              {editingPipeline
-                ? "Update the pipeline configuration."
-                : "Create a pipeline to sync data from a source to your Lakehouse."}
+              Update the pipeline configuration.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -741,7 +807,7 @@ export default function PipelinesPage() {
             <Button
               variant="outline"
               onClick={() => {
-                setIsCreateDialogOpen(false);
+                setIsEditDialogOpen(false);
                 resetForm();
               }}
               disabled={isLoading}
@@ -753,17 +819,16 @@ export default function PipelinesPage() {
               disabled={
                 isLoading ||
                 !formData.name.trim() ||
-                !formData.table_name.trim() ||
-                (!editingPipeline && !formData.source)
+                !formData.table_name.trim()
               }
             >
               {isLoading ? (
                 <>
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {editingPipeline ? "Updating..." : "Creating..."}
+                  Updating...
                 </>
               ) : (
-                <>{editingPipeline ? "Update Pipeline" : "Create Pipeline"}</>
+                <>Update Pipeline</>
               )}
             </Button>
           </DialogFooter>
@@ -801,6 +866,15 @@ export default function PipelinesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Pipeline Stats Dialog */}
+      <PipelineStatsDialog
+        open={isStatsDialogOpen}
+        onOpenChange={setIsStatsDialogOpen}
+        stats={selectedPipelineStats}
+        pipelineName={selectedPipelineName}
+        isLoading={isLoadingStats}
+      />
     </div>
   );
 }
