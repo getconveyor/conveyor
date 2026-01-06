@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { AccessibilityProvider } from "@/components/accessibility-provider";
 import { SkipToMain } from "@/components/skip-to-main";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,23 +32,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AccessibilityProvider>
-          <SkipToMain />
-          <ErrorBoundary>
-            <QueryProvider>
-              <AuthProvider>
-                <WorkspaceProvider>
-                  {children}
-                  <Toaster richColors position="top-right" />
-                </WorkspaceProvider>
-              </AuthProvider>
-            </QueryProvider>
-          </ErrorBoundary>
-        </AccessibilityProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AccessibilityProvider>
+            <SkipToMain />
+            <ErrorBoundary>
+              <QueryProvider>
+                <AuthProvider>
+                  <WorkspaceProvider>
+                    {children}
+                    <Toaster richColors position="top-right" />
+                  </WorkspaceProvider>
+                </AuthProvider>
+              </QueryProvider>
+            </ErrorBoundary>
+          </AccessibilityProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

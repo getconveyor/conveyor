@@ -190,7 +190,7 @@ export default function HistoryPage() {
                           {query.execution_time_display}
                         </Badge>
                       )}
-                      <span>Catalog: {query.catalog}</span>
+                      <span>Namespace: {query.namespace}</span>
                       {query.schema && <span>Schema: {query.schema}</span>}
                       <span className="text-muted-foreground">
                         By: {query.user_email}

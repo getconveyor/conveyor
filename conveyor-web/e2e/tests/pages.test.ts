@@ -87,11 +87,11 @@ describe("Platform Pages Tests", () => {
   });
 
   describe("Lakehouse Pages", () => {
-    test("should load catalog page", async () => {
-      await navigateTo(page, platformPages.catalog);
+    test("should load namespaces page", async () => {
+      await navigateTo(page, platformPages.namespaces);
       await waitForPageReady(page);
 
-      expect(page.url()).toContain("/catalog");
+      expect(page.url()).toContain("/namespaces");
     });
 
     test("should load tables page", async () => {

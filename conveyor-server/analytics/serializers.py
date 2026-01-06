@@ -80,7 +80,7 @@ class SavedQuerySerializer(serializers.ModelSerializer):
         model = SavedQuery
         fields = [
             'id', 'workspace', 'name', 'description',
-            'query_text', 'catalog', 'schema_name',
+            'query_text', 'namespace', 'schema_name',
             'parameters', 'tags', 'folder',
             'is_public', 'owner', 'owner_name',
             'execution_count', 'last_executed_at', 'avg_execution_time_ms',

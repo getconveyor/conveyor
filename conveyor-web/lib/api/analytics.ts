@@ -75,7 +75,7 @@ export interface SavedQuery {
   name: string;
   description: string;
   query_text: string;
-  catalog: string;
+  namespace: string;
   schema_name: string;
   parameters: Array<{ name: string; type: string; default?: any }>;
   tags: string[];

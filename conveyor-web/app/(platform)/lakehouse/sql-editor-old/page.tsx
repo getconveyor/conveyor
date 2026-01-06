@@ -8,16 +8,26 @@ import {
   IconDeviceFloppy,
   IconClock,
   IconDownload,
+  IconDatabase,
+  IconLoader2,
 } from "@tabler/icons-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   executeQuery,
   getQueryHistory,
   QueryHistory,
 } from "@/lib/api/lakehouse";
+import { getNamespaces, Namespace } from "@/lib/api/warehouse";
 
 /**
  * Parse Trino error message to extract the human-readable message
@@ -62,6 +72,11 @@ export default function SqlEditorPage() {
   const [queryHistory, setQueryHistory] = useState<QueryHistory[]>([]);
   const { toast } = useToast();
 
+  // Namespace state
+  const [namespaces, setNamespaces] = useState<Namespace[]>([]);
+  const [selectedNamespace, setSelectedNamespace] = useState<string>("iceberg");
+  const [isFetchingNamespaces, setIsFetchingNamespaces] = useState(false);
+
   // Update query when table parameter changes
   useEffect(() => {
     if (tableParam) {
@@ -71,6 +86,35 @@ export default function SqlEditorPage() {
 
   useEffect(() => {
     loadQueryHistory();
+  }, []);
+
+  // Fetch available namespaces
+  useEffect(() => {
+    const fetchNamespaces = async () => {
+      setIsFetchingNamespaces(true);
+      try {
+        const allNamespaces = await getNamespaces();
+        // Filter to only show Iceberg namespaces (not system namespaces)
+        const icebergNamespaces = allNamespaces.filter(
+          (n) => n.connector === "iceberg" && !n.is_system
+        );
+        setNamespaces(icebergNamespaces);
+
+        // Set default namespace if available
+        const defaultNamespace = icebergNamespaces.find((n) => n.is_default);
+        if (defaultNamespace) {
+          setSelectedNamespace(defaultNamespace.name);
+        } else if (icebergNamespaces.length > 0) {
+          setSelectedNamespace(icebergNamespaces[0].name);
+        }
+      } catch (error) {
+        console.error("Failed to fetch namespaces:", error);
+      } finally {
+        setIsFetchingNamespaces(false);
+      }
+    };
+
+    fetchNamespaces();
   }, []);
 
   const loadQueryHistory = async () => {
@@ -98,7 +142,7 @@ export default function SqlEditorPage() {
     try {
       const response = await executeQuery({
         query: query.trim(),
-        catalog: "iceberg",
+        namespace: selectedNamespace,
         limit: 1000,
       });
 
@@ -217,7 +261,41 @@ export default function SqlEditorPage() {
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Query Editor</span>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant="outline">Catalog: iceberg</Badge>
+              <Select
+                value={selectedNamespace}
+                onValueChange={setSelectedNamespace}
+                disabled={isFetchingNamespaces}
+              >
+                <SelectTrigger className="h-7 w-36 text-xs">
+                  {isFetchingNamespaces ? (
+                    <div className="flex items-center gap-1">
+                      <IconLoader2 className="h-3 w-3 animate-spin" />
+                      <span>Loading...</span>
+                    </div>
+                  ) : (
+                    <SelectValue placeholder="Namespace" />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  {namespaces.length === 0 ? (
+                    <SelectItem value="iceberg">
+                      <div className="flex items-center gap-1">
+                        <IconDatabase className="h-3 w-3" />
+                        iceberg
+                      </div>
+                    </SelectItem>
+                  ) : (
+                    namespaces.map((ns) => (
+                      <SelectItem key={ns.name} value={ns.name}>
+                        <div className="flex items-center gap-1">
+                          <IconDatabase className="h-3 w-3" />
+                          {ns.name}
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
               <span>Ctrl+Enter to execute</span>
             </div>
           </div>
@@ -373,18 +451,22 @@ export default function SqlEditorPage() {
             <p className="text-xs font-medium">List all schemas:</p>
             <code
               className="block p-2 rounded bg-muted text-xs cursor-pointer hover:bg-muted/80"
-              onClick={() => setQuery("SHOW SCHEMAS FROM iceberg;")}
+              onClick={() =>
+                setQuery(`SHOW SCHEMAS FROM ${selectedNamespace};`)
+              }
             >
-              SHOW SCHEMAS FROM iceberg;
+              SHOW SCHEMAS FROM {selectedNamespace};
             </code>
           </div>
           <div className="space-y-1">
             <p className="text-xs font-medium">List tables in bronze layer:</p>
             <code
               className="block p-2 rounded bg-muted text-xs cursor-pointer hover:bg-muted/80"
-              onClick={() => setQuery("SHOW TABLES FROM iceberg.bronze;")}
+              onClick={() =>
+                setQuery(`SHOW TABLES FROM ${selectedNamespace}.bronze;`)
+              }
             >
-              SHOW TABLES FROM iceberg.bronze;
+              SHOW TABLES FROM {selectedNamespace}.bronze;
             </code>
           </div>
           <div className="space-y-1">
@@ -393,11 +475,12 @@ export default function SqlEditorPage() {
               className="block p-2 rounded bg-muted text-xs cursor-pointer hover:bg-muted/80"
               onClick={() =>
                 setQuery(
-                  "SELECT * FROM iceberg.bronze.default.my_table LIMIT 100;"
+                  `SELECT * FROM ${selectedNamespace}.bronze.default.my_table LIMIT 100;`
                 )
               }
             >
-              SELECT * FROM iceberg.bronze.default.my_table LIMIT 100;
+              SELECT * FROM {selectedNamespace}.bronze.default.my_table LIMIT
+              100;
             </code>
           </div>
         </CardContent>

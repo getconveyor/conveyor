@@ -116,7 +116,8 @@ class PipelineRunSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'pipeline', 'pipeline_name', 'status', 'start_time',
             'end_time', 'duration', 'records_processed', 'bytes_processed',
-            'errors', 'metrics', 'triggered_by', 'triggered_by_user',
+            'errors', 'metrics', 'error_count', 'error_message',
+            'current_step', 'progress', 'triggered_by', 'triggered_by_user',
             'triggered_by_user_details', 'created_at'
         ]
         read_only_fields = [

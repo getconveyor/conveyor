@@ -126,7 +126,7 @@ class SavedQuery(models.Model):
     
     # Query
     query_text = models.TextField()
-    catalog = models.CharField(max_length=100, default='iceberg')
+    namespace = models.CharField(max_length=100, default='iceberg')
     schema_name = models.CharField(max_length=100, blank=True)
     
     # Parameters

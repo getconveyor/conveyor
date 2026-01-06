@@ -52,7 +52,7 @@ def get_trino_connection():
         host=getattr(settings, 'TRINO_HOST', 'trino'),
         port=getattr(settings, 'TRINO_PORT', 8080),
         user='trino',
-        catalog='iceberg',
+        catalog='iceberg',  # Trino still uses catalog terminology internally
         http_scheme='http',
     )
 
@@ -433,7 +433,7 @@ class SavedQueryViewSet(viewsets.ModelViewSet):
             name=f"{query.name} (Copy)",
             description=query.description,
             query_text=query.query_text,
-            catalog=query.catalog,
+            namespace=query.namespace,
             schema_name=query.schema_name,
             parameters=query.parameters,
             tags=query.tags,

@@ -393,6 +393,32 @@ export const transformationApi = {
       getAuthOptions()
     );
   },
+
+  // Jobs - Get notebooks that have been executed (transformation jobs)
+  async getJobs(): Promise<Notebook[]> {
+    const response = await apiClient.get<PaginatedResponse<Notebook>>(
+      "/api/transformation/notebooks/",
+      getAuthOptions()
+    );
+    // Return all notebooks sorted by last_executed (most recent first)
+    const notebooks = response.results || response;
+    return notebooks
+      .filter((n: Notebook) => n.last_executed !== null)
+      .sort((a: Notebook, b: Notebook) => {
+        const dateA = a.last_executed ? new Date(a.last_executed).getTime() : 0;
+        const dateB = b.last_executed ? new Date(b.last_executed).getTime() : 0;
+        return dateB - dateA;
+      });
+  },
+
+  // Get all notebooks (for job scheduling)
+  async getSchedulableNotebooks(): Promise<Notebook[]> {
+    const response = await apiClient.get<PaginatedResponse<Notebook>>(
+      "/api/transformation/notebooks/",
+      getAuthOptions()
+    );
+    return response.results || response;
+  },
 };
 
 export default transformationApi;

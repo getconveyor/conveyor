@@ -223,10 +223,12 @@ export default function PipelinesPage() {
   const handleEditPipeline = useCallback((pipeline: Pipeline) => {
     setEditingPipeline(pipeline);
     const lakehouseConfig = pipeline.config?.lakehouse;
+    // Ensure source is a string - it could be the source ID or undefined
+    const sourceId = pipeline.source ? String(pipeline.source) : "";
     setFormData({
       name: pipeline.name,
       description: pipeline.description || "",
-      source: pipeline.source || "",
+      source: sourceId,
       layer: lakehouseConfig?.layer || "bronze",
       namespace: lakehouseConfig?.namespace || "",
       table_name:
@@ -701,30 +703,42 @@ export default function PipelinesPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="source">Source *</Label>
-                <Select
-                  value={formData.source || ""}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, source: value })
-                  }
-                  disabled={!!editingPipeline}
-                >
-                  <SelectTrigger id="source">
-                    <SelectValue placeholder="Select source" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sources.length === 0 ? (
-                      <SelectItem value="__none__" disabled>
-                        No sources available
-                      </SelectItem>
-                    ) : (
-                      sources.map((source) => (
-                        <SelectItem key={source.id} value={String(source.id)}>
-                          {source.name} ({source.type})
+                {editingPipeline ? (
+                  <Input
+                    id="source"
+                    value={
+                      editingPipeline.source_name ||
+                      editingPipeline.source_details?.name ||
+                      "Unknown Source"
+                    }
+                    disabled
+                    className="bg-muted"
+                  />
+                ) : (
+                  <Select
+                    value={formData.source || ""}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, source: value })
+                    }
+                  >
+                    <SelectTrigger id="source">
+                      <SelectValue placeholder="Select source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sources.length === 0 ? (
+                        <SelectItem value="__none__" disabled>
+                          No sources available
                         </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                      ) : (
+                        sources.map((source) => (
+                          <SelectItem key={source.id} value={String(source.id)}>
+                            {source.name} ({source.type})
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               <div className="grid gap-2">

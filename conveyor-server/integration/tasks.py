@@ -71,6 +71,10 @@ def run_pipeline_task(self, pipeline_id: str, triggered_by_user_id: Optional[int
 
         pipeline = Pipeline.objects.select_related('source', 'destination').get(id=pipeline_id)
 
+        # Update pipeline status to running
+        pipeline.status = 'running'
+        pipeline.save(update_fields=['status'])
+
         # Create PipelineRun record
         pipeline_run = PipelineRun.objects.create(
             pipeline=pipeline,
@@ -240,9 +244,12 @@ def run_pipeline_task(self, pipeline_id: str, triggered_by_user_id: Optional[int
         pipeline_run.error_count = total_errors
         pipeline_run.save()
 
-        # Update pipeline last_run
+        # Update pipeline status and last_run
+        pipeline.status = 'success' if total_errors == 0 else 'failed'
         pipeline.last_run = timezone.now()
-        pipeline.save()
+        pipeline.run_count = (pipeline.run_count or 0) + 1
+        pipeline.records_processed = (pipeline.records_processed or 0) + total_records
+        pipeline.save(update_fields=['status', 'last_run', 'run_count', 'records_processed'])
 
         _broadcast_progress(pipeline_run, 100, 'Pipeline completed successfully')
 
@@ -271,6 +278,14 @@ def run_pipeline_task(self, pipeline_id: str, triggered_by_user_id: Optional[int
             pipeline_run.save()
 
             _broadcast_progress(pipeline_run, pipeline_run.progress, f'Pipeline failed: {str(e)}')
+
+        # Update pipeline status to failed
+        try:
+            pipeline = Pipeline.objects.get(id=pipeline_id)
+            pipeline.status = 'failed'
+            pipeline.save(update_fields=['status'])
+        except Exception:
+            pass  # Pipeline may not exist
 
         raise
 

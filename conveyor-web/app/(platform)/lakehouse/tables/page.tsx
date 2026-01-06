@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { listTables, IcebergTable } from "@/lib/api/lakehouse";
-import { getCatalogs, Catalog } from "@/lib/api/warehouse";
+import { getNamespaces, Namespace } from "@/lib/api/warehouse";
 import {
   IconTable,
   IconRefresh,
@@ -31,54 +31,56 @@ export default function TablesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [layerFilter, setLayerFilter] = useState<string>("all");
 
-  // Catalog state
-  const [catalogs, setCatalogs] = useState<Catalog[]>([]);
-  const [selectedCatalog, setSelectedCatalog] = useState<string>("iceberg");
-  const [isFetchingCatalogs, setIsFetchingCatalogs] = useState(false);
+  // Namespace state
+  const [namespaces, setNamespaces] = useState<Namespace[]>([]);
+  const [selectedNamespace, setSelectedNamespace] = useState<string>("iceberg");
+  const [isFetchingNamespaces, setIsFetchingNamespaces] = useState(false);
 
-  // Fetch available catalogs
+  // Fetch available namespaces
   useEffect(() => {
-    const fetchCatalogsData = async () => {
-      setIsFetchingCatalogs(true);
+    const fetchNamespacesData = async () => {
+      setIsFetchingNamespaces(true);
       try {
-        const allCatalogs = await getCatalogs();
-        // Filter to only show Iceberg catalogs (not system catalogs)
-        const icebergCatalogs = allCatalogs.filter(
-          (c) => c.connector === "iceberg" && !c.is_system
+        const allNamespaces = await getNamespaces();
+        // Filter to only show Iceberg namespaces (not system namespaces)
+        const icebergNamespaces = allNamespaces.filter(
+          (n) => n.connector === "iceberg" && !n.is_system
         );
-        setCatalogs(icebergCatalogs);
+        setNamespaces(icebergNamespaces);
 
-        // Set default catalog if available
-        const defaultCatalog = icebergCatalogs.find((c) => c.is_default);
-        if (defaultCatalog) {
-          setSelectedCatalog(defaultCatalog.name);
-        } else if (icebergCatalogs.length > 0) {
-          setSelectedCatalog(icebergCatalogs[0].name);
+        // Set default namespace if available
+        const defaultNamespace = icebergNamespaces.find((n) => n.is_default);
+        if (defaultNamespace) {
+          setSelectedNamespace(defaultNamespace.name);
+        } else if (icebergNamespaces.length > 0) {
+          setSelectedNamespace(icebergNamespaces[0].name);
         }
       } catch (error) {
-        console.error("Failed to fetch catalogs:", error);
+        console.error("Failed to fetch namespaces:", error);
       } finally {
-        setIsFetchingCatalogs(false);
+        setIsFetchingNamespaces(false);
       }
     };
 
-    fetchCatalogsData();
+    fetchNamespacesData();
   }, []);
 
   useEffect(() => {
     loadTables();
-  }, [layerFilter, selectedCatalog]);
+  }, [layerFilter, selectedNamespace]);
 
   const loadTables = async () => {
     setIsLoading(true);
     try {
-      const params: { layer?: "bronze" | "silver" | "gold"; catalog?: string } =
-        {};
+      const params: {
+        layer?: "bronze" | "silver" | "gold";
+        namespace?: string;
+      } = {};
       if (layerFilter !== "all") {
         params.layer = layerFilter as "bronze" | "silver" | "gold";
       }
-      if (selectedCatalog) {
-        params.catalog = selectedCatalog;
+      if (selectedNamespace) {
+        params.namespace = selectedNamespace;
       }
       const response = await listTables(params);
       setTables(response.tables);
@@ -146,22 +148,22 @@ export default function TablesPage() {
           />
         </div>
         <Select
-          value={selectedCatalog}
-          onValueChange={setSelectedCatalog}
-          disabled={isFetchingCatalogs}
+          value={selectedNamespace}
+          onValueChange={setSelectedNamespace}
+          disabled={isFetchingNamespaces}
         >
           <SelectTrigger className="w-44">
-            {isFetchingCatalogs ? (
+            {isFetchingNamespaces ? (
               <div className="flex items-center gap-2">
                 <IconLoader2 className="h-4 w-4 animate-spin" />
                 <span>Loading...</span>
               </div>
             ) : (
-              <SelectValue placeholder="Select catalog" />
+              <SelectValue placeholder="Select namespace" />
             )}
           </SelectTrigger>
           <SelectContent>
-            {catalogs.length === 0 ? (
+            {namespaces.length === 0 ? (
               <SelectItem value="iceberg">
                 <div className="flex items-center gap-2">
                   <IconDatabase className="h-4 w-4" />
@@ -169,12 +171,12 @@ export default function TablesPage() {
                 </div>
               </SelectItem>
             ) : (
-              catalogs.map((cat) => (
-                <SelectItem key={cat.name} value={cat.name}>
+              namespaces.map((ns) => (
+                <SelectItem key={ns.name} value={ns.name}>
                   <div className="flex items-center gap-2">
                     <IconDatabase className="h-4 w-4" />
-                    {cat.name}
-                    {cat.is_default && (
+                    {ns.name}
+                    {ns.is_default && (
                       <Badge variant="secondary" className="ml-1 text-xs">
                         default
                       </Badge>
@@ -315,7 +317,7 @@ export default function TablesPage() {
               {filteredTables.length !== 1 ? "s" : ""}
             </span>
             <div className="flex items-center gap-4 text-muted-foreground">
-              <span>Catalog: {selectedCatalog}</span>
+              <span>Namespace: {selectedNamespace}</span>
               <span>Storage: MinIO (S3)</span>
             </div>
           </div>

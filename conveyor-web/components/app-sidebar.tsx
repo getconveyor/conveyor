@@ -19,9 +19,11 @@ import {
 
 import { NavPlatform } from "@/components/nav-platform";
 import { NavSecondary } from "@/components/nav-secondary";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -119,8 +121,8 @@ const data = {
           url: "/lakehouse/history",
         },
         {
-          title: "Catalogs",
-          url: "/lakehouse/catalogs",
+          title: "Namespaces",
+          url: "/lakehouse/namespaces",
         },
         {
           title: "Storage Settings",
@@ -305,6 +307,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavPlatform items={data.navMain} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <ThemeToggle variant="sidebar" />
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   );
 }

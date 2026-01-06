@@ -14,6 +14,7 @@ import {
   IconAlertCircle,
   IconLoader2,
   IconPlayerPause,
+  IconNotebook,
 } from "@tabler/icons-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,46 +53,45 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { integrationApi, PipelineRun } from "@/lib/api/integration";
+import { transformationApi, Notebook } from "@/lib/api/transformation";
+import Link from "next/link";
 
-type JobStatus = "running" | "completed" | "failed" | "queued";
+type JobStatus = "running" | "completed" | "failed" | "queued" | "idle";
 
 interface Job {
   id: string;
   name: string;
-  workflow: string;
+  notebook_id: string;
+  language: string;
+  framework: string;
   status: JobStatus;
   startTime: string;
-  duration: string;
-  recordsProcessed: string;
-  progress: number;
+  lastExecuted: string | null;
+  cellCount: number;
 }
 
-const mapPipelineRunToJob = (run: PipelineRun): Job => {
+const mapNotebookToJob = (notebook: Notebook): Job => {
   const status: JobStatus =
-    run.status === "running"
+    notebook.status === "running"
       ? "running"
-      : run.status === "success"
-      ? "completed"
-      : run.status === "failed"
+      : notebook.status === "error"
       ? "failed"
-      : "queued";
+      : notebook.last_executed
+      ? "completed"
+      : "idle";
 
   return {
-    id: run.id,
-    name: `Run ${run.id.slice(0, 8)}`,
-    workflow: run.pipeline_name || "Unknown Pipeline",
+    id: notebook.id,
+    name: notebook.name,
+    notebook_id: notebook.id,
+    language: notebook.language,
+    framework: notebook.framework,
     status,
-    startTime: run.start_time
-      ? new Date(run.start_time).toLocaleString()
-      : "Scheduled",
-    duration: run.duration
-      ? `${Math.floor(run.duration / 60)}m ${run.duration % 60}s`
+    startTime: notebook.last_executed
+      ? new Date(notebook.last_executed).toLocaleString()
       : "-",
-    recordsProcessed: run.records_processed
-      ? run.records_processed.toLocaleString()
-      : "-",
-    progress: status === "completed" ? 100 : status === "running" ? 50 : 0,
+    lastExecuted: notebook.last_executed,
+    cellCount: notebook.cell_count,
   };
 };
 
@@ -106,27 +106,33 @@ const statusConfig: Record<
   completed: { label: "Completed", variant: "outline" },
   failed: { label: "Failed", variant: "destructive" },
   queued: { label: "Queued", variant: "secondary" },
+  idle: { label: "Idle", variant: "secondary" },
 };
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [notebooks, setNotebooks] = useState<Notebook[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isRunJobDialogOpen, setIsRunJobDialogOpen] = useState(false);
   const [jobToCancel, setJobToCancel] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedWorkflow, setSelectedWorkflow] = useState("");
+  const [selectedNotebook, setSelectedNotebook] = useState("");
 
   const loadJobs = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const runs = await integrationApi.getPipelineRuns();
-      setJobs(runs.map(mapPipelineRunToJob));
+      const [executedNotebooks, allNotebooks] = await Promise.all([
+        transformationApi.getJobs(),
+        transformationApi.getSchedulableNotebooks(),
+      ]);
+      setJobs(executedNotebooks.map(mapNotebookToJob));
+      setNotebooks(allNotebooks);
     } catch (err) {
       console.error("Failed to load jobs:", err);
-      setError("Failed to load jobs");
+      setError("Failed to load transformation jobs");
     } finally {
       setIsLoading(false);
     }
@@ -139,7 +145,7 @@ export default function JobsPage() {
   const filteredJobs = jobs.filter((job) => {
     const matchesSearch =
       job.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.workflow.toLowerCase().includes(searchQuery.toLowerCase());
+      job.language.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || job.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -152,49 +158,28 @@ export default function JobsPage() {
   };
 
   const handleRunJob = async () => {
-    if (!selectedWorkflow) return;
+    if (!selectedNotebook) return;
 
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    const jobNumber = jobs.length + 1;
-    const newJob: Job = {
-      id: Date.now().toString(),
-      name: `${selectedWorkflow} Run #${jobNumber}`,
-      workflow: selectedWorkflow,
-      status: "running",
-      startTime: "Just now",
-      duration: "0s",
-      recordsProcessed: "0",
-      progress: 0,
-    };
-
-    setJobs([newJob, ...jobs]);
-    setIsLoading(false);
-    setIsRunJobDialogOpen(false);
-    setSelectedWorkflow("");
+    try {
+      setIsLoading(true);
+      await transformationApi.runNotebook(selectedNotebook);
+      // Refresh the jobs list
+      await loadJobs();
+      setIsRunJobDialogOpen(false);
+      setSelectedNotebook("");
+    } catch (err) {
+      console.error("Failed to run notebook:", err);
+      setError("Failed to start notebook execution");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCancelJob = async () => {
     if (!jobToCancel) return;
 
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    setJobs((jobs) =>
-      jobs.map((j) =>
-        j.id === jobToCancel
-          ? {
-              ...j,
-              status: "failed" as JobStatus,
-              duration: j.duration === "-" ? "0s" : j.duration,
-            }
-          : j
-      )
-    );
-    setIsLoading(false);
+    // Note: Currently there's no cancel endpoint, so we just close the dialog
+    // In a real implementation, you'd call an API to cancel the job
     setJobToCancel(null);
   };
 
@@ -202,14 +187,14 @@ export default function JobsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Jobs</h1>
+          <h1 className="text-2xl font-bold">Transformation Jobs</h1>
           <p className="text-sm text-muted-foreground">
-            Monitor and manage transformation job executions
+            Monitor and manage notebook transformation executions
           </p>
         </div>
         <Button onClick={() => setIsRunJobDialogOpen(true)}>
           <IconPlayerPlay className="mr-2 h-4 w-4" />
-          Run Job
+          Run Notebook
         </Button>
       </div>
 
@@ -278,136 +263,184 @@ export default function JobsPage() {
                   <SelectItem value="running">Running</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="failed">Failed</SelectItem>
-                  <SelectItem value="queued">Queued</SelectItem>
+                  <SelectItem value="idle">Idle</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="icon">
-                <IconRefresh className="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={loadJobs}
+                disabled={isLoading}
+              >
+                <IconRefresh
+                  className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+                />
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent className="pt-2">
-          <div className="space-y-2">
-            {filteredJobs.map((job) => (
-              <Card key={job.id}>
-                <CardContent className="p-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <IconTerminal className="h-4 w-4 text-muted-foreground" />
-                        <h3 className="font-semibold text-sm">{job.name}</h3>
-                        <Badge
-                          variant={statusConfig[job.status].variant}
-                          className="text-xs"
-                        >
-                          {statusConfig[job.status].label}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        Workflow: {job.workflow}
-                      </p>
-                      {job.status === "running" && (
-                        <div className="mb-2">
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span className="text-muted-foreground">
-                              Progress
-                            </span>
-                            <span className="font-medium">{job.progress}%</span>
-                          </div>
-                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary transition-all duration-300"
-                              style={{ width: `${job.progress}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                        <div>
-                          <p className="text-muted-foreground">Started</p>
-                          <p className="font-medium">{job.startTime}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Duration</p>
-                          <p className="font-medium">{job.duration}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Records</p>
-                          <p className="font-medium">{job.recordsProcessed}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Status</p>
-                          <p className="font-medium">
+          {error && (
+            <div className="flex items-center gap-2 text-destructive mb-4 p-3 bg-destructive/10 rounded-md">
+              <IconAlertCircle className="h-4 w-4" />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
+          {isLoading && jobs.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredJobs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <IconNotebook className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">
+                No transformation jobs found
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Run a notebook to see execution history here
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredJobs.map((job) => (
+                <Card key={job.id}>
+                  <CardContent className="p-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <IconNotebook className="h-4 w-4 text-muted-foreground" />
+                          <h3 className="font-semibold text-sm">{job.name}</h3>
+                          <Badge
+                            variant={statusConfig[job.status].variant}
+                            className="text-xs"
+                          >
                             {statusConfig[job.status].label}
-                          </p>
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          {job.language} • {job.framework} • {job.cellCount}{" "}
+                          cells
+                        </p>
+                        {job.status === "running" && (
+                          <div className="mb-2">
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="text-muted-foreground">
+                                Executing...
+                              </span>
+                              <IconLoader2 className="h-3 w-3 animate-spin" />
+                            </div>
+                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary animate-pulse"
+                                style={{ width: "60%" }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                          <div>
+                            <p className="text-muted-foreground">
+                              Last Executed
+                            </p>
+                            <p className="font-medium">{job.startTime}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Language</p>
+                            <p className="font-medium capitalize">
+                              {job.language}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Framework</p>
+                            <p className="font-medium capitalize">
+                              {job.framework}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {(job.status === "running" ||
-                        job.status === "queued") && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2"
-                          onClick={() => setJobToCancel(job.id)}
-                          disabled={isLoading}
-                        >
-                          {isLoading ? (
-                            <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <>
-                              <IconPlayerPause className="h-3.5 w-3.5 mr-1" />
-                              Cancel
-                            </>
-                          )}
-                        </Button>
-                      )}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                      <div className="flex items-center gap-1.5">
+                        {job.status === "running" && (
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
-                            className="h-8 w-8 p-0"
+                            className="h-8 px-2"
+                            onClick={() => setJobToCancel(job.id)}
                             disabled={isLoading}
                           >
-                            <IconDotsVertical className="h-4 w-4" />
+                            {isLoading ? (
+                              <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <>
+                                <IconPlayerPause className="h-3.5 w-3.5 mr-1" />
+                                Cancel
+                              </>
+                            )}
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <IconEye className="mr-2 h-4 w-4" />
-                            View Logs
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <IconClock className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          {job.status === "failed" && (
-                            <DropdownMenuItem>
-                              <IconAlertCircle className="mr-2 h-4 w-4" />
-                              View Error
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              disabled={isLoading}
+                            >
+                              <IconDotsVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link
+                                href={`/data-transformation/notebooks/${job.notebook_id}`}
+                              >
+                                <IconEye className="mr-2 h-4 w-4" />
+                                View Notebook
+                              </Link>
                             </DropdownMenuItem>
-                          )}
-                          {(job.status === "completed" ||
-                            job.status === "failed") && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem>
-                                <IconPlayerPlay className="mr-2 h-4 w-4" />
-                                Re-run Job
+                            {job.status === "failed" && (
+                              <DropdownMenuItem asChild>
+                                <Link
+                                  href={`/data-transformation/notebooks/${job.notebook_id}`}
+                                >
+                                  <IconAlertCircle className="mr-2 h-4 w-4" />
+                                  View Error
+                                </Link>
                               </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            )}
+                            {(job.status === "completed" ||
+                              job.status === "failed" ||
+                              job.status === "idle") && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={async () => {
+                                    try {
+                                      await transformationApi.runNotebook(
+                                        job.notebook_id
+                                      );
+                                      loadJobs();
+                                    } catch (err) {
+                                      console.error(
+                                        "Failed to re-run notebook:",
+                                        err
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <IconPlayerPlay className="mr-2 h-4 w-4" />
+                                  Run Again
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -417,7 +450,7 @@ export default function JobsPage() {
         onOpenChange={(open) => {
           if (!open) {
             setIsRunJobDialogOpen(false);
-            setSelectedWorkflow("");
+            setSelectedNotebook("");
           }
         }}
         modal
@@ -428,37 +461,33 @@ export default function JobsPage() {
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
           <DialogHeader>
-            <DialogTitle>Run Job</DialogTitle>
+            <DialogTitle>Run Notebook</DialogTitle>
             <DialogDescription>
-              Select a workflow to run as a new job
+              Select a notebook to execute as a transformation job
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="workflow">Workflow</Label>
+              <Label htmlFor="notebook">Notebook</Label>
               <Select
-                value={selectedWorkflow}
-                onValueChange={setSelectedWorkflow}
+                value={selectedNotebook}
+                onValueChange={setSelectedNotebook}
               >
-                <SelectTrigger id="workflow">
-                  <SelectValue placeholder="Select workflow" />
+                <SelectTrigger id="notebook">
+                  <SelectValue placeholder="Select notebook" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Customer Data ETL">
-                    Customer Data ETL
-                  </SelectItem>
-                  <SelectItem value="Sales Analytics Pipeline">
-                    Sales Analytics Pipeline
-                  </SelectItem>
-                  <SelectItem value="Real-time Event Processing">
-                    Real-time Event Processing
-                  </SelectItem>
-                  <SelectItem value="Daily Data Quality Check">
-                    Daily Data Quality Check
-                  </SelectItem>
-                  <SelectItem value="Weekly Report Generation">
-                    Weekly Report Generation
-                  </SelectItem>
+                  {notebooks.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No notebooks available
+                    </SelectItem>
+                  ) : (
+                    notebooks.map((notebook) => (
+                      <SelectItem key={notebook.id} value={notebook.id}>
+                        {notebook.name} ({notebook.language})
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -468,7 +497,7 @@ export default function JobsPage() {
               variant="outline"
               onClick={() => {
                 setIsRunJobDialogOpen(false);
-                setSelectedWorkflow("");
+                setSelectedNotebook("");
               }}
               disabled={isLoading}
             >
@@ -476,7 +505,7 @@ export default function JobsPage() {
             </Button>
             <Button
               onClick={handleRunJob}
-              disabled={!selectedWorkflow || isLoading}
+              disabled={!selectedNotebook || isLoading}
             >
               {isLoading ? (
                 <>
@@ -486,7 +515,7 @@ export default function JobsPage() {
               ) : (
                 <>
                   <IconPlayerPlay className="mr-2 h-4 w-4" />
-                  Run Job
+                  Run Notebook
                 </>
               )}
             </Button>

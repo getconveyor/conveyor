@@ -2,7 +2,7 @@ import { apiClient, getAuthOptions } from "./client";
 
 export interface ExecuteQueryRequest {
   query: string;
-  catalog?: string;
+  namespace?: string;
   schema?: string;
   name?: string;
   limit?: number;
@@ -20,17 +20,17 @@ export interface ExecuteQueryResponse {
 }
 
 export interface IcebergTable {
-  catalog: string;
+  namespace: string;
   schema: string;
   layer: "bronze" | "silver" | "gold";
-  namespace: string;
+  schema_namespace: string;
   table_name: string;
   full_name: string;
   row_count: number | null;
 }
 
 export interface TablesResponse {
-  catalog: string;
+  namespace: string;
   tables: IcebergTable[];
   total_tables: number;
 }
@@ -42,7 +42,7 @@ export interface QueryHistory {
   user_email: string;
   name: string | null;
   query_text: string;
-  catalog: string;
+  namespace: string;
   schema: string | null;
   status: "running" | "finished" | "failed" | "cancelled";
   rows_returned: number | null;
@@ -70,7 +70,7 @@ export async function executeQuery(
  * List Iceberg tables, optionally filtered by layer
  */
 export async function listTables(params?: {
-  catalog?: string;
+  namespace?: string;
   schema?: string;
   layer?: "bronze" | "silver" | "gold";
 }): Promise<TablesResponse> {

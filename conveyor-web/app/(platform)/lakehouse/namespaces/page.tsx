@@ -51,31 +51,31 @@ import {
   CheckCircle,
 } from "lucide-react";
 import {
-  getCatalogs,
-  createCatalog,
-  deleteCatalog,
-  Catalog,
+  getNamespaces,
+  createNamespace,
+  deleteNamespace,
+  Namespace,
 } from "@/lib/api/warehouse";
 
-export default function CatalogsPage() {
-  const [catalogs, setCatalogs] = useState<Catalog[]>([]);
+export default function NamespacesPage() {
+  const [namespaces, setNamespaces] = useState<Namespace[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [newCatalogName, setNewCatalogName] = useState("");
+  const [newNamespaceName, setNewNamespaceName] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchCatalogs = useCallback(async () => {
+  const fetchNamespaces = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const catalogsList = await getCatalogs();
-      setCatalogs(catalogsList);
+      const namespacesList = await getNamespaces();
+      setNamespaces(namespacesList);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Failed to load catalogs";
+        err instanceof Error ? err.message : "Failed to load namespaces";
       setError(message);
       toast({
         title: "Error",
@@ -88,14 +88,14 @@ export default function CatalogsPage() {
   }, [toast]);
 
   useEffect(() => {
-    fetchCatalogs();
-  }, [fetchCatalogs]);
+    fetchNamespaces();
+  }, [fetchNamespaces]);
 
-  const handleCreateCatalog = async () => {
-    if (!newCatalogName.trim()) {
+  const handleCreateNamespace = async () => {
+    if (!newNamespaceName.trim()) {
       toast({
         title: "Error",
-        description: "Please enter a catalog name",
+        description: "Please enter a namespace name",
         variant: "destructive",
       });
       return;
@@ -103,12 +103,12 @@ export default function CatalogsPage() {
 
     setCreating(true);
     try {
-      const response = await createCatalog({
-        name: newCatalogName.toLowerCase().trim(),
+      const response = await createNamespace({
+        name: newNamespaceName.toLowerCase().trim(),
       });
 
       toast({
-        title: "Catalog Created",
+        title: "Namespace Created",
         description: (
           <div className="flex items-center gap-2">
             <CheckCircle className="h-4 w-4 text-green-500" />
@@ -117,14 +117,14 @@ export default function CatalogsPage() {
         ),
       });
 
-      setNewCatalogName("");
+      setNewNamespaceName("");
       setDialogOpen(false);
-      fetchCatalogs();
+      fetchNamespaces();
     } catch (err) {
       toast({
         title: "Error",
         description:
-          err instanceof Error ? err.message : "Failed to create catalog",
+          err instanceof Error ? err.message : "Failed to create namespace",
         variant: "destructive",
       });
     } finally {
@@ -132,22 +132,22 @@ export default function CatalogsPage() {
     }
   };
 
-  const handleDeleteCatalog = async (catalogName: string) => {
-    setDeleting(catalogName);
+  const handleDeleteNamespace = async (namespaceName: string) => {
+    setDeleting(namespaceName);
     try {
-      const response = await deleteCatalog(catalogName);
+      const response = await deleteNamespace(namespaceName);
 
       toast({
-        title: "Catalog Deleted",
+        title: "Namespace Deleted",
         description: response.message,
       });
 
-      fetchCatalogs();
+      fetchNamespaces();
     } catch (err) {
       toast({
         title: "Error",
         description:
-          err instanceof Error ? err.message : "Failed to delete catalog",
+          err instanceof Error ? err.message : "Failed to delete namespace",
         variant: "destructive",
       });
     } finally {
@@ -184,13 +184,17 @@ export default function CatalogsPage() {
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Catalogs</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Namespaces</h1>
           <p className="text-muted-foreground">
-            Manage Trino catalogs for your data lakehouse projects
+            Manage Trino namespaces for your data lakehouse projects
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={fetchCatalogs} disabled={loading}>
+          <Button
+            variant="outline"
+            onClick={fetchNamespaces}
+            disabled={loading}
+          >
             <RefreshCw
               className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`}
             />
@@ -200,25 +204,25 @@ export default function CatalogsPage() {
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
-                New Catalog
+                New Namespace
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create New Catalog</DialogTitle>
+                <DialogTitle>Create New Namespace</DialogTitle>
                 <DialogDescription>
-                  Create a new Iceberg catalog for your project. Each catalog is
-                  a separate namespace for your tables and schemas.
+                  Create a new Iceberg namespace for your project. Each
+                  namespace is a separate area for your tables and schemas.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="name">Catalog Name</Label>
+                  <Label htmlFor="name">Namespace Name</Label>
                   <Input
                     id="name"
                     placeholder="my_project"
-                    value={newCatalogName}
-                    onChange={(e) => setNewCatalogName(e.target.value)}
+                    value={newNamespaceName}
+                    onChange={(e) => setNewNamespaceName(e.target.value)}
                     disabled={creating}
                   />
                   <p className="text-xs text-muted-foreground">
@@ -235,11 +239,11 @@ export default function CatalogsPage() {
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleCreateCatalog} disabled={creating}>
+                <Button onClick={handleCreateNamespace} disabled={creating}>
                   {creating && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  Create Catalog
+                  Create Namespace
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -251,11 +255,11 @@ export default function CatalogsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Database className="h-5 w-5" />
-            Available Catalogs
+            Available Namespaces
           </CardTitle>
           <CardDescription>
-            Catalogs define data sources in Trino. Iceberg catalogs store tables
-            in your data lakehouse.
+            Namespaces define data sources in Trino. Iceberg namespaces store
+            tables in your data lakehouse.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -269,18 +273,18 @@ export default function CatalogsPage() {
               <p className="text-destructive">{error}</p>
               <Button
                 variant="outline"
-                onClick={fetchCatalogs}
+                onClick={fetchNamespaces}
                 className="mt-4"
               >
                 Try Again
               </Button>
             </div>
-          ) : catalogs.length === 0 ? (
+          ) : namespaces.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Database className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No catalogs found</p>
+              <p className="text-muted-foreground">No namespaces found</p>
               <p className="text-sm text-muted-foreground">
-                Create your first catalog to start organizing your data
+                Create your first namespace to start organizing your data
               </p>
             </div>
           ) : (
@@ -294,41 +298,41 @@ export default function CatalogsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {catalogs.map((catalog) => (
-                  <TableRow key={catalog.name}>
+                {namespaces.map((namespace) => (
+                  <TableRow key={namespace.name}>
                     <TableCell className="font-medium">
-                      {catalog.name}
+                      {namespace.name}
                     </TableCell>
                     <TableCell>
-                      {getConnectorBadge(catalog.connector)}
+                      {getConnectorBadge(namespace.connector)}
                     </TableCell>
                     <TableCell>
-                      {catalog.is_default ? (
+                      {namespace.is_default ? (
                         <Badge
                           variant="outline"
                           className="border-primary text-primary"
                         >
                           Default
                         </Badge>
-                      ) : catalog.is_system ? (
+                      ) : namespace.is_system ? (
                         <Badge variant="secondary">System</Badge>
                       ) : (
                         <Badge variant="outline">Custom</Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {!catalog.is_system &&
-                        !catalog.is_default &&
-                        catalog.name !== "postgres" && (
+                      {!namespace.is_system &&
+                        !namespace.is_default &&
+                        namespace.name !== "postgres" && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="text-destructive hover:text-destructive"
-                                disabled={deleting === catalog.name}
+                                disabled={deleting === namespace.name}
                               >
-                                {deleting === catalog.name ? (
+                                {deleting === namespace.name ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
                                   <Trash2 className="h-4 w-4" />
@@ -338,12 +342,12 @@ export default function CatalogsPage() {
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>
-                                  Delete Catalog?
+                                  Delete Namespace?
                                 </AlertDialogTitle>
                                 <AlertDialogDescription>
                                   Are you sure you want to delete the &quot;
-                                  {catalog.name}&quot; catalog? This action
-                                  cannot be undone. Any tables in this catalog
+                                  {namespace.name}&quot; namespace? This action
+                                  cannot be undone. Any tables in this namespace
                                   will become inaccessible.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
@@ -351,11 +355,11 @@ export default function CatalogsPage() {
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() =>
-                                    handleDeleteCatalog(catalog.name)
+                                    handleDeleteNamespace(namespace.name)
                                   }
                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
-                                  Delete Catalog
+                                  Delete Namespace
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -379,8 +383,9 @@ export default function CatalogsPage() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
           <p>
-            After creating or deleting a catalog, you need to restart the Trino
-            container for changes to take effect. Run the following command:
+            After creating or deleting a namespace, you need to restart the
+            Trino container for changes to take effect. Run the following
+            command:
           </p>
           <code className="mt-2 block rounded bg-muted px-3 py-2 font-mono text-sm">
             docker restart conveyor-trino

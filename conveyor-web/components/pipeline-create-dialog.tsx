@@ -49,7 +49,7 @@ import {
   SourceSchema,
   CreatePipelineData,
 } from "@/lib/api/integration";
-import { getCatalogs, Catalog } from "@/lib/api/warehouse";
+import { getNamespaces, Namespace } from "@/lib/api/warehouse";
 import { cn } from "@/lib/utils";
 
 interface PipelineCreateDialogProps {
@@ -80,14 +80,14 @@ export function PipelineCreateDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [sourceId, setSourceId] = useState("");
-  const [catalog, setCatalog] = useState("iceberg");
+  const [trinoNamespace, setTrinoNamespace] = useState("iceberg");
   const [layer, setLayer] = useState("bronze");
-  const [namespace, setNamespace] = useState("");
+  const [schemaNamespace, setSchemaNamespace] = useState("");
   const [schedule, setSchedule] = useState("");
 
-  // Catalog state
-  const [catalogs, setCatalogs] = useState<Catalog[]>([]);
-  const [isFetchingCatalogs, setIsFetchingCatalogs] = useState(false);
+  // Namespace state
+  const [namespaces, setNamespaces] = useState<Namespace[]>([]);
+  const [isFetchingNamespaces, setIsFetchingNamespaces] = useState(false);
 
   // Schema discovery state
   const [isDiscovering, setIsDiscovering] = useState(false);
@@ -112,43 +112,43 @@ export function PipelineCreateDialog({
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch available catalogs when dialog opens
-  const fetchCatalogsData = useCallback(async () => {
-    setIsFetchingCatalogs(true);
+  // Fetch available namespaces when dialog opens
+  const fetchNamespacesData = useCallback(async () => {
+    setIsFetchingNamespaces(true);
     try {
-      const allCatalogs = await getCatalogs();
-      // Filter to only show Iceberg catalogs (not system catalogs)
-      const icebergCatalogs = allCatalogs.filter(
+      const allNamespaces = await getNamespaces();
+      // Filter to only show Iceberg namespaces (not system namespaces)
+      const icebergNamespaces = allNamespaces.filter(
         (c) => c.connector === "iceberg" && !c.is_system
       );
-      setCatalogs(icebergCatalogs);
+      setNamespaces(icebergNamespaces);
 
-      // Set default catalog if available
-      const defaultCatalog = icebergCatalogs.find((c) => c.is_default);
-      if (defaultCatalog) {
-        setCatalog(defaultCatalog.name);
-      } else if (icebergCatalogs.length > 0) {
-        setCatalog(icebergCatalogs[0].name);
+      // Set default namespace if available
+      const defaultNamespace = icebergNamespaces.find((c) => c.is_default);
+      if (defaultNamespace) {
+        setTrinoNamespace(defaultNamespace.name);
+      } else if (icebergNamespaces.length > 0) {
+        setTrinoNamespace(icebergNamespaces[0].name);
       }
     } catch (error) {
-      console.error("Failed to fetch catalogs:", error);
+      console.error("Failed to fetch namespaces:", error);
     } finally {
-      setIsFetchingCatalogs(false);
+      setIsFetchingNamespaces(false);
     }
   }, []);
 
   // Reset form when dialog opens/closes
   useEffect(() => {
     if (open) {
-      fetchCatalogsData();
+      fetchNamespacesData();
     } else {
       setStep("config");
       setName("");
       setDescription("");
       setSourceId("");
-      setCatalog("iceberg");
+      setTrinoNamespace("iceberg");
       setLayer("bronze");
-      setNamespace("");
+      setSchemaNamespace("");
       setSchedule("");
       setDiscoveredSchema(null);
       setDiscoveryError(null);
@@ -157,7 +157,7 @@ export function PipelineCreateDialog({
       setSearchQuery("");
       setSyncMode("selected");
     }
-  }, [open, fetchCatalogsData]);
+  }, [open, fetchNamespacesData]);
 
   // Discover schema when source changes
   const handleDiscoverSchema = useCallback(async () => {
@@ -294,9 +294,9 @@ export function PipelineCreateDialog({
             return acc;
           }, {} as Record<string, any>),
           lakehouse: {
-            catalog,
+            namespace: trinoNamespace,
             layer,
-            namespace: namespace || "default",
+            schema_namespace: schemaNamespace || "default",
             format: "iceberg",
             storage: "minio",
           },
@@ -320,8 +320,8 @@ export function PipelineCreateDialog({
     }
   };
 
-  // Move to table selection step
-  const handleNextStep = () => {
+  // Move to table selection step and trigger discovery
+  const handleNextStep = useCallback(async () => {
     if (!name.trim()) {
       toast.error("Please enter a pipeline name");
       return;
@@ -330,12 +330,34 @@ export function PipelineCreateDialog({
       toast.error("Please select a source");
       return;
     }
-    if (!discoveredSchema) {
-      toast.error("Please discover schema first");
-      return;
-    }
     setStep("tables");
-  };
+
+    // Trigger schema discovery if not already done
+    if (!discoveredSchema && !isDiscovering) {
+      setIsDiscovering(true);
+      setDiscoveryError(null);
+
+      try {
+        const schema = await integrationApi.getSourceSchema(sourceId);
+        setDiscoveredSchema(schema);
+
+        // Auto-expand first schema if available
+        const schemas = new Set(
+          schema.streams.map((s) => s.schema || "default").filter(Boolean)
+        );
+        if (schemas.size > 0) {
+          setExpandedSchemas(new Set([Array.from(schemas)[0]]));
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to discover schema";
+        setDiscoveryError(message);
+        toast.error(message);
+      } finally {
+        setIsDiscovering(false);
+      }
+    }
+  }, [name, sourceId, discoveredSchema, isDiscovering]);
 
   const selectedSource = sources.find((s) => s.id === sourceId);
 
@@ -354,7 +376,7 @@ export function PipelineCreateDialog({
           </DialogTitle>
           <DialogDescription>
             {step === "config"
-              ? "Configure your pipeline and discover available tables from the source."
+              ? "Configure your pipeline settings."
               : `Select which tables to sync from ${
                   selectedSource?.name || "your source"
                 } to the Lakehouse.`}
@@ -416,24 +438,24 @@ export function PipelineCreateDialog({
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="catalog">Lakehouse Catalog *</Label>
+                <Label htmlFor="namespace">Lakehouse Namespace *</Label>
                 <Select
-                  value={catalog}
-                  onValueChange={setCatalog}
-                  disabled={isFetchingCatalogs}
+                  value={trinoNamespace}
+                  onValueChange={setTrinoNamespace}
+                  disabled={isFetchingNamespaces}
                 >
-                  <SelectTrigger id="catalog">
-                    {isFetchingCatalogs ? (
+                  <SelectTrigger id="namespace">
+                    {isFetchingNamespaces ? (
                       <div className="flex items-center gap-2">
                         <IconLoader2 className="h-4 w-4 animate-spin" />
-                        <span>Loading catalogs...</span>
+                        <span>Loading namespaces...</span>
                       </div>
                     ) : (
-                      <SelectValue placeholder="Select a catalog" />
+                      <SelectValue placeholder="Select a namespace" />
                     )}
                   </SelectTrigger>
                   <SelectContent>
-                    {catalogs.length === 0 ? (
+                    {namespaces.length === 0 ? (
                       <SelectItem value="iceberg">
                         <div className="flex items-center gap-2">
                           <IconDatabase className="h-4 w-4" />
@@ -441,12 +463,12 @@ export function PipelineCreateDialog({
                         </div>
                       </SelectItem>
                     ) : (
-                      catalogs.map((cat) => (
-                        <SelectItem key={cat.name} value={cat.name}>
+                      namespaces.map((ns) => (
+                        <SelectItem key={ns.name} value={ns.name}>
                           <div className="flex items-center gap-2">
                             <IconDatabase className="h-4 w-4" />
-                            {cat.name}
-                            {cat.is_default && (
+                            {ns.name}
+                            {ns.is_default && (
                               <Badge
                                 variant="secondary"
                                 className="ml-1 text-xs"
@@ -461,7 +483,7 @@ export function PipelineCreateDialog({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Data will be stored in this Iceberg catalog
+                  Data will be stored in this Iceberg namespace
                 </p>
               </div>
 
@@ -484,9 +506,9 @@ export function PipelineCreateDialog({
                 <Input
                   id="namespace"
                   placeholder="e.g., sales, marketing (default: source name)"
-                  value={namespace}
+                  value={schemaNamespace}
                   onChange={(e) =>
-                    setNamespace(
+                    setSchemaNamespace(
                       e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_")
                     )
                   }
@@ -503,49 +525,44 @@ export function PipelineCreateDialog({
                 />
               </div>
             </div>
-
-            {/* Schema Discovery Section */}
-            <div className="border rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
+          </div>
+        ) : (
+          // Step 2: Table selection
+          <div className="flex flex-col gap-4 py-4 h-[60vh]">
+            {/* Schema discovery status */}
+            {isDiscovering && (
+              <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/20">
+                <IconLoader2 className="h-5 w-5 animate-spin text-primary" />
                 <div>
-                  <h4 className="font-medium">Schema Discovery</h4>
+                  <p className="font-medium">Discovering Schema...</p>
                   <p className="text-sm text-muted-foreground">
-                    Discover available tables from the source database
+                    Fetching available tables from{" "}
+                    {selectedSource?.name || "the source"}
                   </p>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={handleDiscoverSchema}
-                  disabled={!sourceId || isDiscovering}
-                >
-                  {isDiscovering ? (
-                    <>
-                      <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Discovering...
-                    </>
-                  ) : discoveredSchema ? (
-                    <>
-                      <IconRefresh className="mr-2 h-4 w-4" />
-                      Refresh
-                    </>
-                  ) : (
-                    <>
-                      <IconSearch className="mr-2 h-4 w-4" />
-                      Discover Schema
-                    </>
-                  )}
-                </Button>
               </div>
+            )}
 
-              {discoveryError && (
-                <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+            {discoveryError && !isDiscovering && (
+              <div className="flex items-center justify-between gap-2 p-4 border rounded-lg bg-destructive/10">
+                <div className="flex items-center gap-2 text-sm text-destructive">
                   <IconAlertCircle className="h-4 w-4" />
                   {discoveryError}
                 </div>
-              )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDiscoverSchema}
+                >
+                  <IconRefresh className="mr-2 h-4 w-4" />
+                  Retry
+                </Button>
+              </div>
+            )}
 
-              {discoveredSchema && (
-                <div className="flex items-center gap-4 text-sm bg-green-500/10 text-green-700 dark:text-green-400 p-3 rounded-md">
+            {discoveredSchema && !isDiscovering && (
+              <div className="flex items-center justify-between gap-4 text-sm bg-green-500/10 text-green-700 dark:text-green-400 p-3 rounded-md">
+                <div className="flex items-center gap-2">
                   <IconCheck className="h-4 w-4" />
                   <span>
                     Found <strong>{discoveredSchema.streams.length}</strong>{" "}
@@ -562,198 +579,220 @@ export function PipelineCreateDialog({
                     schema(s)
                   </span>
                 </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          // Step 2: Table selection
-          <div className="flex flex-col gap-4 py-4 h-[60vh]">
-            {/* Sync mode selection */}
-            <div className="flex items-center gap-4 pb-2 border-b">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="sync-all"
-                  checked={syncMode === "all"}
-                  onCheckedChange={(checked) =>
-                    setSyncMode(checked ? "all" : "selected")
-                  }
-                />
-                <Label
-                  htmlFor="sync-all"
-                  className="font-medium cursor-pointer"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDiscoverSchema}
+                  disabled={isDiscovering}
                 >
-                  Sync all tables ({discoveredSchema?.streams.length || 0})
-                </Label>
+                  <IconRefresh className="mr-2 h-4 w-4" />
+                  Refresh
+                </Button>
               </div>
-
-              {syncMode === "selected" && (
-                <>
-                  <div className="h-4 w-px bg-border" />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={selectAll}
-                    className="text-xs"
-                  >
-                    Select All
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={deselectAll}
-                    className="text-xs"
-                  >
-                    Deselect All
-                  </Button>
-                  <div className="ml-auto">
-                    <Badge variant="secondary">
-                      {selectedStreams.size} selected
-                    </Badge>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {syncMode === "selected" && (
-              <>
-                {/* Search */}
-                <div className="relative">
-                  <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search tables..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-
-                {/* Table list */}
-                <ScrollArea className="flex-1 border rounded-md min-h-0">
-                  <div className="p-2 space-y-1 max-h-full">
-                    {Object.entries(filteredGroups).map(([schema, streams]) => (
-                      <Collapsible
-                        key={schema}
-                        open={expandedSchemas.has(schema)}
-                        onOpenChange={(open) => {
-                          const newExpanded = new Set(expandedSchemas);
-                          if (open) {
-                            newExpanded.add(schema);
-                          } else {
-                            newExpanded.delete(schema);
-                          }
-                          setExpandedSchemas(newExpanded);
-                        }}
-                      >
-                        <CollapsibleTrigger className="flex items-center gap-2 w-full p-2 hover:bg-muted/50 rounded-md">
-                          {expandedSchemas.has(schema) ? (
-                            <IconChevronDown className="h-4 w-4" />
-                          ) : (
-                            <IconChevronRight className="h-4 w-4" />
-                          )}
-                          <IconDatabase className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{schema}</span>
-                          <Badge variant="outline" className="ml-auto">
-                            {streams.length} tables
-                          </Badge>
-                          <Checkbox
-                            checked={streams.every((s) =>
-                              selectedStreams.has(s.name)
-                            )}
-                            onCheckedChange={() =>
-                              toggleSchemaStreams(schema, streams)
-                            }
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <div className="ml-6 space-y-1 mt-1">
-                            {streams.map((stream) => (
-                              <div
-                                key={stream.name}
-                                className={cn(
-                                  "flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer",
-                                  selectedStreams.has(stream.name) &&
-                                    "bg-primary/5"
-                                )}
-                                onClick={() => toggleStream(stream.name)}
-                              >
-                                <Checkbox
-                                  checked={selectedStreams.has(stream.name)}
-                                  onCheckedChange={() =>
-                                    toggleStream(stream.name)
-                                  }
-                                />
-                                <IconTable className="h-4 w-4 text-muted-foreground" />
-                                <div className="flex-1">
-                                  <span className="text-sm">{stream.name}</span>
-                                  {stream.row_count !== undefined && (
-                                    <span className="text-xs text-muted-foreground ml-2">
-                                      (~{stream.row_count.toLocaleString()}{" "}
-                                      rows)
-                                    </span>
-                                  )}
-                                </div>
-                                {selectedStreams.has(stream.name) && (
-                                  <div className="text-xs text-muted-foreground">
-                                    → {catalog}.{layer}.
-                                    {namespace ||
-                                      selectedSource?.name
-                                        .toLowerCase()
-                                        .replace(/[^a-z0-9_]/g, "_") ||
-                                      "default"}
-                                    .{getTableName(stream.name)}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    ))}
-
-                    {Object.keys(filteredGroups).length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No tables found matching your search
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
-              </>
             )}
 
-            {syncMode === "all" && (
-              <div className="flex-1 border rounded-md p-4 bg-muted/20">
-                <div className="flex items-center gap-2 mb-4">
-                  <IconCheck className="h-5 w-5 text-green-500" />
-                  <span className="font-medium">
-                    All {discoveredSchema?.streams.length} tables will be synced
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Each table will be synced to the <strong>{catalog}</strong>{" "}
-                  catalog, <strong>{layer}</strong> layer with its original name
-                  converted to a valid Iceberg table name.
-                </p>
-                <div className="bg-background rounded-md p-3 text-sm font-mono">
-                  <p className="text-muted-foreground mb-2">Example paths:</p>
-                  {discoveredSchema?.streams.slice(0, 3).map((stream) => (
-                    <p key={stream.name}>
-                      {stream.name} → {catalog}.{layer}.
-                      {namespace ||
-                        selectedSource?.name
-                          .toLowerCase()
-                          .replace(/[^a-z0-9_]/g, "_") ||
-                        "default"}
-                      .{getTableName(stream.name)}
-                    </p>
-                  ))}
-                  {(discoveredSchema?.streams.length || 0) > 3 && (
-                    <p className="text-muted-foreground">
-                      ... and {(discoveredSchema?.streams.length || 0) - 3} more
-                    </p>
+            {/* Sync mode selection */}
+            {discoveredSchema && !isDiscovering && (
+              <>
+                <div className="flex items-center gap-4 pb-2 border-b">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="sync-all"
+                      checked={syncMode === "all"}
+                      onCheckedChange={(checked) =>
+                        setSyncMode(checked ? "all" : "selected")
+                      }
+                    />
+                    <Label
+                      htmlFor="sync-all"
+                      className="font-medium cursor-pointer"
+                    >
+                      Sync all tables ({discoveredSchema?.streams.length || 0})
+                    </Label>
+                  </div>
+
+                  {syncMode === "selected" && (
+                    <>
+                      <div className="h-4 w-px bg-border" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={selectAll}
+                        className="text-xs"
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={deselectAll}
+                        className="text-xs"
+                      >
+                        Deselect All
+                      </Button>
+                      <div className="ml-auto">
+                        <Badge variant="secondary">
+                          {selectedStreams.size} selected
+                        </Badge>
+                      </div>
+                    </>
                   )}
                 </div>
-              </div>
+
+                {syncMode === "selected" && (
+                  <>
+                    {/* Search */}
+                    <div className="relative">
+                      <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search tables..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+
+                    {/* Table list */}
+                    <ScrollArea className="flex-1 border rounded-md min-h-0">
+                      <div className="p-2 space-y-1 max-h-full">
+                        {Object.entries(filteredGroups).map(
+                          ([schema, streams]) => (
+                            <Collapsible
+                              key={schema}
+                              open={expandedSchemas.has(schema)}
+                              onOpenChange={(open) => {
+                                const newExpanded = new Set(expandedSchemas);
+                                if (open) {
+                                  newExpanded.add(schema);
+                                } else {
+                                  newExpanded.delete(schema);
+                                }
+                                setExpandedSchemas(newExpanded);
+                              }}
+                            >
+                              <CollapsibleTrigger className="flex items-center gap-2 w-full p-2 hover:bg-muted/50 rounded-md">
+                                {expandedSchemas.has(schema) ? (
+                                  <IconChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <IconChevronRight className="h-4 w-4" />
+                                )}
+                                <IconDatabase className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium">{schema}</span>
+                                <Badge variant="outline" className="ml-auto">
+                                  {streams.length} tables
+                                </Badge>
+                                <Checkbox
+                                  checked={streams.every((s) =>
+                                    selectedStreams.has(s.name)
+                                  )}
+                                  onCheckedChange={() =>
+                                    toggleSchemaStreams(schema, streams)
+                                  }
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="ml-6 space-y-1 mt-1">
+                                  {streams.map((stream) => (
+                                    <div
+                                      key={stream.name}
+                                      className={cn(
+                                        "flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer",
+                                        selectedStreams.has(stream.name) &&
+                                          "bg-primary/5"
+                                      )}
+                                      onClick={() => toggleStream(stream.name)}
+                                    >
+                                      <Checkbox
+                                        checked={selectedStreams.has(
+                                          stream.name
+                                        )}
+                                        onCheckedChange={() =>
+                                          toggleStream(stream.name)
+                                        }
+                                      />
+                                      <IconTable className="h-4 w-4 text-muted-foreground" />
+                                      <div className="flex-1">
+                                        <span className="text-sm">
+                                          {stream.name}
+                                        </span>
+                                        {stream.row_count !== undefined && (
+                                          <span className="text-xs text-muted-foreground ml-2">
+                                            (~
+                                            {stream.row_count.toLocaleString()}{" "}
+                                            rows)
+                                          </span>
+                                        )}
+                                      </div>
+                                      {selectedStreams.has(stream.name) && (
+                                        <div className="text-xs text-muted-foreground">
+                                          → {trinoNamespace}.{layer}.
+                                          {schemaNamespace ||
+                                            selectedSource?.name
+                                              .toLowerCase()
+                                              .replace(/[^a-z0-9_]/g, "_") ||
+                                            "default"}
+                                          .{getTableName(stream.name)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          )
+                        )}
+
+                        {Object.keys(filteredGroups).length === 0 && (
+                          <div className="text-center py-8 text-muted-foreground">
+                            No tables found matching your search
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </>
+                )}
+
+                {syncMode === "all" && (
+                  <div className="flex-1 border rounded-md p-4 bg-muted/20">
+                    <div className="flex items-center gap-2 mb-4">
+                      <IconCheck className="h-5 w-5 text-green-500" />
+                      <span className="font-medium">
+                        All {discoveredSchema?.streams.length} tables will be
+                        synced
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Each table will be synced to the{" "}
+                      <strong>{trinoNamespace}</strong> namespace,{" "}
+                      <strong>{layer}</strong> layer with its original name
+                      converted to a valid Iceberg table name.
+                    </p>
+                    <div className="bg-background rounded-md p-3 text-sm font-mono">
+                      <p className="text-muted-foreground mb-2">
+                        Example paths:
+                      </p>
+                      {discoveredSchema?.streams.slice(0, 3).map((stream) => (
+                        <p key={stream.name}>
+                          {stream.name} → {trinoNamespace}.{layer}.
+                          {schemaNamespace ||
+                            selectedSource?.name
+                              .toLowerCase()
+                              .replace(/[^a-z0-9_]/g, "_") ||
+                            "default"}
+                          .{getTableName(stream.name)}
+                        </p>
+                      ))}
+                      {(discoveredSchema?.streams.length || 0) > 3 && (
+                        <p className="text-muted-foreground">
+                          ... and {(discoveredSchema?.streams.length || 0) - 3}{" "}
+                          more
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -778,7 +817,7 @@ export function PipelineCreateDialog({
           {step === "config" ? (
             <Button
               onClick={handleNextStep}
-              disabled={!name.trim() || !sourceId || !discoveredSchema}
+              disabled={!name.trim() || !sourceId}
             >
               Next: Select Tables
               <IconChevronRight className="ml-2 h-4 w-4" />

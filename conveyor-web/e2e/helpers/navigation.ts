@@ -66,7 +66,7 @@ export const platformPages = {
   sources: "/data-integration/sources",
 
   // Lakehouse
-  catalog: "/lakehouse/catalog",
+  namespaces: "/lakehouse/namespaces",
   tables: "/lakehouse/tables",
   sqlEditor: "/lakehouse/sql-editor",
   queryHistory: "/lakehouse/query-history",

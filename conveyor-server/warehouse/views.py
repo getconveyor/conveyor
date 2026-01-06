@@ -19,8 +19,8 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
-# Path to Trino catalog directory (mounted from host)
-TRINO_CATALOG_PATH = '/app/trino-catalogs'  # We'll mount this in docker-compose
+# Path to Trino namespace directory (mounted from host)
+TRINO_NAMESPACE_PATH = '/app/trino-catalogs'  # We'll mount this in docker-compose
 
 
 class TrinoQueryViewSet(viewsets.ViewSet):
@@ -45,7 +45,7 @@ class TrinoQueryViewSet(viewsets.ViewSet):
 
         workspace_id = request.headers.get('X-Workspace-ID')
         query_text = serializer.validated_data['query']
-        catalog = serializer.validated_data.get('catalog', 'iceberg')
+        namespace = serializer.validated_data.get('namespace', 'iceberg')
         schema = serializer.validated_data.get('schema')
         name = serializer.validated_data.get('name')
         limit = serializer.validated_data.get('limit', 1000)
@@ -56,7 +56,7 @@ class TrinoQueryViewSet(viewsets.ViewSet):
             user=request.user,
             name=name,
             query_text=query_text,
-            catalog=catalog,
+            namespace=namespace,
             schema=schema,
             status='running'
         )
@@ -68,9 +68,9 @@ class TrinoQueryViewSet(viewsets.ViewSet):
             conn = self._get_trino_connection()
             cursor = conn.cursor()
 
-            # Set catalog and schema if provided
+            # Set namespace and schema if provided
             if schema:
-                cursor.execute(f"USE {catalog}.{schema}")
+                cursor.execute(f"USE {namespace}.{schema}")
 
             # Execute query with limit
             # Strip trailing semicolons - Trino Python client doesn't expect them
@@ -140,7 +140,7 @@ class TrinoQueryViewSet(viewsets.ViewSet):
         serializer = TableListSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
-        catalog = serializer.validated_data.get('catalog', 'iceberg')
+        namespace = serializer.validated_data.get('namespace', 'iceberg')
         schema_filter = serializer.validated_data.get('schema')
         layer = serializer.validated_data.get('layer')
 
@@ -148,8 +148,8 @@ class TrinoQueryViewSet(viewsets.ViewSet):
             conn = self._get_trino_connection()
             cursor = conn.cursor()
 
-            # Get all schemas in the catalog
-            cursor.execute(f"SHOW SCHEMAS FROM {catalog}")
+            # Get all schemas in the namespace
+            cursor.execute(f"SHOW SCHEMAS FROM {namespace}")
             schemas = [row[0] for row in cursor.fetchall()]
 
             # Filter by layer if specified
@@ -165,7 +165,7 @@ class TrinoQueryViewSet(viewsets.ViewSet):
                     continue
 
                 try:
-                    cursor.execute(f"SHOW TABLES FROM {catalog}.{schema}")
+                    cursor.execute(f"SHOW TABLES FROM {namespace}.{schema}")
                     tables = cursor.fetchall()
 
                     for table_row in tables:
@@ -176,19 +176,19 @@ class TrinoQueryViewSet(viewsets.ViewSet):
                             cursor.execute(f"""
                                 SELECT
                                     COUNT(*) as row_count
-                                FROM {catalog}.{schema}.{table_name}
+                                FROM {namespace}.{schema}.{table_name}
                             """)
                             row_count = cursor.fetchone()[0]
                         except:
                             row_count = None
 
                         tables_data.append({
-                            'catalog': catalog,
+                            'namespace': namespace,
                             'schema': schema,
                             'layer': schema.split('.')[0] if '.' in schema else schema,
-                            'namespace': schema.split('.')[1] if '.' in schema and len(schema.split('.')) > 1 else 'default',
+                            'schema_namespace': schema.split('.')[1] if '.' in schema and len(schema.split('.')) > 1 else 'default',
                             'table_name': table_name,
-                            'full_name': f"{catalog}.{schema}.{table_name}",
+                            'full_name': f"{namespace}.{schema}.{table_name}",
                             'row_count': row_count
                         })
                 except Exception as e:
@@ -199,7 +199,7 @@ class TrinoQueryViewSet(viewsets.ViewSet):
             conn.close()
 
             return Response({
-                'catalog': catalog,
+                'namespace': namespace,
                 'tables': tables_data,
                 'total_tables': len(tables_data)
             })
@@ -231,13 +231,13 @@ class QueryHistoryViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class CatalogViewSet(viewsets.ViewSet):
-    """ViewSet for managing Trino Iceberg catalogs (projects)"""
+class NamespaceViewSet(viewsets.ViewSet):
+    """ViewSet for managing Trino Iceberg namespaces (projects)"""
     permission_classes = [IsAuthenticated, IsWorkspaceMember]
 
-    def _get_catalog_template(self, catalog_name: str) -> str:
-        """Generate Iceberg catalog properties file content"""
-        return f"""# Iceberg Catalog Configuration for {catalog_name}
+    def _get_namespace_template(self, namespace_name: str) -> str:
+        """Generate Iceberg namespace properties file content"""
+        return f"""# Iceberg Namespace Configuration for {namespace_name}
 connector.name=iceberg
 
 # Hive Metastore configuration
@@ -260,29 +260,29 @@ iceberg.max-partitions-per-writer=100
 iceberg.minimum-assigned-split-weight=0.05
 """
 
-    def _validate_catalog_name(self, name: str) -> tuple[bool, str]:
-        """Validate catalog name"""
+    def _validate_namespace_name(self, name: str) -> tuple[bool, str]:
+        """Validate namespace name"""
         if not name:
-            return False, "Catalog name is required"
+            return False, "Namespace name is required"
         if not re.match(r'^[a-z][a-z0-9_]*$', name):
-            return False, "Catalog name must start with a letter and contain only lowercase letters, numbers, and underscores"
+            return False, "Namespace name must start with a letter and contain only lowercase letters, numbers, and underscores"
         if len(name) > 50:
-            return False, "Catalog name must be 50 characters or less"
+            return False, "Namespace name must be 50 characters or less"
         if name in ['system', 'information_schema']:
-            return False, "This catalog name is reserved"
+            return False, "This namespace name is reserved"
         return True, ""
 
     def list(self, request):
-        """List all available catalogs"""
+        """List all available namespaces"""
         try:
-            catalogs = []
+            namespaces = []
             
-            # List catalog files from the mounted directory
-            if os.path.exists(TRINO_CATALOG_PATH):
-                for filename in os.listdir(TRINO_CATALOG_PATH):
+            # List namespace files from the mounted directory
+            if os.path.exists(TRINO_NAMESPACE_PATH):
+                for filename in os.listdir(TRINO_NAMESPACE_PATH):
                     if filename.endswith('.properties'):
-                        catalog_name = filename[:-11]  # Remove .properties
-                        file_path = os.path.join(TRINO_CATALOG_PATH, filename)
+                        namespace_name = filename[:-11]  # Remove .properties
+                        file_path = os.path.join(TRINO_NAMESPACE_PATH, filename)
                         
                         # Read the file to check connector type
                         connector_type = 'unknown'
@@ -298,105 +298,201 @@ iceberg.minimum-assigned-split-weight=0.05
                         except Exception:
                             pass
                         
-                        catalogs.append({
-                            'name': catalog_name,
+                        namespaces.append({
+                            'name': namespace_name,
                             'connector': connector_type,
                             'file': filename,
-                            'is_system': catalog_name in ['system', 'information_schema'],
-                            'is_default': catalog_name == 'iceberg'
+                            'is_system': namespace_name in ['system', 'information_schema'],
+                            'is_default': namespace_name == 'iceberg'
                         })
             
             return Response({
-                'catalogs': sorted(catalogs, key=lambda x: x['name']),
-                'total': len(catalogs)
+                'namespaces': sorted(namespaces, key=lambda x: x['name']),
+                'total': len(namespaces)
             })
             
         except Exception as e:
-            logger.error(f"Failed to list catalogs: {str(e)}")
+            logger.error(f"Failed to list namespaces: {str(e)}")
             return Response({
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def create(self, request):
-        """Create a new Iceberg catalog"""
+        """Create a new Iceberg namespace"""
         name = request.data.get('name', '').lower().strip()
         description = request.data.get('description', '')
         
         # Validate name
-        is_valid, error = self._validate_catalog_name(name)
+        is_valid, error = self._validate_namespace_name(name)
         if not is_valid:
             return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Check if catalog already exists
-        catalog_file = os.path.join(TRINO_CATALOG_PATH, f'{name}.properties')
-        if os.path.exists(catalog_file):
+        # Check if namespace already exists
+        namespace_file = os.path.join(TRINO_NAMESPACE_PATH, f'{name}.properties')
+        if os.path.exists(namespace_file):
             return Response({
-                'error': f'Catalog "{name}" already exists'
+                'error': f'Namespace "{name}" already exists'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            # Create the catalog properties file
-            content = self._get_catalog_template(name)
+            # Create the namespace properties file
+            content = self._get_namespace_template(name)
             
-            with open(catalog_file, 'w') as f:
+            with open(namespace_file, 'w') as f:
                 f.write(content)
             
-            logger.info(f"Created catalog: {name}")
+            logger.info(f"Created namespace: {name}")
             
             return Response({
                 'name': name,
-                'message': f'Catalog "{name}" created successfully. Restart Trino to activate.',
+                'message': f'Namespace "{name}" created successfully. Restart Trino to activate.',
                 'restart_required': True
             }, status=status.HTTP_201_CREATED)
             
         except Exception as e:
-            logger.error(f"Failed to create catalog {name}: {str(e)}")
+            logger.error(f"Failed to create namespace {name}: {str(e)}")
             return Response({
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def destroy(self, request, pk=None):
-        """Delete a catalog"""
-        catalog_name = pk
+        """Delete a namespace"""
+        namespace_name = pk
         
-        if catalog_name in ['iceberg', 'system', 'information_schema', 'postgres']:
+        if namespace_name in ['iceberg', 'system', 'information_schema', 'postgres']:
             return Response({
-                'error': 'Cannot delete system or default catalogs'
+                'error': 'Cannot delete system or default namespaces'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        catalog_file = os.path.join(TRINO_CATALOG_PATH, f'{catalog_name}.properties')
+        namespace_file = os.path.join(TRINO_NAMESPACE_PATH, f'{namespace_name}.properties')
         
-        if not os.path.exists(catalog_file):
+        if not os.path.exists(namespace_file):
             return Response({
-                'error': f'Catalog "{catalog_name}" not found'
+                'error': f'Namespace "{namespace_name}" not found'
             }, status=status.HTTP_404_NOT_FOUND)
         
         try:
-            os.remove(catalog_file)
-            logger.info(f"Deleted catalog: {catalog_name}")
+            os.remove(namespace_file)
+            logger.info(f"Deleted namespace: {namespace_name}")
             
             return Response({
-                'message': f'Catalog "{catalog_name}" deleted. Restart Trino to apply.',
+                'message': f'Namespace "{namespace_name}" deleted. Restart Trino to apply.',
                 'restart_required': True
             })
             
         except Exception as e:
-            logger.error(f"Failed to delete catalog {catalog_name}: {str(e)}")
+            logger.error(f"Failed to delete namespace {namespace_name}: {str(e)}")
             return Response({
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=['post'])
     def restart_trino(self, request):
-        """Restart Trino container to reload catalogs"""
+        """Restart Trino container to reload namespaces"""
         try:
             # This would typically be done via Docker API or a management script
             # For now, we'll return instructions
             return Response({
-                'message': 'To reload catalogs, restart the Trino container',
+                'message': 'To reload namespaces, restart the Trino container',
                 'command': 'docker restart conveyor-trino'
             })
         except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['get'])
+    def schemas(self, request, pk=None):
+        """Get all schemas and tables for a namespace (for schema browser)"""
+        namespace_name = pk
+
+        try:
+            conn = trino.dbapi.connect(
+                host=os.getenv('TRINO_HOST', 'trino'),
+                port=int(os.getenv('TRINO_PORT', 8080)),
+                user='conveyor',
+                catalog=namespace_name,
+            )
+            cursor = conn.cursor()
+
+            # Get all schemas in the namespace
+            cursor.execute(f"SHOW SCHEMAS FROM {namespace_name}")
+            schemas = [row[0] for row in cursor.fetchall()]
+
+            # Build schema tree
+            schema_tree = []
+            for schema in schemas:
+                if schema in ['information_schema', 'sys']:
+                    continue
+
+                schema_node = {
+                    'id': f"{namespace_name}-{schema}",
+                    'name': schema,
+                    'type': 'schema',
+                    'children': []
+                }
+
+                # Determine layer based on schema name
+                if schema in ['bronze', 'silver', 'gold']:
+                    schema_node['type'] = 'layer'
+                    schema_node['layer'] = schema
+
+                try:
+                    # Get tables in this schema
+                    cursor.execute(f"SHOW TABLES FROM {namespace_name}.{schema}")
+                    tables = cursor.fetchall()
+
+                    for table_row in tables:
+                        table_name = table_row[0]
+                        table_node = {
+                            'id': f"{namespace_name}-{schema}-{table_name}",
+                            'name': table_name,
+                            'type': 'table',
+                            'children': []
+                        }
+
+                        try:
+                            # Get columns for this table
+                            cursor.execute(f"DESCRIBE {namespace_name}.{schema}.{table_name}")
+                            columns = cursor.fetchall()
+
+                            for col_row in columns:
+                                col_name = col_row[0]
+                                col_type = col_row[1] if len(col_row) > 1 else 'unknown'
+                                table_node['children'].append({
+                                    'id': f"{namespace_name}-{schema}-{table_name}-{col_name}",
+                                    'name': col_name,
+                                    'type': 'column',
+                                    'dataType': col_type.upper()
+                                })
+                        except Exception as e:
+                            logger.warning(f"Could not describe table {table_name}: {str(e)}")
+
+                        schema_node['children'].append(table_node)
+
+                except Exception as e:
+                    logger.warning(f"Could not list tables in schema {schema}: {str(e)}")
+
+                schema_tree.append(schema_node)
+
+            cursor.close()
+            conn.close()
+
+            # Wrap in namespace node
+            result = [{
+                'id': namespace_name,
+                'name': namespace_name,
+                'type': 'namespace',
+                'children': schema_tree
+            }]
+
+            return Response({
+                'namespace': namespace_name,
+                'schema_tree': result
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to get schemas for namespace {namespace_name}: {str(e)}")
             return Response({
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

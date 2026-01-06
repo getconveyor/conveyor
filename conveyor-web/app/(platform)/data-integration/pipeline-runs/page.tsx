@@ -10,6 +10,9 @@ import {
   IconLoader2,
   IconAlertCircle,
   IconHistory,
+  IconEye,
+  IconFileText,
+  IconX,
 } from "@tabler/icons-react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { integrationApi, PipelineRun, Pipeline } from "@/lib/api/integration";
@@ -41,11 +44,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { formatDistanceToNow } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { formatDistanceToNow, format } from "date-fns";
 import { PageHeader } from "@/components/page-header";
 import { DataGrid } from "@/components/data-grid";
 
-type RunStatus = "pending" | "running" | "success" | "failed" | "cancelled";
+type RunStatus =
+  | "pending"
+  | "running"
+  | "success"
+  | "failed"
+  | "cancelled"
+  | "completed"
+  | "completed_with_errors";
 
 const statusConfig: Record<
   RunStatus,
@@ -70,6 +89,16 @@ const statusConfig: Record<
     variant: "default",
     icon: <IconCircleCheck className="h-4 w-4" />,
   },
+  completed: {
+    label: "Completed",
+    variant: "default",
+    icon: <IconCircleCheck className="h-4 w-4" />,
+  },
+  completed_with_errors: {
+    label: "Completed with Errors",
+    variant: "outline",
+    icon: <IconAlertCircle className="h-4 w-4 text-yellow-500" />,
+  },
   failed: {
     label: "Failed",
     variant: "destructive",
@@ -89,6 +118,9 @@ export default function PipelineRunsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [pipelineFilter, setPipelineFilter] = useState<string>("all");
   const [runToCancel, setRunToCancel] = useState<string | null>(null);
+  const [selectedRun, setSelectedRun] = useState<PipelineRun | null>(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [showLogsDialog, setShowLogsDialog] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -282,8 +314,24 @@ export default function PipelineRunsPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem disabled>View Details</DropdownMenuItem>
-                  <DropdownMenuItem disabled>View Logs</DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setSelectedRun(run);
+                      setShowDetailsDialog(true);
+                    }}
+                  >
+                    <IconEye className="h-4 w-4 mr-2" />
+                    View Details
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setSelectedRun(run);
+                      setShowLogsDialog(true);
+                    }}
+                  >
+                    <IconFileText className="h-4 w-4 mr-2" />
+                    View Logs
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -424,6 +472,232 @@ export default function PipelineRunsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Run Details Dialog */}
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconEye className="h-5 w-5" />
+              Run Details
+            </DialogTitle>
+            <DialogDescription>
+              {selectedRun?.pipeline_name} - Run {selectedRun?.id.slice(0, 8)}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedRun && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Status
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {statusConfig[selectedRun.status as RunStatus]?.icon}
+                    <Badge
+                      variant={
+                        statusConfig[selectedRun.status as RunStatus]
+                          ?.variant || "outline"
+                      }
+                    >
+                      {statusConfig[selectedRun.status as RunStatus]?.label ||
+                        selectedRun.status}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Progress
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all"
+                        style={{ width: `${selectedRun.progress || 0}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium">
+                      {selectedRun.progress || 0}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <Separator />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Start Time
+                  </p>
+                  <p className="text-sm mt-1">
+                    {selectedRun.start_time
+                      ? format(new Date(selectedRun.start_time), "PPpp")
+                      : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    End Time
+                  </p>
+                  <p className="text-sm mt-1">
+                    {selectedRun.end_time
+                      ? format(new Date(selectedRun.end_time), "PPpp")
+                      : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Duration
+                  </p>
+                  <p className="text-sm mt-1">
+                    {formatDuration(selectedRun.duration)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Triggered By
+                  </p>
+                  <p className="text-sm mt-1 capitalize">
+                    {selectedRun.triggered_by || "-"}
+                  </p>
+                </div>
+              </div>
+              <Separator />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Records Processed
+                  </p>
+                  <p className="text-sm mt-1">
+                    {selectedRun.records_processed?.toLocaleString() || 0}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Bytes Processed
+                  </p>
+                  <p className="text-sm mt-1">
+                    {formatBytes(selectedRun.bytes_processed ?? null)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Current Step
+                  </p>
+                  <p className="text-sm mt-1">
+                    {selectedRun.current_step || "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Error Count
+                  </p>
+                  <p className="text-sm mt-1">{selectedRun.error_count || 0}</p>
+                </div>
+              </div>
+              {selectedRun.metrics &&
+                Object.keys(selectedRun.metrics).length > 0 && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground mb-2">
+                        Metrics
+                      </p>
+                      <pre className="text-xs bg-muted p-3 rounded-md overflow-auto">
+                        {JSON.stringify(selectedRun.metrics, null, 2)}
+                      </pre>
+                    </div>
+                  </>
+                )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Logs Dialog */}
+      <Dialog open={showLogsDialog} onOpenChange={setShowLogsDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconFileText className="h-5 w-5" />
+              Run Logs
+            </DialogTitle>
+            <DialogDescription>
+              {selectedRun?.pipeline_name} - Run {selectedRun?.id.slice(0, 8)}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedRun && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={
+                    statusConfig[selectedRun.status as RunStatus]?.variant ||
+                    "outline"
+                  }
+                >
+                  {statusConfig[selectedRun.status as RunStatus]?.label ||
+                    selectedRun.status}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  {selectedRun.current_step}
+                </span>
+              </div>
+              <ScrollArea className="h-[400px] rounded-md border">
+                <div className="p-4 font-mono text-sm space-y-2">
+                  {selectedRun.error_message ? (
+                    <div className="text-destructive whitespace-pre-wrap">
+                      <strong>Error:</strong>
+                      <br />
+                      {selectedRun.error_message}
+                    </div>
+                  ) : null}
+                  {selectedRun.errors &&
+                  Array.isArray(selectedRun.errors) &&
+                  selectedRun.errors.length > 0
+                    ? selectedRun.errors.map((error: any, index: number) => (
+                        <div key={index} className="text-destructive">
+                          [{index + 1}]{" "}
+                          {typeof error === "string"
+                            ? error
+                            : JSON.stringify(error)}
+                        </div>
+                      ))
+                    : null}
+                  {!selectedRun.error_message &&
+                    (!selectedRun.errors ||
+                      (Array.isArray(selectedRun.errors) &&
+                        selectedRun.errors.length === 0)) && (
+                      <div className="text-muted-foreground">
+                        <p>
+                          Run started at{" "}
+                          {selectedRun.start_time
+                            ? format(new Date(selectedRun.start_time), "PPpp")
+                            : "N/A"}
+                        </p>
+                        {selectedRun.current_step && (
+                          <p>Current step: {selectedRun.current_step}</p>
+                        )}
+                        <p>Progress: {selectedRun.progress || 0}%</p>
+                        <p>
+                          Records processed:{" "}
+                          {selectedRun.records_processed?.toLocaleString() || 0}
+                        </p>
+                        {selectedRun.end_time && (
+                          <p>
+                            Completed at{" "}
+                            {format(new Date(selectedRun.end_time), "PPpp")}
+                          </p>
+                        )}
+                        <p className="mt-4 text-muted-foreground/70">
+                          No errors recorded for this run.
+                        </p>
+                      </div>
+                    )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

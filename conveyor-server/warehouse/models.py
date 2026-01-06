@@ -15,7 +15,7 @@ class QueryHistory(models.Model):
     # Query details
     name = models.CharField(max_length=255, blank=True, null=True)
     query_text = models.TextField()
-    catalog = models.CharField(max_length=100, default='iceberg')
+    namespace = models.CharField(max_length=100, default='iceberg')
     schema = models.CharField(max_length=100, blank=True, null=True)
 
     # Execution details

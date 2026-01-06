@@ -1,6 +1,6 @@
 import { apiClient, getAuthOptions } from "./client";
 
-export interface Catalog {
+export interface Namespace {
   name: string;
   connector: string;
   file: string;
@@ -8,51 +8,80 @@ export interface Catalog {
   is_default: boolean;
 }
 
-export interface CatalogsResponse {
-  catalogs: Catalog[];
+export interface NamespacesResponse {
+  namespaces: Namespace[];
 }
 
-export interface CreateCatalogRequest {
+export interface CreateNamespaceRequest {
   name: string;
 }
 
-export interface CatalogActionResponse {
+export interface NamespaceActionResponse {
   message: string;
   error?: string;
 }
 
-/**
- * Get all catalogs
- */
-export async function getCatalogs(): Promise<Catalog[]> {
-  const response = await apiClient.get<CatalogsResponse>(
-    "/api/lakehouse/catalogs/",
-    getAuthOptions()
-  );
-  return response.catalogs || [];
+export interface SchemaTreeNode {
+  id: string;
+  name: string;
+  type: "namespace" | "layer" | "schema" | "table" | "column";
+  layer?: "bronze" | "silver" | "gold";
+  dataType?: string;
+  isPrimaryKey?: boolean;
+  isNullable?: boolean;
+  children?: SchemaTreeNode[];
+}
+
+export interface NamespaceSchemasResponse {
+  namespace: string;
+  schema_tree: SchemaTreeNode[];
 }
 
 /**
- * Create a new catalog
+ * Get all namespaces
  */
-export async function createCatalog(
-  data: CreateCatalogRequest
-): Promise<CatalogActionResponse> {
-  return apiClient.post<CatalogActionResponse>(
-    "/api/lakehouse/catalogs/",
+export async function getNamespaces(): Promise<Namespace[]> {
+  const response = await apiClient.get<NamespacesResponse>(
+    "/api/lakehouse/namespaces/",
+    getAuthOptions()
+  );
+  return response.namespaces || [];
+}
+
+/**
+ * Get schemas for a namespace (for schema browser)
+ */
+export async function getNamespaceSchemas(
+  namespaceName: string
+): Promise<SchemaTreeNode[]> {
+  const response = await apiClient.get<NamespaceSchemasResponse>(
+    `/api/lakehouse/namespaces/${namespaceName}/schemas/`,
+    getAuthOptions()
+  );
+  return response.schema_tree || [];
+}
+
+/**
+ * Create a new namespace
+ */
+export async function createNamespace(
+  data: CreateNamespaceRequest
+): Promise<NamespaceActionResponse> {
+  return apiClient.post<NamespaceActionResponse>(
+    "/api/lakehouse/namespaces/",
     data,
     getAuthOptions()
   );
 }
 
 /**
- * Delete a catalog
+ * Delete a namespace
  */
-export async function deleteCatalog(
-  catalogName: string
-): Promise<CatalogActionResponse> {
-  return apiClient.delete<CatalogActionResponse>(
-    `/api/lakehouse/catalogs/${catalogName}/`,
+export async function deleteNamespace(
+  namespaceName: string
+): Promise<NamespaceActionResponse> {
+  return apiClient.delete<NamespaceActionResponse>(
+    `/api/lakehouse/namespaces/${namespaceName}/`,
     getAuthOptions()
   );
 }

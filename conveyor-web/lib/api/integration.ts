@@ -128,7 +128,14 @@ export interface PipelineRun {
   id: string;
   pipeline?: string;
   pipeline_name?: string;
-  status: "pending" | "running" | "success" | "failed" | "cancelled";
+  status:
+    | "pending"
+    | "running"
+    | "success"
+    | "failed"
+    | "cancelled"
+    | "completed"
+    | "completed_with_errors";
   start_time: string | null;
   end_time: string | null;
   duration: number | null;
@@ -136,7 +143,18 @@ export interface PipelineRun {
   bytes_processed?: number | null;
   errors?: Record<string, any> | null;
   metrics?: Record<string, any> | null;
+  error_count?: number;
+  error_message?: string | null;
+  current_step?: string;
+  progress?: number;
   triggered_by?: "manual" | "schedule" | "api";
+  triggered_by_user?: string | null;
+  triggered_by_user_details?: {
+    id: number;
+    email: string;
+    first_name: string;
+    last_name: string;
+  } | null;
   created_at: string;
 }
 

@@ -5,7 +5,7 @@ from .models import QueryHistory
 class QueryExecuteSerializer(serializers.Serializer):
     """Serializer for executing a Trino query"""
     query = serializers.CharField(required=True)
-    catalog = serializers.CharField(default='iceberg')
+    namespace = serializers.CharField(default='iceberg')
     schema = serializers.CharField(required=False, allow_blank=True)
     name = serializers.CharField(required=False, allow_blank=True)
     limit = serializers.IntegerField(default=1000, min_value=1, max_value=10000)
@@ -20,7 +20,7 @@ class QueryHistorySerializer(serializers.ModelSerializer):
         model = QueryHistory
         fields = [
             'id', 'workspace_id', 'user', 'user_email',
-            'name', 'query_text', 'catalog', 'schema',
+            'name', 'query_text', 'namespace', 'schema',
             'status', 'rows_returned', 'execution_time_ms',
             'execution_time_display', 'error_message',
             'created_at', 'completed_at'
@@ -42,7 +42,7 @@ class QueryHistorySerializer(serializers.ModelSerializer):
 
 class TableListSerializer(serializers.Serializer):
     """Serializer for listing Iceberg tables"""
-    catalog = serializers.CharField(default='iceberg')
+    namespace = serializers.CharField(default='iceberg')
     schema = serializers.CharField(required=False, allow_blank=True)
     layer = serializers.ChoiceField(
         choices=['bronze', 'silver', 'gold'],

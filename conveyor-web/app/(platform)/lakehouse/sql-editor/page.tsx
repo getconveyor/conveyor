@@ -35,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SchemaTree, SchemaTreeNode } from "@/components/schema-tree";
+import { SchemaTree } from "@/components/schema-tree";
 import { DataGrid, commonColumns, dateFormatter } from "@/components/data-grid";
 import { toast } from "sonner";
 import {
@@ -43,180 +43,13 @@ import {
   getQueryHistory,
   QueryHistory,
 } from "@/lib/api/lakehouse";
-import { getCatalogs, Catalog } from "@/lib/api/warehouse";
+import {
+  getNamespaces,
+  getNamespaceSchemas,
+  Namespace,
+  SchemaTreeNode,
+} from "@/lib/api/warehouse";
 import { useAuth } from "@/contexts/auth-context";
-
-// Demo schema data
-const demoSchemaData: SchemaTreeNode[] = [
-  {
-    id: "iceberg",
-    name: "iceberg",
-    type: "catalog",
-    children: [
-      {
-        id: "iceberg-bronze",
-        name: "bronze",
-        type: "layer",
-        layer: "bronze",
-        children: [
-          {
-            id: "iceberg-bronze-default",
-            name: "default",
-            type: "schema",
-            children: [
-              {
-                id: "iceberg-bronze-default-customers",
-                name: "customers",
-                type: "table",
-                children: [
-                  {
-                    id: "c-id",
-                    name: "id",
-                    type: "column",
-                    dataType: "BIGINT",
-                    isPrimaryKey: true,
-                  },
-                  {
-                    id: "c-name",
-                    name: "name",
-                    type: "column",
-                    dataType: "VARCHAR",
-                  },
-                  {
-                    id: "c-email",
-                    name: "email",
-                    type: "column",
-                    dataType: "VARCHAR",
-                  },
-                  {
-                    id: "c-created",
-                    name: "created_at",
-                    type: "column",
-                    dataType: "TIMESTAMP",
-                  },
-                ],
-              },
-              {
-                id: "iceberg-bronze-default-orders",
-                name: "orders",
-                type: "table",
-                children: [
-                  {
-                    id: "o-id",
-                    name: "id",
-                    type: "column",
-                    dataType: "BIGINT",
-                    isPrimaryKey: true,
-                  },
-                  {
-                    id: "o-customer",
-                    name: "customer_id",
-                    type: "column",
-                    dataType: "BIGINT",
-                  },
-                  {
-                    id: "o-total",
-                    name: "total",
-                    type: "column",
-                    dataType: "DECIMAL",
-                  },
-                  {
-                    id: "o-status",
-                    name: "status",
-                    type: "column",
-                    dataType: "VARCHAR",
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-      {
-        id: "iceberg-silver",
-        name: "silver",
-        type: "layer",
-        layer: "silver",
-        children: [
-          {
-            id: "iceberg-silver-analytics",
-            name: "analytics",
-            type: "schema",
-            children: [
-              {
-                id: "iceberg-silver-analytics-customer_metrics",
-                name: "customer_metrics",
-                type: "table",
-                children: [
-                  {
-                    id: "cm-id",
-                    name: "customer_id",
-                    type: "column",
-                    dataType: "BIGINT",
-                    isPrimaryKey: true,
-                  },
-                  {
-                    id: "cm-orders",
-                    name: "total_orders",
-                    type: "column",
-                    dataType: "INTEGER",
-                  },
-                  {
-                    id: "cm-revenue",
-                    name: "total_revenue",
-                    type: "column",
-                    dataType: "DECIMAL",
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-      {
-        id: "iceberg-gold",
-        name: "gold",
-        type: "layer",
-        layer: "gold",
-        children: [
-          {
-            id: "iceberg-gold-reporting",
-            name: "reporting",
-            type: "schema",
-            children: [
-              {
-                id: "iceberg-gold-reporting-daily_sales",
-                name: "daily_sales",
-                type: "table",
-                children: [
-                  {
-                    id: "ds-date",
-                    name: "date",
-                    type: "column",
-                    dataType: "DATE",
-                    isPrimaryKey: true,
-                  },
-                  {
-                    id: "ds-revenue",
-                    name: "revenue",
-                    type: "column",
-                    dataType: "DECIMAL",
-                  },
-                  {
-                    id: "ds-orders",
-                    name: "order_count",
-                    type: "column",
-                    dataType: "INTEGER",
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-];
 
 interface QueryTab {
   id: string;
@@ -263,45 +96,66 @@ export default function EnhancedSqlEditorPage() {
   const [isRunning, setIsRunning] = useState(false);
   const [queryHistory, setQueryHistory] = useState<QueryHistory[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [schemaData, setSchemaData] =
-    useState<SchemaTreeNode[]>(demoSchemaData);
-  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [schemaData, setSchemaData] = useState<SchemaTreeNode[]>([]);
+  const [schemaLoading, setSchemaLoading] = useState(true);
 
-  // Catalog state
-  const [catalogs, setCatalogs] = useState<Catalog[]>([]);
-  const [selectedCatalog, setSelectedCatalog] = useState<string>("iceberg");
-  const [isFetchingCatalogs, setIsFetchingCatalogs] = useState(false);
+  // Namespace state
+  const [namespaces, setNamespaces] = useState<Namespace[]>([]);
+  const [selectedNamespace, setSelectedNamespace] = useState<string>("iceberg");
+  const [isFetchingNamespaces, setIsFetchingNamespaces] = useState(false);
 
   const currentTab = tabs.find((t) => t.id === activeTab);
 
-  // Fetch available catalogs
+  // Load schemas for selected namespace
+  const loadSchemas = useCallback(async (namespaceName: string) => {
+    setSchemaLoading(true);
+    try {
+      const schemas = await getNamespaceSchemas(namespaceName);
+      setSchemaData(schemas);
+    } catch (error) {
+      console.error("Failed to load schemas:", error);
+      // Set empty array on error - user can refresh to retry
+      setSchemaData([]);
+    } finally {
+      setSchemaLoading(false);
+    }
+  }, []);
+
+  // Fetch available namespaces
   useEffect(() => {
-    const fetchCatalogsData = async () => {
-      setIsFetchingCatalogs(true);
+    const fetchNamespacesData = async () => {
+      setIsFetchingNamespaces(true);
       try {
-        const allCatalogs = await getCatalogs();
-        // Filter to only show Iceberg catalogs (not system catalogs)
-        const icebergCatalogs = allCatalogs.filter(
+        const allNamespaces = await getNamespaces();
+        // Filter to only show Iceberg namespaces (not system namespaces)
+        const icebergNamespaces = allNamespaces.filter(
           (c) => c.connector === "iceberg" && !c.is_system
         );
-        setCatalogs(icebergCatalogs);
+        setNamespaces(icebergNamespaces);
 
-        // Set default catalog if available
-        const defaultCatalog = icebergCatalogs.find((c) => c.is_default);
-        if (defaultCatalog) {
-          setSelectedCatalog(defaultCatalog.name);
-        } else if (icebergCatalogs.length > 0) {
-          setSelectedCatalog(icebergCatalogs[0].name);
+        // Set default namespace if available
+        const defaultNamespace = icebergNamespaces.find((c) => c.is_default);
+        if (defaultNamespace) {
+          setSelectedNamespace(defaultNamespace.name);
+        } else if (icebergNamespaces.length > 0) {
+          setSelectedNamespace(icebergNamespaces[0].name);
         }
       } catch (error) {
-        console.error("Failed to fetch catalogs:", error);
+        console.error("Failed to fetch namespaces:", error);
       } finally {
-        setIsFetchingCatalogs(false);
+        setIsFetchingNamespaces(false);
       }
     };
 
-    fetchCatalogsData();
+    fetchNamespacesData();
   }, []);
+
+  // Load schemas when namespace changes
+  useEffect(() => {
+    if (selectedNamespace) {
+      loadSchemas(selectedNamespace);
+    }
+  }, [selectedNamespace, loadSchemas]);
 
   useEffect(() => {
     loadQueryHistory();
@@ -361,7 +215,7 @@ export default function EnhancedSqlEditorPage() {
     try {
       const response = await executeQuery({
         query: currentTab.query.trim(),
-        catalog: selectedCatalog,
+        namespace: selectedNamespace,
         limit: 1000,
       });
 
@@ -462,10 +316,7 @@ export default function EnhancedSqlEditorPage() {
   };
 
   const refreshSchema = async () => {
-    setSchemaLoading(true);
-    // Simulate schema refresh
-    await new Promise((r) => setTimeout(r, 1000));
-    setSchemaLoading(false);
+    await loadSchemas(selectedNamespace);
     toast.success("Schema refreshed");
   };
 
@@ -512,28 +363,28 @@ export default function EnhancedSqlEditorPage() {
             </div>
             <div className="flex items-center gap-2">
               <Select
-                value={selectedCatalog}
-                onValueChange={setSelectedCatalog}
-                disabled={isFetchingCatalogs}
+                value={selectedNamespace}
+                onValueChange={setSelectedNamespace}
+                disabled={isFetchingNamespaces}
               >
                 <SelectTrigger className="h-8 w-36 text-xs">
-                  {isFetchingCatalogs ? (
+                  {isFetchingNamespaces ? (
                     <div className="flex items-center gap-2">
                       <IconLoader2 className="h-3 w-3 animate-spin" />
                       <span>Loading...</span>
                     </div>
                   ) : (
-                    <SelectValue placeholder="Catalog" />
+                    <SelectValue placeholder="Namespace" />
                   )}
                 </SelectTrigger>
                 <SelectContent>
-                  {catalogs.length === 0 ? (
+                  {namespaces.length === 0 ? (
                     <SelectItem value="iceberg">iceberg</SelectItem>
                   ) : (
-                    catalogs.map((cat) => (
-                      <SelectItem key={cat.name} value={cat.name}>
-                        {cat.name}
-                        {cat.is_default && " (default)"}
+                    namespaces.map((ns) => (
+                      <SelectItem key={ns.name} value={ns.name}>
+                        {ns.name}
+                        {ns.is_default && " (default)"}
                       </SelectItem>
                     ))
                   )}

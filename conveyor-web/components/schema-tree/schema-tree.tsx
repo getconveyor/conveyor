@@ -37,7 +37,7 @@ import {
 export interface SchemaTreeNode {
   id: string;
   name: string;
-  type: "catalog" | "schema" | "table" | "column" | "layer";
+  type: "namespace" | "schema" | "table" | "column" | "layer";
   dataType?: string;
   isPrimaryKey?: boolean;
   isNullable?: boolean;
@@ -48,7 +48,7 @@ export interface SchemaTreeNode {
 interface SchemaTreeProps {
   data: SchemaTreeNode[];
   onSelect?: (node: SchemaTreeNode) => void;
-  onTableSelect?: (catalogSchemaTable: string) => void;
+  onTableSelect?: (namespaceSchemaTable: string) => void;
   onRefresh?: () => void;
   loading?: boolean;
   className?: string;
@@ -57,7 +57,7 @@ interface SchemaTreeProps {
 
 // Icon mapping for node types
 const nodeIcons: Record<string, React.ElementType> = {
-  catalog: IconDatabase,
+  namespace: IconDatabase,
   schema: IconFolder,
   layer: IconStack,
   table: IconTable,
@@ -164,7 +164,7 @@ function Node({ node, style, dragHandle }: NodeRendererProps<SchemaTreeNode>) {
             <ContextMenuItem>Add to Query</ContextMenuItem>
           </>
         )}
-        {(data.type === "catalog" || data.type === "schema") && (
+        {(data.type === "namespace" || data.type === "schema") && (
           <>
             <ContextMenuItem>Refresh</ContextMenuItem>
             <ContextMenuItem>Copy Name</ContextMenuItem>
