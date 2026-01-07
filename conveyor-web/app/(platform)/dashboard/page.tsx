@@ -35,8 +35,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
-import { monitoringApi, SystemOverview } from "@/lib/api/monitoring";
-import { streamingApi, StreamDashboard } from "@/lib/api/streaming";
+import { SystemOverview } from "@/lib/api/monitoring";
+import { StreamDashboard } from "@/lib/api/streaming";
+import { useSystemOverview } from "@/hooks/use-monitoring";
+import { useStreamDashboard } from "@/hooks/use-streaming";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -47,34 +49,19 @@ function formatBytes(bytes: number): string {
 }
 
 export default function Page() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [monitoringOverview, setMonitoringOverview] =
-    useState<SystemOverview | null>(null);
-  const [streamDashboard, setStreamDashboard] =
-    useState<StreamDashboard | null>(null);
-
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [monitoring, streaming] = await Promise.all([
-        monitoringApi.getSystemOverview(),
-        streamingApi.getDashboard(),
-      ]);
-      setMonitoringOverview(monitoring);
-      setStreamDashboard(streaming);
-    } catch (err) {
-      console.error("Failed to fetch dashboard data:", err);
-      setError("Failed to load dashboard data");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const {
+    data: monitoringOverview,
+    isLoading: monitoringLoading,
+    error: monitoringError,
+  } = useSystemOverview();
+  const {
+    data: streamDashboard,
+    isLoading: streamingLoading,
+    error: streamingError,
+  } = useStreamDashboard();
+  const loading = monitoringLoading || streamingLoading;
+  const error =
+    monitoringError || streamingError ? "Failed to load dashboard data" : null;
 
   const platformStats = [
     {
@@ -309,10 +296,12 @@ export default function Page() {
                 <Skeleton className="h-8 w-full" />
               ) : (
                 <>
-                  <div className="text-2xl font-bold">{stat.value}</div>
+                  <div className="text-2xl font-semibold">{stat.value}</div>
                   <p
                     className={`text-xs ${
-                      stat.trend === "up" ? "text-green-500" : "text-red-500"
+                      stat.trend === "up"
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400"
                     }`}
                   >
                     {stat.change}
@@ -326,20 +315,18 @@ export default function Page() {
 
       {/* Quick Links */}
       <div>
-        <h2 className="text-2xl font-semibold mb-4">Quick Actions</h2>
+        <h2 className="text-lg font-semibold mb-3">Quick Actions</h2>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {quickLinks.map((link) => (
             <Link key={link.title} href={link.url}>
-              <Card className="hover:shadow-md transition-all hover:border-primary cursor-pointer">
+              <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-lg ${link.bgColor}`}
-                    >
-                      <link.icon className={`h-5 w-5 ${link.color}`} />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted">
+                      <link.icon className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">{link.title}</p>
+                      <p className="font-medium text-sm">{link.title}</p>
                       <p className="text-xs text-muted-foreground">
                         {link.description}
                       </p>
@@ -354,8 +341,8 @@ export default function Page() {
 
       {/* Tutorials & Documentation */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-semibold">Learning Resources</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">Learning Resources</h2>
           <Button variant="outline" size="sm" asChild>
             <Link href="#">View All</Link>
           </Button>
@@ -364,24 +351,20 @@ export default function Page() {
           {tutorials.map((tutorial) => (
             <Card
               key={tutorial.title}
-              className="hover:shadow-md transition-shadow"
+              className="hover:bg-accent/30 transition-colors"
             >
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-lg ${tutorial.color} bg-opacity-10`}
-                    >
-                      <tutorial.icon className={`h-5 w-5 ${tutorial.color}`} />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted">
+                      <tutorial.icon className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <CardTitle className="text-base">
+                      <CardTitle className="text-sm font-medium">
                         {tutorial.title}
                       </CardTitle>
                       <div className="flex items-center gap-2 mt-1">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full bg-opacity-10 ${tutorial.color}`}
-                        >
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                           {tutorial.type}
                         </span>
                         <span className="text-xs text-muted-foreground">
@@ -391,7 +374,7 @@ export default function Page() {
                     </div>
                   </div>
                 </div>
-                <CardDescription className="mt-2">
+                <CardDescription className="mt-2 text-sm">
                   {tutorial.description}
                 </CardDescription>
               </CardHeader>
@@ -414,7 +397,7 @@ export default function Page() {
           {platformSections.map((section) => (
             <Card
               key={section.title}
-              className="hover:shadow-md transition-shadow"
+              className="hover:bg-accent/30 transition-colors"
             >
               <CardHeader>
                 <div className="flex items-center gap-3 mb-2">

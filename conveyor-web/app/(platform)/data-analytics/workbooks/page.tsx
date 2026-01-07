@@ -186,7 +186,7 @@ export default function WorkbooksPage() {
       <>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Workbooks</h1>
+            <h1 className="text-xl font-semibold">Workbooks</h1>
             <p className="text-sm text-muted-foreground">
               Interactive data analysis and visualization notebooks
             </p>
@@ -221,7 +221,7 @@ export default function WorkbooksPage() {
       <>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Workbooks</h1>
+            <h1 className="text-xl font-semibold">Workbooks</h1>
             <p className="text-sm text-muted-foreground">
               Interactive data analysis and visualization notebooks
             </p>
@@ -244,7 +244,7 @@ export default function WorkbooksPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Workbooks</h1>
+          <h1 className="text-xl font-semibold">Workbooks</h1>
           <p className="text-sm text-muted-foreground">
             Interactive data analysis and visualization notebooks
           </p>
@@ -334,7 +334,7 @@ export default function WorkbooksPage() {
           {filteredWorkbooks.map((workbook) => (
             <Card
               key={workbook.id}
-              className="hover:shadow-md transition-shadow"
+              className="hover:bg-accent/30 transition-colors"
             >
               <CardHeader>
                 <div className="flex items-start justify-between">

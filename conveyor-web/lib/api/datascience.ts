@@ -98,6 +98,244 @@ export interface FeatureGroup {
   event_time_column: string | null;
   ttl_minutes: number | null;
   tags: string | null;
+  row_count: number | null;
+  last_updated_at: string | null;
+  created_by: string | null;
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeatureDefinition {
+  id: string;
+  feature_group: string;
+  feature_group_name: string;
+  name: string;
+  description: string;
+  dtype:
+    | "int"
+    | "float"
+    | "string"
+    | "bool"
+    | "datetime"
+    | "array"
+    | "embedding";
+  transform_type:
+    | "passthrough"
+    | "standard_scale"
+    | "min_max_scale"
+    | "log_transform"
+    | "one_hot"
+    | "label_encode"
+    | "embedding"
+    | "bucketize"
+    | "time_since"
+    | "date_parts"
+    | "rolling_agg"
+    | "custom_sql"
+    | "custom_python";
+  transform_config: Record<string, any>;
+  source_columns: string[];
+  transformation_expression: string;
+  statistics: FeatureStatistics | null;
+  importance_score: number | null;
+  validation_rules: Array<{ rule_type: string; params: Record<string, any> }>;
+  order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeatureEngineeringStep {
+  name: string;
+  type: string;
+  source: string;
+  config?: Record<string, any>;
+  expression?: string;
+}
+
+export interface DataPrepConfig {
+  handle_nulls?: {
+    strategy:
+      | "drop"
+      | "fill"
+      | "fill_mean"
+      | "fill_median"
+      | "fill_mode"
+      | "fill_forward"
+      | "fill_backward";
+    fill_value?: any;
+    columns?: string[];
+  };
+  handle_outliers?: {
+    method: "clip" | "remove" | "replace_mean" | "replace_median";
+    lower?: number;
+    upper?: number;
+    use_percentile?: boolean;
+    columns?: string[];
+  };
+  deduplicate?: {
+    columns?: string[];
+    keep?: "first" | "last";
+  };
+  filter_conditions?: Array<{
+    column: string;
+    op:
+      | "eq"
+      | "ne"
+      | "gt"
+      | "gte"
+      | "lt"
+      | "lte"
+      | "in"
+      | "not_in"
+      | "is_null"
+      | "is_not_null"
+      | "contains";
+    value: any;
+  }>;
+}
+
+export interface FeatureEngineeringJob {
+  id: string;
+  workspace: string;
+  name: string;
+  description: string;
+  source_type: string;
+  source_table: string;
+  source_query: string;
+  target_feature_group: string;
+  target_feature_group_name: string;
+  transform_mode: "sql" | "python" | "hybrid";
+  sql_query: string;
+  python_code: string;
+  data_prep_config: DataPrepConfig;
+  feature_engineering_steps: FeatureEngineeringStep[];
+  schedule_type: "manual" | "cron" | "interval" | "event";
+  schedule_cron: string;
+  schedule_interval_minutes: number | null;
+  is_incremental: boolean;
+  watermark_column: string;
+  last_watermark: Record<string, any> | null;
+  backfill_start_date: string | null;
+  backfill_end_date: string | null;
+  status: "active" | "paused" | "error" | "draft";
+  last_run_at: string | null;
+  last_run_status: string;
+  last_run_duration_seconds: number | null;
+  last_run_rows_processed: number | null;
+  total_runs: number;
+  successful_runs: number;
+  failed_runs: number;
+  last_error_message: string;
+  last_error_at: string | null;
+  owner: string | null;
+  owner_name: string | null;
+  run_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeatureEngineeringRun {
+  id: string;
+  job: string;
+  job_name: string;
+  status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  started_at: string | null;
+  completed_at: string | null;
+  duration_seconds: number | null;
+  current_step: string;
+  progress_percent: number;
+  rows_read: number;
+  rows_processed: number;
+  rows_written: number;
+  rows_failed: number;
+  data_start_time: string | null;
+  data_end_time: string | null;
+  watermark_value: Record<string, any> | null;
+  error_message: string;
+  error_traceback: string;
+  logs: string;
+  celery_task_id: string;
+  triggered_by: string | null;
+  triggered_by_name: string | null;
+  created_at: string;
+}
+
+export interface FeatureMaterialization {
+  id: string;
+  feature_group: string;
+  feature_group_name: string;
+  engineering_run: string | null;
+  store_type: "offline" | "online" | "both";
+  status: "pending" | "running" | "completed" | "failed";
+  started_at: string | null;
+  completed_at: string | null;
+  data_start_time: string | null;
+  data_end_time: string | null;
+  rows_materialized: number;
+  features_materialized: number;
+  storage_bytes: number | null;
+  offline_path: string;
+  offline_format: string;
+  online_keys_updated: number;
+  online_ttl_seconds: number | null;
+  error_message: string;
+  created_at: string;
+}
+
+export interface OnlineFeatureStore {
+  id: string;
+  workspace: string;
+  name: string;
+  description: string;
+  redis_host: string;
+  redis_port: number;
+  redis_db: number;
+  redis_key_prefix: string;
+  default_ttl_seconds: number;
+  is_active: boolean;
+  last_sync_at: string | null;
+  total_keys: number;
+  memory_used_bytes: number | null;
+  avg_latency_ms: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeatureStatistics {
+  feature_name?: string;
+  dtype?: string;
+  count: number;
+  non_null_count: number;
+  null_count: number;
+  null_percentage: number;
+  inferred_dtype?: string;
+  // Numeric stats
+  min?: number;
+  max?: number;
+  mean?: number;
+  median?: number;
+  std?: number;
+  variance?: number;
+  q1?: number;
+  q3?: number;
+  iqr?: number;
+  // Categorical stats
+  unique_count?: number;
+  most_common?: Array<[any, number]>;
+  cardinality?: number;
+  // Boolean stats
+  true_count?: number;
+  false_count?: number;
+  true_percentage?: number;
+  // Datetime stats
+  range_days?: number;
+  // Histogram
+  histogram?: {
+    counts: number[];
+    bin_edges: number[];
+  };
   created_by: string | null;
   created_by_name: string | null;
   created_at: string;
@@ -638,6 +876,413 @@ export const dataScienceApi = {
     return apiClient.get(
       `/api/data-science/training-datasets/${id}/statistics/`,
       getAuthOptions()
+    );
+  },
+
+  // Feature Definitions
+  async getFeatureDefinitions(params?: {
+    feature_group?: string;
+    active?: boolean;
+  }): Promise<FeatureDefinition[]> {
+    const response = await apiClient.get<PaginatedResponse<FeatureDefinition>>(
+      "/api/data-science/feature-definitions/",
+      {
+        ...getAuthOptions(),
+        params,
+      }
+    );
+    return response.results;
+  },
+
+  async getFeatureDefinition(id: string): Promise<FeatureDefinition> {
+    return apiClient.get<FeatureDefinition>(
+      `/api/data-science/feature-definitions/${id}/`,
+      getAuthOptions()
+    );
+  },
+
+  async createFeatureDefinition(
+    data: Partial<FeatureDefinition>
+  ): Promise<FeatureDefinition> {
+    return apiClient.post<FeatureDefinition>(
+      "/api/data-science/feature-definitions/",
+      data,
+      getAuthOptions()
+    );
+  },
+
+  async updateFeatureDefinition(
+    id: string,
+    data: Partial<FeatureDefinition>
+  ): Promise<FeatureDefinition> {
+    return apiClient.patch<FeatureDefinition>(
+      `/api/data-science/feature-definitions/${id}/`,
+      data,
+      getAuthOptions()
+    );
+  },
+
+  async deleteFeatureDefinition(id: string): Promise<void> {
+    return apiClient.delete(
+      `/api/data-science/feature-definitions/${id}/`,
+      getAuthOptions()
+    );
+  },
+
+  async bulkCreateFeatureDefinitions(
+    definitions: Partial<FeatureDefinition>[]
+  ): Promise<{ created: number; ids: string[] }> {
+    return apiClient.post(
+      "/api/data-science/feature-definitions/bulk_create/",
+      { definitions },
+      getAuthOptions()
+    );
+  },
+
+  // Feature Engineering Jobs
+  async getFeatureEngineeringJobs(params?: {
+    status?: string;
+    feature_group?: string;
+    search?: string;
+  }): Promise<FeatureEngineeringJob[]> {
+    const response = await apiClient.get<
+      PaginatedResponse<FeatureEngineeringJob>
+    >("/api/data-science/feature-engineering-jobs/", {
+      ...getAuthOptions(),
+      params,
+    });
+    return response.results;
+  },
+
+  async getFeatureEngineeringJob(id: string): Promise<FeatureEngineeringJob> {
+    return apiClient.get<FeatureEngineeringJob>(
+      `/api/data-science/feature-engineering-jobs/${id}/`,
+      getAuthOptions()
+    );
+  },
+
+  async createFeatureEngineeringJob(
+    data: Partial<FeatureEngineeringJob>
+  ): Promise<FeatureEngineeringJob> {
+    return apiClient.post<FeatureEngineeringJob>(
+      "/api/data-science/feature-engineering-jobs/",
+      data,
+      getAuthOptions()
+    );
+  },
+
+  async updateFeatureEngineeringJob(
+    id: string,
+    data: Partial<FeatureEngineeringJob>
+  ): Promise<FeatureEngineeringJob> {
+    return apiClient.patch<FeatureEngineeringJob>(
+      `/api/data-science/feature-engineering-jobs/${id}/`,
+      data,
+      getAuthOptions()
+    );
+  },
+
+  async deleteFeatureEngineeringJob(id: string): Promise<void> {
+    return apiClient.delete(
+      `/api/data-science/feature-engineering-jobs/${id}/`,
+      getAuthOptions()
+    );
+  },
+
+  async runFeatureEngineeringJob(
+    id: string,
+    asyncExecution: boolean = true
+  ): Promise<{
+    status: string;
+    task_id?: string;
+    job_id: string;
+    message?: string;
+  }> {
+    return apiClient.post(
+      `/api/data-science/feature-engineering-jobs/${id}/run/`,
+      { async_execution: asyncExecution },
+      getAuthOptions()
+    );
+  },
+
+  async pauseFeatureEngineeringJob(
+    id: string
+  ): Promise<{ status: string; job_id: string }> {
+    return apiClient.post(
+      `/api/data-science/feature-engineering-jobs/${id}/pause/`,
+      {},
+      getAuthOptions()
+    );
+  },
+
+  async resumeFeatureEngineeringJob(
+    id: string
+  ): Promise<{ status: string; job_id: string }> {
+    return apiClient.post(
+      `/api/data-science/feature-engineering-jobs/${id}/resume/`,
+      {},
+      getAuthOptions()
+    );
+  },
+
+  async getFeatureEngineeringJobRuns(
+    id: string
+  ): Promise<FeatureEngineeringRun[]> {
+    return apiClient.get(
+      `/api/data-science/feature-engineering-jobs/${id}/runs/`,
+      getAuthOptions()
+    );
+  },
+
+  async testFeatureEngineeringJob(
+    id: string,
+    sampleSize?: number
+  ): Promise<{
+    status: string;
+    job_id: string;
+    data_prep_config: Record<string, any>;
+    feature_engineering_steps: FeatureEngineeringStep[];
+  }> {
+    return apiClient.post(
+      `/api/data-science/feature-engineering-jobs/${id}/test/`,
+      {},
+      {
+        ...getAuthOptions(),
+        params: { sample_size: sampleSize },
+      }
+    );
+  },
+
+  // Feature Engineering Runs
+  async getFeatureEngineeringRuns(params?: {
+    job?: string;
+    status?: string;
+  }): Promise<FeatureEngineeringRun[]> {
+    const response = await apiClient.get<
+      PaginatedResponse<FeatureEngineeringRun>
+    >("/api/data-science/feature-engineering-runs/", {
+      ...getAuthOptions(),
+      params,
+    });
+    return response.results;
+  },
+
+  async getFeatureEngineeringRun(id: string): Promise<FeatureEngineeringRun> {
+    return apiClient.get<FeatureEngineeringRun>(
+      `/api/data-science/feature-engineering-runs/${id}/`,
+      getAuthOptions()
+    );
+  },
+
+  async cancelFeatureEngineeringRun(
+    id: string
+  ): Promise<{ status: string; run_id: string }> {
+    return apiClient.post(
+      `/api/data-science/feature-engineering-runs/${id}/cancel/`,
+      {},
+      getAuthOptions()
+    );
+  },
+
+  async getFeatureEngineeringRunLogs(id: string): Promise<{
+    run_id: string;
+    logs: string;
+    error_message: string;
+    error_traceback: string;
+  }> {
+    return apiClient.get(
+      `/api/data-science/feature-engineering-runs/${id}/logs/`,
+      getAuthOptions()
+    );
+  },
+
+  // Feature Materializations
+  async getFeatureMaterializations(params?: {
+    feature_group?: string;
+    status?: string;
+  }): Promise<FeatureMaterialization[]> {
+    const response = await apiClient.get<
+      PaginatedResponse<FeatureMaterialization>
+    >("/api/data-science/materializations/", {
+      ...getAuthOptions(),
+      params,
+    });
+    return response.results;
+  },
+
+  async getFeatureMaterialization(id: string): Promise<FeatureMaterialization> {
+    return apiClient.get<FeatureMaterialization>(
+      `/api/data-science/materializations/${id}/`,
+      getAuthOptions()
+    );
+  },
+
+  // Online Feature Store
+  async getOnlineFeatureStores(): Promise<OnlineFeatureStore[]> {
+    const response = await apiClient.get<PaginatedResponse<OnlineFeatureStore>>(
+      "/api/data-science/online-stores/",
+      getAuthOptions()
+    );
+    return response.results;
+  },
+
+  async getOnlineFeatureStore(id: string): Promise<OnlineFeatureStore> {
+    return apiClient.get<OnlineFeatureStore>(
+      `/api/data-science/online-stores/${id}/`,
+      getAuthOptions()
+    );
+  },
+
+  async createOnlineFeatureStore(
+    data: Partial<OnlineFeatureStore>
+  ): Promise<OnlineFeatureStore> {
+    return apiClient.post<OnlineFeatureStore>(
+      "/api/data-science/online-stores/",
+      data,
+      getAuthOptions()
+    );
+  },
+
+  async testOnlineFeatureStoreConnection(id: string): Promise<{
+    status: string;
+    redis_version?: string;
+    connected_clients?: number;
+    used_memory_human?: string;
+    error?: string;
+  }> {
+    return apiClient.post(
+      `/api/data-science/online-stores/${id}/test_connection/`,
+      {},
+      getAuthOptions()
+    );
+  },
+
+  async getOnlineFeatureStoreStats(id: string): Promise<{
+    total_keys: number;
+    memory_used_bytes: number;
+    memory_used_human: string;
+    connected_clients: number;
+    uptime_in_days: number;
+  }> {
+    return apiClient.get(
+      `/api/data-science/online-stores/${id}/stats/`,
+      getAuthOptions()
+    );
+  },
+
+  // Feature Group Extended Actions
+  async materializeFeatures(
+    featureGroupId: string,
+    options: {
+      store_type?: "offline" | "online" | "both";
+      start_time?: string;
+      end_time?: string;
+    }
+  ): Promise<{
+    status: string;
+    task_id: string;
+    feature_group_id: string;
+    store_type: string;
+  }> {
+    return apiClient.post(
+      `/api/data-science/feature-groups/${featureGroupId}/materialize/`,
+      options,
+      getAuthOptions()
+    );
+  },
+
+  async getOnlineFeatures(
+    featureGroupId: string,
+    entityIds: string[],
+    features?: string[]
+  ): Promise<
+    Array<{
+      entity_id: string;
+      [key: string]: any;
+    }>
+  > {
+    return apiClient.post(
+      `/api/data-science/feature-groups/${featureGroupId}/get_features/`,
+      { entity_ids: entityIds, features },
+      getAuthOptions()
+    );
+  },
+
+  async getFeatureGroupStatistics(
+    featureGroupId: string
+  ): Promise<FeatureStatistics[]> {
+    return apiClient.get(
+      `/api/data-science/feature-groups/${featureGroupId}/feature_statistics/`,
+      getAuthOptions()
+    );
+  },
+
+  async syncOnlineFeatures(
+    featureGroupId: string,
+    entityIds?: string[]
+  ): Promise<{
+    status: string;
+    task_id: string;
+    feature_group_id: string;
+  }> {
+    return apiClient.post(
+      `/api/data-science/feature-groups/${featureGroupId}/sync_online/`,
+      { entity_ids: entityIds },
+      getAuthOptions()
+    );
+  },
+
+  async getFeatureGroupMaterializations(
+    featureGroupId: string
+  ): Promise<FeatureMaterialization[]> {
+    return apiClient.get(
+      `/api/data-science/feature-groups/${featureGroupId}/materializations/`,
+      getAuthOptions()
+    );
+  },
+
+  // Feature View Extended Actions
+  async createTrainingDatasetFromView(
+    featureViewId: string,
+    options: {
+      name: string;
+      description?: string;
+      label_column?: string;
+      start_time?: string;
+      end_time?: string;
+      split_config?: {
+        train?: number;
+        validation?: number;
+        test?: number;
+      };
+    }
+  ): Promise<{
+    status: string;
+    task_id: string;
+    feature_view_id: string;
+    name: string;
+  }> {
+    return apiClient.post(
+      `/api/data-science/feature-views/${featureViewId}/create_training_dataset/`,
+      options,
+      getAuthOptions()
+    );
+  },
+
+  async previewFeatureView(
+    featureViewId: string,
+    limit?: number
+  ): Promise<{
+    columns: string[];
+    rows: any[][];
+    feature_view: string;
+  }> {
+    return apiClient.get(
+      `/api/data-science/feature-views/${featureViewId}/preview_data/`,
+      {
+        ...getAuthOptions(),
+        params: { limit },
+      }
     );
   },
 };

@@ -27,76 +27,8 @@ import {
 import { IconArrowsExchange, IconArrowLeft } from "@tabler/icons-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { integrationApi, CreatePipelineData } from "@/lib/api/integration";
-
-// Demo initial nodes for a sample pipeline
-const demoNodes: Node[] = [
-  {
-    id: "source-1",
-    type: "source",
-    position: { x: 100, y: 150 },
-    data: {
-      label: "PostgreSQL",
-      connectorType: "postgresql",
-      status: "connected",
-    },
-  },
-  {
-    id: "transform-1",
-    type: "transform",
-    position: { x: 400, y: 100 },
-    data: {
-      label: "Filter Active Users",
-      transformType: "filter",
-      status: "configured",
-    },
-  },
-  {
-    id: "transform-2",
-    type: "transform",
-    position: { x: 400, y: 250 },
-    data: {
-      label: "Aggregate Sales",
-      transformType: "aggregate",
-      status: "ready",
-    },
-  },
-  {
-    id: "destination-1",
-    type: "destination",
-    position: { x: 700, y: 150 },
-    data: {
-      label: "Customers Table",
-      destinationType: "lakehouse",
-      layer: "bronze",
-      status: "ready",
-    },
-  },
-];
-
-const demoEdges: Edge[] = [
-  {
-    id: "e1-2",
-    source: "source-1",
-    target: "transform-1",
-    type: "custom",
-    animated: true,
-  },
-  {
-    id: "e1-3",
-    source: "source-1",
-    target: "transform-2",
-    type: "custom",
-    animated: true,
-  },
-  {
-    id: "e2-4",
-    source: "transform-1",
-    target: "destination-1",
-    type: "custom",
-    animated: true,
-  },
-];
+import { useCreatePipeline } from "@/hooks/use-pipelines";
+import { CreatePipelineData } from "@/lib/api/integration";
 
 export default function PipelineBuilderPage() {
   const router = useRouter();
@@ -104,9 +36,11 @@ export default function PipelineBuilderPage() {
   const [pipelineDescription, setPipelineDescription] = useState("");
   const [schedule, setSchedule] = useState("");
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
-  const [nodes, setNodes] = useState<Node[]>(demoNodes);
-  const [edges, setEdges] = useState<Edge[]>(demoEdges);
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  const createPipelineMutation = useCreatePipeline();
 
   // Load template from session storage if available
   useEffect(() => {
@@ -170,9 +104,9 @@ export default function PipelineBuilderPage() {
       };
 
       // Call the API to create the pipeline
-      const savedPipeline = await integrationApi.createPipeline(pipelineData);
+      await createPipelineMutation.mutateAsync(pipelineData);
 
-      console.log("Pipeline saved:", savedPipeline);
+      console.log("Pipeline saved");
       toast.success("Pipeline saved successfully!");
       setIsSaveDialogOpen(false);
       router.push("/data-integration/pipelines");

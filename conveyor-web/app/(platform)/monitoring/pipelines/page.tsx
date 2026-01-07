@@ -243,7 +243,7 @@ export default function PipelineRunsPage() {
       <>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Pipeline Runs</h1>
+            <h1 className="text-xl font-semibold">Pipeline Runs</h1>
             <p className="text-sm text-muted-foreground">
               Monitor and track workflow execution history
             </p>
@@ -272,7 +272,7 @@ export default function PipelineRunsPage() {
       <>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Pipeline Runs</h1>
+            <h1 className="text-xl font-semibold">Pipeline Runs</h1>
             <p className="text-sm text-muted-foreground">
               Monitor and track workflow execution history
             </p>
@@ -295,7 +295,7 @@ export default function PipelineRunsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Pipeline Runs</h1>
+          <h1 className="text-xl font-semibold">Pipeline Runs</h1>
           <p className="text-sm text-muted-foreground">
             Monitor and track workflow execution history
           </p>

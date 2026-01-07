@@ -241,7 +241,7 @@ export default function PoliciesPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Data Policies</h1>
+          <h1 className="text-xl font-semibold">Data Policies</h1>
           <p className="text-sm text-muted-foreground">
             Define and manage data governance policies
           </p>

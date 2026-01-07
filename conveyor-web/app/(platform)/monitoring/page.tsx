@@ -208,7 +208,7 @@ export default function MonitoringPage() {
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className="text-2xl font-semibold">{stat.value}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 {stat.change}
               </p>
@@ -218,22 +218,18 @@ export default function MonitoringPage() {
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+        <h2 className="text-base font-medium mb-3">Quick Actions</h2>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           {quickActions.map((action) => (
             <Link key={action.title} href={action.href}>
-              <Card className="hover:shadow-md transition-all hover:border-primary cursor-pointer h-full">
+              <Card className="hover:bg-accent/50 transition-colors cursor-pointer h-full">
                 <CardContent className="p-4">
                   <div className="flex flex-col gap-3">
-                    <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-lg bg-opacity-10 ${action.color}`}
-                    >
-                      <action.icon className={`h-5 w-5 ${action.color}`} />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted">
+                      <action.icon className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-semibold text-sm mb-1">
-                        {action.title}
-                      </p>
+                      <p className="font-medium text-sm mb-1">{action.title}</p>
                       <p className="text-xs text-muted-foreground">
                         {action.description}
                       </p>
@@ -250,7 +246,9 @@ export default function MonitoringPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Recent Alerts</CardTitle>
+              <CardTitle className="text-base font-medium">
+                Recent Alerts
+              </CardTitle>
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/monitoring/alerts">View All</Link>
               </Button>
@@ -260,7 +258,7 @@ export default function MonitoringPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {alerts.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   No alerts
@@ -269,7 +267,7 @@ export default function MonitoringPage() {
                 alerts.slice(0, 5).map((alert) => (
                   <div
                     key={alert.id}
-                    className="flex items-center justify-between p-3 rounded-lg border"
+                    className="flex items-center justify-between p-2.5 rounded-md border"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <IconAlertTriangle
@@ -306,14 +304,16 @@ export default function MonitoringPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Service Health</CardTitle>
+            <CardTitle className="text-base font-medium">
+              Service Health
+            </CardTitle>
             <CardDescription>Platform component status</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {health.length === 0 ? (
                 <>
-                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <div className="flex items-center justify-between p-2.5 rounded-md border">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 rounded-full bg-green-500" />
                       <span className="text-sm">Data Integration</span>
@@ -322,7 +322,7 @@ export default function MonitoringPage() {
                       Healthy
                     </Badge>
                   </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <div className="flex items-center justify-between p-2.5 rounded-md border">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 rounded-full bg-green-500" />
                       <span className="text-sm">Data Warehouse</span>
@@ -331,7 +331,7 @@ export default function MonitoringPage() {
                       Healthy
                     </Badge>
                   </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <div className="flex items-center justify-between p-2.5 rounded-md border">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 rounded-full bg-green-500" />
                       <span className="text-sm">Real-Time Analytics</span>
@@ -340,7 +340,7 @@ export default function MonitoringPage() {
                       Healthy
                     </Badge>
                   </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <div className="flex items-center justify-between p-2.5 rounded-md border">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 rounded-full bg-green-500" />
                       <span className="text-sm">Data Lake Storage</span>
@@ -495,7 +495,7 @@ export default function MonitoringPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-3">
             <div>
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 <IconActivity className="h-4 w-4 text-blue-500" />

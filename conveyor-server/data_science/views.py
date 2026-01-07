@@ -858,7 +858,618 @@ class TrainingDatasetViewSet(viewsets.ModelViewSet):
             )
     
     @action(detail=True, methods=['get'])
-    def statistics(self, request, pk=None):
+    def feature_statistics(self, request, pk=None):
         """Get dataset statistics."""
         dataset = self.get_object()
         return Response(dataset.statistics or {})
+
+# New Feature Engineering ViewSets
+
+class FeatureDefinitionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for feature definitions within feature groups.
+    """
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+    
+    def get_serializer_class(self):
+        from .serializers import FeatureDefinitionSerializer, FeatureDefinitionCreateSerializer
+        if self.action in ['create', 'update', 'partial_update']:
+            return FeatureDefinitionCreateSerializer
+        return FeatureDefinitionSerializer
+    
+    def get_queryset(self):
+        from .models import FeatureDefinition
+        
+        queryset = FeatureDefinition.objects.all()
+        
+        # Filter by feature group
+        feature_group_id = self.request.query_params.get('feature_group')
+        if feature_group_id:
+            queryset = queryset.filter(feature_group_id=feature_group_id)
+        
+        # Filter by active status
+        active = self.request.query_params.get('active')
+        if active is not None:
+            queryset = queryset.filter(is_active=active.lower() == 'true')
+        
+        return queryset.order_by('order', 'name')
+    
+    @action(detail=True, methods=['get'])
+    def feature_statistics(self, request, pk=None):
+        """Get statistics for a feature definition."""
+        feature_def = self.get_object()
+        return Response(feature_def.statistics or {})
+    
+    @action(detail=False, methods=['post'])
+    def bulk_create(self, request):
+        """Bulk create feature definitions."""
+        from .serializers import FeatureDefinitionCreateSerializer
+        from .models import FeatureDefinition
+        
+        definitions = request.data.get('definitions', [])
+        created = []
+        
+        for defn in definitions:
+            serializer = FeatureDefinitionCreateSerializer(data=defn)
+            if serializer.is_valid():
+                instance = serializer.save()
+                created.append(str(instance.id))
+        
+        return Response({
+            'created': len(created),
+            'ids': created
+        }, status=status.HTTP_201_CREATED)
+
+
+class FeatureEngineeringJobViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for feature engineering jobs.
+    """
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+    
+    def get_serializer_class(self):
+        from .serializers import FeatureEngineeringJobSerializer, FeatureEngineeringJobCreateSerializer
+        if self.action in ['create']:
+            return FeatureEngineeringJobCreateSerializer
+        return FeatureEngineeringJobSerializer
+    
+    def get_queryset(self):
+        from .models import FeatureEngineeringJob
+        
+        workspace_id = self.request.headers.get('X-Workspace-ID')
+        queryset = FeatureEngineeringJob.objects.all()
+        
+        if workspace_id:
+            queryset = queryset.filter(workspace_id=workspace_id)
+        
+        # Filter by status
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        # Filter by target feature group
+        feature_group_id = self.request.query_params.get('feature_group')
+        if feature_group_id:
+            queryset = queryset.filter(target_feature_group_id=feature_group_id)
+        
+        # Search
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) | Q(description__icontains=search)
+            )
+        
+        return queryset.order_by('-updated_at')
+    
+    def perform_create(self, serializer):
+        workspace_id = self.request.headers.get('X-Workspace-ID')
+        serializer.save(
+            workspace_id=workspace_id,
+            owner=self.request.user
+        )
+    
+    @action(detail=True, methods=['post'])
+    def run(self, request, pk=None):
+        """Run the feature engineering job."""
+        from .tasks import run_feature_engineering_job
+        from .serializers import RunFeatureEngineeringRequestSerializer
+        
+        job = self.get_object()
+        
+        # Validate request
+        serializer = RunFeatureEngineeringRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        async_execution = serializer.validated_data.get('async_execution', True)
+        
+        if async_execution:
+            # Run asynchronously
+            task = run_feature_engineering_job.delay(
+                str(job.id),
+                triggered_by_user_id=request.user.id
+            )
+            
+            return Response({
+                'status': 'started',
+                'task_id': task.id,
+                'job_id': str(job.id),
+                'message': f'Feature engineering job "{job.name}" started'
+            }, status=status.HTTP_202_ACCEPTED)
+        else:
+            # Run synchronously
+            result = run_feature_engineering_job(
+                str(job.id),
+                triggered_by_user_id=request.user.id
+            )
+            
+            return Response(result)
+    
+    @action(detail=True, methods=['post'])
+    def pause(self, request, pk=None):
+        """Pause a scheduled job."""
+        job = self.get_object()
+        job.status = 'paused'
+        job.save()
+        
+        return Response({'status': 'paused', 'job_id': str(job.id)})
+    
+    @action(detail=True, methods=['post'])
+    def resume(self, request, pk=None):
+        """Resume a paused job."""
+        job = self.get_object()
+        job.status = 'active'
+        job.save()
+        
+        return Response({'status': 'active', 'job_id': str(job.id)})
+    
+    @action(detail=True, methods=['get'])
+    def runs(self, request, pk=None):
+        """Get runs for this job."""
+        from .serializers import FeatureEngineeringRunSerializer
+        
+        job = self.get_object()
+        runs = job.runs.all().order_by('-created_at')[:20]
+        
+        serializer = FeatureEngineeringRunSerializer(runs, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def test(self, request, pk=None):
+        """Test the feature engineering job with sample data."""
+        from .feature_engineering import FeatureEngineer
+        
+        job = self.get_object()
+        
+        try:
+            engineer = FeatureEngineer(str(job.workspace_id))
+            
+            # Get sample data
+            sample_size = int(request.query_params.get('sample_size', 100))
+            
+            # This would load sample data and run transformations
+            # For now, return job configuration
+            return Response({
+                'status': 'success',
+                'job_id': str(job.id),
+                'data_prep_config': job.data_prep_config,
+                'feature_engineering_steps': job.feature_engineering_steps,
+                'sample_size': sample_size
+            })
+            
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class FeatureEngineeringRunViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for feature engineering runs (read-only).
+    """
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+    
+    def get_serializer_class(self):
+        from .serializers import FeatureEngineeringRunSerializer
+        return FeatureEngineeringRunSerializer
+    
+    def get_queryset(self):
+        from .models import FeatureEngineeringRun
+        
+        workspace_id = self.request.headers.get('X-Workspace-ID')
+        queryset = FeatureEngineeringRun.objects.all()
+        
+        if workspace_id:
+            queryset = queryset.filter(job__workspace_id=workspace_id)
+        
+        # Filter by job
+        job_id = self.request.query_params.get('job')
+        if job_id:
+            queryset = queryset.filter(job_id=job_id)
+        
+        # Filter by status
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        return queryset.order_by('-created_at')
+    
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Cancel a running job."""
+        run = self.get_object()
+        
+        if run.status == 'running':
+            # Cancel celery task if available
+            if run.celery_task_id:
+                from celery.result import AsyncResult
+                AsyncResult(run.celery_task_id).revoke(terminate=True)
+            
+            run.status = 'cancelled'
+            run.completed_at = timezone.now()
+            run.save()
+            
+            return Response({'status': 'cancelled', 'run_id': str(run.id)})
+        
+        return Response({
+            'status': 'error',
+            'error': f'Cannot cancel run with status: {run.status}'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['get'])
+    def logs(self, request, pk=None):
+        """Get logs for a run."""
+        run = self.get_object()
+        return Response({
+            'run_id': str(run.id),
+            'logs': run.logs or '',
+            'error_message': run.error_message,
+            'error_traceback': run.error_traceback
+        })
+
+
+class FeatureMaterializationViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for feature materializations (read-only).
+    """
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+    
+    def get_serializer_class(self):
+        from .serializers import FeatureMaterializationSerializer
+        return FeatureMaterializationSerializer
+    
+    def get_queryset(self):
+        from .models import FeatureMaterialization
+        
+        workspace_id = self.request.headers.get('X-Workspace-ID')
+        queryset = FeatureMaterialization.objects.all()
+        
+        if workspace_id:
+            queryset = queryset.filter(feature_group__workspace_id=workspace_id)
+        
+        # Filter by feature group
+        feature_group_id = self.request.query_params.get('feature_group')
+        if feature_group_id:
+            queryset = queryset.filter(feature_group_id=feature_group_id)
+        
+        # Filter by status
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        return queryset.order_by('-created_at')
+
+
+class OnlineFeatureStoreViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for online feature store configuration.
+    """
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+    
+    def get_serializer_class(self):
+        from .serializers import OnlineFeatureStoreSerializer
+        return OnlineFeatureStoreSerializer
+    
+    def get_queryset(self):
+        from .models import OnlineFeatureStore
+        
+        workspace_id = self.request.headers.get('X-Workspace-ID')
+        queryset = OnlineFeatureStore.objects.all()
+        
+        if workspace_id:
+            queryset = queryset.filter(workspace_id=workspace_id)
+        
+        return queryset.order_by('-created_at')
+    
+    def perform_create(self, serializer):
+        workspace_id = self.request.headers.get('X-Workspace-ID')
+        serializer.save(workspace_id=workspace_id)
+    
+    @action(detail=True, methods=['post'])
+    def test_connection(self, request, pk=None):
+        """Test Redis connection."""
+        store = self.get_object()
+        
+        try:
+            import redis
+            
+            client = redis.Redis(
+                host=store.redis_host,
+                port=store.redis_port,
+                db=store.redis_db,
+                socket_timeout=5
+            )
+            
+            # Test ping
+            client.ping()
+            
+            # Get info
+            info = client.info()
+            
+            return Response({
+                'status': 'connected',
+                'redis_version': info.get('redis_version'),
+                'connected_clients': info.get('connected_clients'),
+                'used_memory_human': info.get('used_memory_human'),
+            })
+            
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['get'])
+    def stats(self, request, pk=None):
+        """Get online store statistics."""
+        store = self.get_object()
+        
+        try:
+            import redis
+            
+            client = redis.Redis(
+                host=store.redis_host,
+                port=store.redis_port,
+                db=store.redis_db
+            )
+            
+            info = client.info()
+            
+            # Count keys with prefix
+            prefix = store.redis_key_prefix
+            key_count = 0
+            for key in client.scan_iter(f"{prefix}:*", count=1000):
+                key_count += 1
+            
+            return Response({
+                'total_keys': key_count,
+                'memory_used_bytes': info.get('used_memory'),
+                'memory_used_human': info.get('used_memory_human'),
+                'connected_clients': info.get('connected_clients'),
+                'uptime_in_days': info.get('uptime_in_days'),
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Extended FeatureGroup actions
+
+def _add_feature_group_actions():
+    """Add additional actions to FeatureGroupViewSet."""
+    
+    @action(detail=True, methods=['post'])
+    def materialize(self, request, pk=None):
+        """Materialize features to stores."""
+        from .tasks import materialize_features
+        from .serializers import MaterializeFeaturesRequestSerializer
+        
+        feature_group = self.get_object()
+        
+        serializer = MaterializeFeaturesRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        store_type = serializer.validated_data.get('store_type', 'offline')
+        start_time = serializer.validated_data.get('start_time')
+        end_time = serializer.validated_data.get('end_time')
+        
+        task = materialize_features.delay(
+            str(feature_group.id),
+            store_type=store_type,
+            start_time=start_time.isoformat() if start_time else None,
+            end_time=end_time.isoformat() if end_time else None
+        )
+        
+        return Response({
+            'status': 'started',
+            'task_id': task.id,
+            'feature_group_id': str(feature_group.id),
+            'store_type': store_type
+        }, status=status.HTTP_202_ACCEPTED)
+    
+    @action(detail=True, methods=['post'])
+    def get_features(self, request, pk=None):
+        """Get features for specific entities from online store."""
+        from .feature_engineering import FeatureEngineer
+        from .serializers import GetFeaturesRequestSerializer
+        
+        feature_group = self.get_object()
+        
+        serializer = GetFeaturesRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        entity_ids = serializer.validated_data.get('entity_ids', [])
+        features = serializer.validated_data.get('features')
+        
+        engineer = FeatureEngineer(str(feature_group.workspace_id))
+        
+        result = engineer.get_online_features(
+            feature_group.name,
+            entity_ids,
+            features
+        )
+        
+        return Response(result)
+    
+    @action(detail=True, methods=['get'])
+    def statistics(self, request, pk=None):
+        """Get feature statistics for this group."""
+        from .models import FeatureDefinition
+        
+        feature_group = self.get_object()
+        
+        definitions = FeatureDefinition.objects.filter(
+            feature_group=feature_group,
+            is_active=True
+        )
+        
+        stats = []
+        for defn in definitions:
+            stats.append({
+                'feature_name': defn.name,
+                'dtype': defn.dtype,
+                **defn.statistics
+            })
+        
+        return Response(stats)
+    
+    @action(detail=True, methods=['post'])
+    def sync_online(self, request, pk=None):
+        """Sync features to online store."""
+        from .tasks import sync_online_features
+        
+        feature_group = self.get_object()
+        entity_ids = request.data.get('entity_ids')
+        
+        task = sync_online_features.delay(
+            str(feature_group.id),
+            entity_ids=entity_ids
+        )
+        
+        return Response({
+            'status': 'started',
+            'task_id': task.id,
+            'feature_group_id': str(feature_group.id)
+        }, status=status.HTTP_202_ACCEPTED)
+    
+    @action(detail=True, methods=['get'])
+    def materializations(self, request, pk=None):
+        """Get materialization history for this feature group."""
+        from .serializers import FeatureMaterializationSerializer
+        
+        feature_group = self.get_object()
+        materializations = feature_group.materializations.all().order_by('-created_at')[:20]
+        
+        serializer = FeatureMaterializationSerializer(materializations, many=True)
+        return Response(serializer.data)
+    
+    return materialize, get_features, statistics, sync_online, materializations
+
+
+# Dynamically add methods to FeatureGroupViewSet
+FeatureGroupViewSet.materialize = _add_feature_group_actions()[0]
+FeatureGroupViewSet.get_features = _add_feature_group_actions()[1]
+FeatureGroupViewSet.feature_statistics = _add_feature_group_actions()[2]
+FeatureGroupViewSet.sync_online = _add_feature_group_actions()[3]
+FeatureGroupViewSet.materializations = _add_feature_group_actions()[4]
+
+
+# Extended FeatureView actions
+
+def _add_feature_view_actions():
+    """Add additional actions to FeatureViewViewSet."""
+    
+    @action(detail=True, methods=['post'])
+    def create_training_dataset(self, request, pk=None):
+        """Create a training dataset from this feature view."""
+        from .tasks import create_training_dataset_task
+        from .serializers import CreateTrainingDatasetRequestSerializer
+        
+        feature_view = self.get_object()
+        
+        serializer = CreateTrainingDatasetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        name = serializer.validated_data.get('name')
+        label_column = serializer.validated_data.get('label_column')
+        start_time = serializer.validated_data.get('start_time')
+        end_time = serializer.validated_data.get('end_time')
+        split_config = serializer.validated_data.get('split_config')
+        
+        task = create_training_dataset_task.delay(
+            str(feature_view.id),
+            name=name,
+            label_column=label_column,
+            start_time=start_time.isoformat() if start_time else None,
+            end_time=end_time.isoformat() if end_time else None,
+            split_config=split_config,
+            created_by_user_id=request.user.id
+        )
+        
+        return Response({
+            'status': 'started',
+            'task_id': task.id,
+            'feature_view_id': str(feature_view.id),
+            'name': name
+        }, status=status.HTTP_202_ACCEPTED)
+    
+    @action(detail=True, methods=['get'])
+    def preview(self, request, pk=None):
+        """Preview data from feature view."""
+        feature_view = self.get_object()
+        limit = int(request.query_params.get('limit', 10))
+        
+        try:
+            import trino
+            
+            conn = trino.dbapi.connect(
+                host=getattr(settings, 'TRINO_HOST', 'trino'),
+                port=getattr(settings, 'TRINO_PORT', 8080),
+                user=getattr(settings, 'TRINO_USER', 'conveyor'),
+                catalog=getattr(settings, 'TRINO_CATALOG', 'iceberg'),
+                schema=getattr(settings, 'TRINO_SCHEMA', 'feature_store'),
+            )
+            cursor = conn.cursor()
+            
+            # Get feature groups and build query
+            feature_groups = feature_view.feature_groups.all()
+            if not feature_groups:
+                return Response({'columns': [], 'rows': [], 'error': 'No feature groups'})
+            
+            primary_fg = feature_groups.first()
+            table_name = primary_fg.source_table
+            
+            # Select specific features
+            features = feature_view.features or []
+            if features:
+                select_cols = [f.get('feature_name', f.get('name', '*')) if isinstance(f, dict) else f for f in features]
+                select_str = ', '.join(select_cols)
+            else:
+                select_str = '*'
+            
+            query = f"SELECT {select_str} FROM {table_name} LIMIT {limit}"
+            cursor.execute(query)
+            
+            columns = [desc[0] for desc in cursor.description]
+            rows = [list(row) for row in cursor.fetchall()]
+            
+            return Response({
+                'columns': columns,
+                'rows': rows,
+                'feature_view': feature_view.name
+            })
+            
+        except Exception as e:
+            return Response({
+                'columns': [],
+                'rows': [],
+                'error': str(e)
+            })
+    
+    return create_training_dataset, preview
+
+
+FeatureViewViewSet.create_training_dataset = _add_feature_view_actions()[0]
+FeatureViewViewSet.preview_data = _add_feature_view_actions()[1]

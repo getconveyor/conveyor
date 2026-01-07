@@ -314,7 +314,7 @@ export default function SharedContentPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Shared Content</h1>
+          <h1 className="text-xl font-semibold">Shared Content</h1>
           <p className="text-sm text-muted-foreground">
             Manage shared dashboards, reports, and workbooks
           </p>
@@ -465,7 +465,7 @@ export default function SharedContentPage() {
                   </div>
 
                   {/* Stats */}
-                  <div className="flex items-center gap-6 text-xs text-muted-foreground pt-3 border-t">
+                  <div className="flex items-center gap-5 text-xs text-muted-foreground pt-3 border-t">
                     <div className="flex items-center gap-1">
                       <IconEye className="h-3 w-3" />
                       <span>{item.views} views</span>

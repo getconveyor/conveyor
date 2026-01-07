@@ -53,7 +53,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { transformationApi, Notebook } from "@/lib/api/transformation";
+import {
+  useJobs,
+  useSchedulableNotebooks,
+  useRunNotebook,
+} from "@/hooks/use-transformation";
+import { Notebook } from "@/lib/api/transformation";
+import { toast } from "sonner";
 import Link from "next/link";
 
 type JobStatus = "running" | "completed" | "failed" | "queued" | "idle";
@@ -110,37 +116,32 @@ const statusConfig: Record<
 };
 
 export default function JobsPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [notebooks, setNotebooks] = useState<Notebook[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isRunJobDialogOpen, setIsRunJobDialogOpen] = useState(false);
   const [jobToCancel, setJobToCancel] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedNotebook, setSelectedNotebook] = useState("");
 
-  const loadJobs = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const [executedNotebooks, allNotebooks] = await Promise.all([
-        transformationApi.getJobs(),
-        transformationApi.getSchedulableNotebooks(),
-      ]);
-      setJobs(executedNotebooks.map(mapNotebookToJob));
-      setNotebooks(allNotebooks);
-    } catch (err) {
-      console.error("Failed to load jobs:", err);
-      setError("Failed to load transformation jobs");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  // Use hooks instead of manual loading
+  const {
+    data: jobsData = [],
+    isLoading: jobsLoading,
+    error: jobsError,
+    refetch: refetchJobs,
+  } = useJobs();
+  const {
+    data: notebooksData = [],
+    isLoading: notebooksLoading,
+    error: notebooksError,
+  } = useSchedulableNotebooks();
+  const runNotebookMutation = useRunNotebook();
 
-  useEffect(() => {
-    loadJobs();
-  }, [loadJobs]);
+  // Convert notebooks to jobs
+  const jobs = jobsData.map(mapNotebookToJob);
+  const notebooks = notebooksData;
+
+  const isLoading = jobsLoading || notebooksLoading;
+  const error = jobsError || notebooksError;
 
   const filteredJobs = jobs.filter((job) => {
     const matchesSearch =
@@ -161,17 +162,12 @@ export default function JobsPage() {
     if (!selectedNotebook) return;
 
     try {
-      setIsLoading(true);
-      await transformationApi.runNotebook(selectedNotebook);
-      // Refresh the jobs list
-      await loadJobs();
+      await runNotebookMutation.mutateAsync(selectedNotebook);
       setIsRunJobDialogOpen(false);
       setSelectedNotebook("");
     } catch (err) {
       console.error("Failed to run notebook:", err);
-      setError("Failed to start notebook execution");
-    } finally {
-      setIsLoading(false);
+      toast.error("Failed to start notebook execution");
     }
   };
 
@@ -187,7 +183,7 @@ export default function JobsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Transformation Jobs</h1>
+          <h1 className="text-xl font-semibold">Transformation Jobs</h1>
           <p className="text-sm text-muted-foreground">
             Monitor and manage notebook transformation executions
           </p>
@@ -269,7 +265,7 @@ export default function JobsPage() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={loadJobs}
+                onClick={() => refetchJobs()}
                 disabled={isLoading}
               >
                 <IconRefresh
@@ -283,7 +279,9 @@ export default function JobsPage() {
           {error && (
             <div className="flex items-center gap-2 text-destructive mb-4 p-3 bg-destructive/10 rounded-md">
               <IconAlertCircle className="h-4 w-4" />
-              <span className="text-sm">{error}</span>
+              <span className="text-sm">
+                {error.message || "An error occurred"}
+              </span>
             </div>
           )}
           {isLoading && jobs.length === 0 ? (
@@ -413,18 +411,8 @@ export default function JobsPage() {
                               <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  onClick={async () => {
-                                    try {
-                                      await transformationApi.runNotebook(
-                                        job.notebook_id
-                                      );
-                                      loadJobs();
-                                    } catch (err) {
-                                      console.error(
-                                        "Failed to re-run notebook:",
-                                        err
-                                      );
-                                    }
+                                  onClick={() => {
+                                    runNotebookMutation.mutate(job.notebook_id);
                                   }}
                                 >
                                   <IconPlayerPlay className="mr-2 h-4 w-4" />

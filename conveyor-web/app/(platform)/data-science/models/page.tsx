@@ -53,7 +53,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { dataScienceApi, MLModel } from "@/lib/api/datascience";
+import { useModels } from "@/hooks/use-datascience";
+import { MLModel } from "@/lib/api/datascience";
 
 type ModelStatus = "deployed" | "training" | "ready" | "failed";
 
@@ -123,18 +124,27 @@ export default function ModelsPage() {
     framework: "scikit-learn",
   });
 
-  const loadModels = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const mlModels = await dataScienceApi.getModels();
+  // Use hook instead of manual loading
+  const {
+    data: mlModels = [],
+    isLoading: modelsLoading,
+    error: modelsError,
+  } = useModels();
+
+  // Update local state when hook data changes
+  useEffect(() => {
+    if (mlModels.length > 0) {
       setModels(mlModels.map(mapMLModelToModel));
-    } catch (err) {
-      console.error("Failed to load models:", err);
-      setError("Failed to load models");
-    } finally {
       setIsLoading(false);
     }
+    if (modelsError) {
+      setError("Failed to load models");
+      setIsLoading(false);
+    }
+  }, [mlModels, modelsError]);
+
+  const loadModels = useCallback(async () => {
+    // No longer needed - hook handles this
   }, []);
 
   useEffect(() => {
@@ -240,7 +250,7 @@ export default function ModelsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">ML Models</h1>
+          <h1 className="text-xl font-semibold">ML Models</h1>
           <p className="text-sm text-muted-foreground">
             Manage and deploy machine learning models
           </p>

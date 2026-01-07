@@ -66,7 +66,7 @@ export default function StoragePage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Storage</h1>
+          <h1 className="text-xl font-semibold">Storage</h1>
           <p className="text-sm text-muted-foreground">
             Monitor storage capacity and performance
           </p>

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { integrationApi, Source, SourceType } from "@/lib/api/integration";
+import { useSources, useSourceCatalog } from "@/hooks/use-integration";
+import { Source, SourceType } from "@/lib/api/integration";
 import { toast } from "sonner";
 import {
   IconPlus,
@@ -54,35 +55,40 @@ export default function SourceConnectorsPage() {
   const [catalogCategory, setCatalogCategory] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
 
+  // Use hooks instead of manual loading
+  const {
+    data: sourceCatalogData,
+    isLoading: catalogLoading,
+    error: catalogError,
+  } = useSourceCatalog();
+  const {
+    data: sourcesData = [],
+    isLoading: sourcesLoading,
+    error: sourcesError,
+  } = useSources();
+
+  // Update local state when hook data changes
   useEffect(() => {
-    loadSourceTypes();
-    loadSources();
+    if (sourceCatalogData) {
+      setSourceTypes(sourceCatalogData.source_types);
+    }
+    setSources(sourcesData);
+    setIsLoading(catalogLoading || sourcesLoading);
+    if (catalogError || sourcesError) {
+      toast.error("Failed to load source data");
+    }
+  }, [
+    sourceCatalogData,
+    sourcesData,
+    catalogLoading,
+    sourcesLoading,
+    catalogError,
+    sourcesError,
+  ]);
+
+  useEffect(() => {
+    // Data loading is now handled by hooks
   }, [currentWorkspace]);
-
-  async function loadSourceTypes() {
-    try {
-      setIsLoading(true);
-      const response = await integrationApi.getSourceCatalog();
-      setSourceTypes(response.source_types);
-    } catch (error: any) {
-      console.error("Failed to load source types:", error);
-      toast.error("Failed to load available source types");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function loadSources() {
-    if (!currentWorkspace) return;
-
-    try {
-      const data = await integrationApi.getSources();
-      setSources(data);
-    } catch (error: any) {
-      console.error("Failed to load sources:", error);
-      toast.error(error.message || "Failed to load sources");
-    }
-  }
 
   const filteredCatalog = sourceTypes.filter((sourceType) => {
     const matchesSearch = sourceType.name
@@ -97,7 +103,7 @@ export default function SourceConnectorsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Source Connectors</h1>
+          <h1 className="text-xl font-semibold">Source Connectors</h1>
           <p className="text-sm text-muted-foreground">
             List of available data source connectors
           </p>
@@ -148,7 +154,7 @@ export default function SourceConnectorsPage() {
                   return (
                     <Card
                       key={sourceType.id}
-                      className="hover:shadow-md transition-shadow"
+                      className="hover:bg-accent/30 transition-colors"
                     >
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3 mb-3">

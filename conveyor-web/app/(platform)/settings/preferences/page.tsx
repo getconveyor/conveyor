@@ -110,7 +110,7 @@ export default function PreferencesPage() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Preferences</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Preferences</h1>
           <p className="text-muted-foreground mt-2">
             Customize your experience and notification settings
           </p>

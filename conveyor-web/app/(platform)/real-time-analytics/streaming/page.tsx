@@ -199,7 +199,7 @@ export default function StreamingPage() {
       <>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Streaming Data</h1>
+            <h1 className="text-xl font-semibold">Streaming Data</h1>
             <p className="text-sm text-muted-foreground">
               Real-time data streams and processing pipelines
             </p>
@@ -235,7 +235,7 @@ export default function StreamingPage() {
       <>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Streaming Data</h1>
+            <h1 className="text-xl font-semibold">Streaming Data</h1>
             <p className="text-sm text-muted-foreground">
               Real-time data streams and processing pipelines
             </p>
@@ -258,7 +258,7 @@ export default function StreamingPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Streaming Data</h1>
+          <h1 className="text-xl font-semibold">Streaming Data</h1>
           <p className="text-sm text-muted-foreground">
             Real-time data streams and processing pipelines
           </p>
@@ -282,7 +282,7 @@ export default function StreamingPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Active Streams</p>
-                <p className="text-2xl font-bold">{activeStreams}</p>
+                <p className="text-2xl font-semibold">{activeStreams}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {streams.length} total
                 </p>
@@ -299,7 +299,7 @@ export default function StreamingPage() {
                 <p className="text-sm text-muted-foreground">
                   Total Throughput
                 </p>
-                <p className="text-2xl font-bold">
+                <p className="text-2xl font-semibold">
                   {totalThroughput.toFixed(1)}K/s
                 </p>
                 <div className="flex items-center gap-1 text-xs text-green-500 mt-1">
@@ -317,7 +317,7 @@ export default function StreamingPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Avg Latency</p>
-                <p className="text-2xl font-bold">{Math.round(avgLatency)}ms</p>
+                <p className="text-2xl font-semibold">{Math.round(avgLatency)}ms</p>
                 <div className="flex items-center gap-1 text-xs text-green-500 mt-1">
                   <IconTrendingDown className="h-3 w-3" />
                   <span>3.2%</span>
@@ -335,7 +335,7 @@ export default function StreamingPage() {
                 <p className="text-sm text-muted-foreground">
                   Records Processed
                 </p>
-                <p className="text-2xl font-bold">
+                <p className="text-2xl font-semibold">
                   {(totalRecords / 1000000).toFixed(1)}M
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Last 24h</p>

@@ -5,7 +5,10 @@ from .views import (
     TransformationRuleViewSet,
     DataQualityCheckViewSet,
     DataQualityResultViewSet,
-    NotebookViewSet
+    NotebookViewSet,
+    WorkflowViewSet,
+    WorkflowStepViewSet,
+    WorkflowRunViewSet
 )
 
 # Create a router and register our viewsets
@@ -15,6 +18,9 @@ router.register(r'transformation-rules', TransformationRuleViewSet, basename='tr
 router.register(r'quality-checks', DataQualityCheckViewSet, basename='quality-check')
 router.register(r'quality-results', DataQualityResultViewSet, basename='quality-result')
 router.register(r'notebooks', NotebookViewSet, basename='notebook')
+router.register(r'workflows', WorkflowViewSet, basename='workflow')
+router.register(r'workflow-steps', WorkflowStepViewSet, basename='workflow-step')
+router.register(r'workflow-runs', WorkflowRunViewSet, basename='workflow-run')
 
 app_name = 'transformation'
 

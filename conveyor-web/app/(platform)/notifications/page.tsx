@@ -34,6 +34,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { monitoringApi, Alert } from "@/lib/api/monitoring";
+import {
+  useAlerts,
+  useAcknowledgeAlert,
+  useDismissAlert,
+} from "@/hooks/use-monitoring";
 import { formatDistanceToNow } from "date-fns";
 
 interface Notification {
@@ -86,32 +91,17 @@ function alertToNotification(alert: Alert): Notification {
 }
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [workflowNotifs, setWorkflowNotifs] = useState(true);
   const [alertNotifs, setAlertNotifs] = useState(true);
   const [emailNotifs, setEmailNotifs] = useState(true);
 
-  const fetchNotifications = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      // Fetch alerts from monitoring API
-      const alerts = await monitoringApi.getAlerts();
-      const notifs = alerts.map(alertToNotification);
-      setNotifications(notifs);
-    } catch (err) {
-      console.error("Failed to fetch notifications:", err);
-      setError("Failed to load notifications");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Use hooks instead of manual loading
+  const { data: alerts = [], isLoading: loading, error } = useAlerts();
+  const acknowledgeMutation = useAcknowledgeAlert();
+  const dismissMutation = useDismissAlert();
 
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+  // Convert alerts to notifications
+  const notifications = alerts.map(alertToNotification);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -169,11 +159,7 @@ export default function NotificationsPage() {
 
   const markAsRead = async (id: string) => {
     try {
-      // Acknowledge the alert on the backend
-      await monitoringApi.acknowledgeAlert(id);
-      setNotifications(
-        notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
-      );
+      await acknowledgeMutation.mutateAsync(id);
     } catch (err) {
       console.error("Failed to acknowledge alert:", err);
     }
@@ -184,9 +170,8 @@ export default function NotificationsPage() {
       // Acknowledge all unread alerts
       const unreadAlerts = notifications.filter((n) => !n.read);
       await Promise.all(
-        unreadAlerts.map((n) => monitoringApi.acknowledgeAlert(n.id))
+        unreadAlerts.map((n) => acknowledgeMutation.mutateAsync(n.id))
       );
-      setNotifications(notifications.map((n) => ({ ...n, read: true })));
     } catch (err) {
       console.error("Failed to acknowledge all alerts:", err);
     }
@@ -194,9 +179,7 @@ export default function NotificationsPage() {
 
   const deleteNotification = async (id: string) => {
     try {
-      // Dismiss the alert on the backend
-      await monitoringApi.dismissAlert(id);
-      setNotifications(notifications.filter((n) => n.id !== id));
+      await dismissMutation.mutateAsync(id);
     } catch (err) {
       console.error("Failed to dismiss alert:", err);
     }
@@ -209,22 +192,12 @@ export default function NotificationsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Notifications</h1>
+          <h1 className="text-xl font-semibold">Notifications</h1>
           <p className="text-sm text-muted-foreground">
             Manage your notifications and preferences
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={fetchNotifications}
-            disabled={loading}
-          >
-            <IconRefresh
-              className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </Button>
           {unreadCount > 0 && (
             <Button variant="outline" onClick={markAllAsRead}>
               <IconCheck className="h-4 w-4 mr-2" />
@@ -237,7 +210,7 @@ export default function NotificationsPage() {
       {error && (
         <Card className="border-destructive">
           <CardContent className="pt-6">
-            <p className="text-destructive">{error}</p>
+            <p className="text-destructive">{error.message}</p>
           </CardContent>
         </Card>
       )}

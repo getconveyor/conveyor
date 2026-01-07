@@ -84,7 +84,7 @@ export interface Pipeline {
   workspace?: string;
   name: string;
   description?: string;
-  status: "active" | "paused" | "error" | "running" | "idle";
+  status: "active" | "paused" | "failed" | "running" | "idle";
 
   source?: string;
   source_details?: {
@@ -280,6 +280,26 @@ export const integrationApi = {
   async getSourceSchema(id: string): Promise<SourceSchema> {
     return apiClient.get<SourceSchema>(
       `/api/integration/sources/${id}/schema/`,
+      getAuthOptions()
+    );
+  },
+
+  async previewSourceData(
+    id: string,
+    stream: string,
+    limit: number = 10
+  ): Promise<{
+    status: string;
+    source_id: string;
+    stream: string;
+    columns: Array<{ name: string; type: string; nullable: boolean }>;
+    records: Record<string, any>[];
+    record_count: number;
+    truncated: boolean;
+  }> {
+    return apiClient.post(
+      `/api/integration/sources/${id}/preview/`,
+      { stream, limit },
       getAuthOptions()
     );
   },

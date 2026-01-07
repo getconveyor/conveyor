@@ -10,8 +10,6 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Clock,
   Calendar,
@@ -203,15 +201,15 @@ export function ScheduleBuilder({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Schedule Type Selection */}
       <div className="space-y-2">
-        <Label>Frequency</Label>
+        <Label className="text-sm font-medium">Frequency</Label>
         <Select
           value={scheduleType}
           onValueChange={(value) => onScheduleTypeChange(value as ScheduleType)}
         >
-          <SelectTrigger>
+          <SelectTrigger className="h-10">
             <SelectValue placeholder="Select frequency" />
           </SelectTrigger>
           <SelectContent>
@@ -219,29 +217,28 @@ export function ScheduleBuilder({
               <SelectItem key={type.value} value={type.value}>
                 <div className="flex items-center gap-2">
                   {type.icon}
-                  <div>
-                    <div className="font-medium">{type.label}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {type.description}
-                    </div>
-                  </div>
+                  <span>{type.label}</span>
                 </div>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        <p className="text-xs text-muted-foreground">
+          {SCHEDULE_TYPES.find((t) => t.value === scheduleType)?.description}
+        </p>
       </div>
 
       {/* Schedule-specific configuration */}
       {scheduleType === "hourly" && (
         <div className="space-y-2">
-          <Label>Run every</Label>
-          <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium">Interval</Label>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">Run every</span>
             <Select
               value={String(scheduleConfig.interval || 1)}
               onValueChange={handleIntervalChange}
             >
-              <SelectTrigger className="w-24">
+              <SelectTrigger className="w-20 h-10">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -259,72 +256,15 @@ export function ScheduleBuilder({
 
       {scheduleType === "daily" && (
         <div className="space-y-2">
-          <Label>Run at</Label>
-          <div className="flex items-center gap-2">
-            <Select
-              value={String(scheduleConfig.hour ?? 0)}
-              onValueChange={handleHourChange}
-            >
-              <SelectTrigger className="w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 24 }, (_, i) => (
-                  <SelectItem key={i} value={String(i)}>
-                    {i.toString().padStart(2, "0")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <span>:</span>
-            <Select
-              value={String(scheduleConfig.minute ?? 0)}
-              onValueChange={handleMinuteChange}
-            >
-              <SelectTrigger className="w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[0, 15, 30, 45].map((m) => (
-                  <SelectItem key={m} value={String(m)}>
-                    {m.toString().padStart(2, "0")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
-
-      {scheduleType === "weekly" && (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Run on</Label>
-            <div className="flex flex-wrap gap-2">
-              {DAYS_OF_WEEK.map((day) => (
-                <label
-                  key={day.value}
-                  className="flex items-center gap-2 px-3 py-2 border rounded-md cursor-pointer hover:bg-accent"
-                >
-                  <Checkbox
-                    checked={(scheduleConfig.days || []).includes(day.value)}
-                    onCheckedChange={(checked) =>
-                      handleDaysOfWeekChange(day.value, checked as boolean)
-                    }
-                  />
-                  <span className="text-sm">{day.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>At</Label>
-            <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium">Time</Label>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">Run at</span>
+            <div className="flex items-center gap-1">
               <Select
                 value={String(scheduleConfig.hour ?? 0)}
                 onValueChange={handleHourChange}
               >
-                <SelectTrigger className="w-20">
+                <SelectTrigger className="w-20 h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -335,12 +275,12 @@ export function ScheduleBuilder({
                   ))}
                 </SelectContent>
               </Select>
-              <span>:</span>
+              <span className="text-lg font-medium">:</span>
               <Select
                 value={String(scheduleConfig.minute ?? 0)}
                 onValueChange={handleMinuteChange}
               >
-                <SelectTrigger className="w-20">
+                <SelectTrigger className="w-20 h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -351,6 +291,79 @@ export function ScheduleBuilder({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {scheduleType === "weekly" && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Days</Label>
+            <div className="flex flex-wrap gap-2">
+              {DAYS_OF_WEEK.map((day) => {
+                const isSelected = (scheduleConfig.days || []).includes(
+                  day.value
+                );
+                return (
+                  <button
+                    key={day.value}
+                    type="button"
+                    onClick={() =>
+                      handleDaysOfWeekChange(day.value, !isSelected)
+                    }
+                    className={`
+                      px-3 py-2 text-sm font-medium rounded-md border transition-colors
+                      ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background hover:bg-accent border-input"
+                      }
+                    `}
+                  >
+                    {day.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Time</Label>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">Run at</span>
+              <div className="flex items-center gap-1">
+                <Select
+                  value={String(scheduleConfig.hour ?? 0)}
+                  onValueChange={handleHourChange}
+                >
+                  <SelectTrigger className="w-20 h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <SelectItem key={i} value={String(i)}>
+                        {i.toString().padStart(2, "0")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-lg font-medium">:</span>
+                <Select
+                  value={String(scheduleConfig.minute ?? 0)}
+                  onValueChange={handleMinuteChange}
+                >
+                  <SelectTrigger className="w-20 h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[0, 15, 30, 45].map((m) => (
+                      <SelectItem key={m} value={String(m)}>
+                        {m.toString().padStart(2, "0")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </div>
@@ -359,57 +372,66 @@ export function ScheduleBuilder({
       {scheduleType === "monthly" && (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Day of month</Label>
-            <Select
-              value={String(scheduleConfig.day ?? 1)}
-              onValueChange={handleDayChange}
-            >
-              <SelectTrigger className="w-24">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 31 }, (_, i) => (
-                  <SelectItem key={i + 1} value={String(i + 1)}>
-                    {i + 1}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label className="text-sm font-medium">Day of Month</Label>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">Run on the</span>
+              <Select
+                value={String(scheduleConfig.day ?? 1)}
+                onValueChange={handleDayChange}
+              >
+                <SelectTrigger className="w-20 h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 31 }, (_, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>
+                      {i + 1}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                of each month
+              </span>
+            </div>
           </div>
           <div className="space-y-2">
-            <Label>At</Label>
-            <div className="flex items-center gap-2">
-              <Select
-                value={String(scheduleConfig.hour ?? 0)}
-                onValueChange={handleHourChange}
-              >
-                <SelectTrigger className="w-20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 24 }, (_, i) => (
-                    <SelectItem key={i} value={String(i)}>
-                      {i.toString().padStart(2, "0")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span>:</span>
-              <Select
-                value={String(scheduleConfig.minute ?? 0)}
-                onValueChange={handleMinuteChange}
-              >
-                <SelectTrigger className="w-20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[0, 15, 30, 45].map((m) => (
-                    <SelectItem key={m} value={String(m)}>
-                      {m.toString().padStart(2, "0")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <Label className="text-sm font-medium">Time</Label>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">Run at</span>
+              <div className="flex items-center gap-1">
+                <Select
+                  value={String(scheduleConfig.hour ?? 0)}
+                  onValueChange={handleHourChange}
+                >
+                  <SelectTrigger className="w-20 h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <SelectItem key={i} value={String(i)}>
+                        {i.toString().padStart(2, "0")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-lg font-medium">:</span>
+                <Select
+                  value={String(scheduleConfig.minute ?? 0)}
+                  onValueChange={handleMinuteChange}
+                >
+                  <SelectTrigger className="w-20 h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[0, 15, 30, 45].map((m) => (
+                      <SelectItem key={m} value={String(m)}>
+                        {m.toString().padStart(2, "0")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </div>
@@ -417,12 +439,12 @@ export function ScheduleBuilder({
 
       {scheduleType === "cron" && (
         <div className="space-y-2">
-          <Label>Cron Expression</Label>
+          <Label className="text-sm font-medium">Cron Expression</Label>
           <Input
             value={scheduleConfig.expression || ""}
             onChange={(e) => handleCronChange(e.target.value)}
             placeholder="0 0 * * *"
-            className="font-mono"
+            className="font-mono h-10"
           />
           <p className="text-xs text-muted-foreground">
             Format: minute hour day month day_of_week (e.g., &quot;0 9 * *
@@ -434,9 +456,9 @@ export function ScheduleBuilder({
       {/* Timezone selector (for all except manual) */}
       {scheduleType !== "manual" && (
         <div className="space-y-2">
-          <Label>Timezone</Label>
+          <Label className="text-sm font-medium">Timezone</Label>
           <Select value={timezone} onValueChange={onTimezoneChange}>
-            <SelectTrigger>
+            <SelectTrigger className="h-10">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -451,14 +473,14 @@ export function ScheduleBuilder({
       )}
 
       {/* Schedule Description Preview */}
-      <Card className="bg-muted/50">
-        <CardContent className="pt-4">
-          <div className="flex items-center gap-2 text-sm">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span>{getScheduleDescription()}</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="rounded-lg bg-primary/5 border border-primary/20 p-3">
+        <div className="flex items-center gap-2 text-sm">
+          <Clock className="h-4 w-4 text-primary" />
+          <span className="font-medium text-foreground">
+            {getScheduleDescription()}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

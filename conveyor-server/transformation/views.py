@@ -8,14 +8,50 @@ import trino
 import time
 import logging
 
-from .models import Transformation, TransformationRule, DataQualityCheck, DataQualityResult, Notebook
+from authentication.permissions import IsWorkspaceMember
+
+from .models import Transformation, TransformationRule, DataQualityCheck, DataQualityResult, Notebook, Workflow, WorkflowStep, WorkflowRun
 from .serializers import (
     TransformationSerializer, TransformationListSerializer,
     TransformationRuleSerializer,
     DataQualityCheckSerializer, DataQualityCheckListSerializer,
     DataQualityResultSerializer, DataQualityResultListSerializer,
-    NotebookSerializer, NotebookListSerializer
+    NotebookSerializer, NotebookListSerializer,
+    WorkflowSerializer, WorkflowStepSerializer, WorkflowRunSerializer
 )
+class WorkflowViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing workflows"""
+    serializer_class = WorkflowSerializer
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+
+    def get_queryset(self):
+        workspace_id = self.request.headers.get('X-Workspace-ID')
+        if not workspace_id:
+            return Workflow.objects.none()
+        return Workflow.objects.filter(workspace_id=workspace_id).select_related('created_by').prefetch_related('steps', 'runs')
+
+    def perform_create(self, serializer):
+        workspace_id = self.request.headers.get('X-Workspace-ID')
+        serializer.save(
+            workspace_id=workspace_id,
+            created_by=self.request.user
+        )
+
+
+class WorkflowStepViewSet(viewsets.ModelViewSet):
+    serializer_class = WorkflowStepSerializer
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+
+    def get_queryset(self):
+        return WorkflowStep.objects.all().select_related('workflow')
+
+
+class WorkflowRunViewSet(viewsets.ModelViewSet):
+    serializer_class = WorkflowRunSerializer
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+
+    def get_queryset(self):
+        return WorkflowRun.objects.all().select_related('workflow')
 from authentication.permissions import IsWorkspaceMember
 
 logger = logging.getLogger(__name__)

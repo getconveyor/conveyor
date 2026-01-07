@@ -53,15 +53,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { transformationApi, Notebook } from "@/lib/api/transformation";
+import {
+  useNotebooks,
+  useCreateNotebook,
+  useRunNotebook,
+  useDuplicateNotebook,
+  useDeleteNotebook,
+  useExportNotebook,
+} from "@/hooks/use-transformation";
+import { Notebook } from "@/lib/api/transformation";
 import { toast } from "sonner";
 
 export default function NotebooksPage() {
   const router = useRouter();
-  const [notebooks, setNotebooks] = useState<Notebook[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [languageFilter, setLanguageFilter] = useState<string>("all");
-  const [isLoading, setIsLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [notebookToDelete, setNotebookToDelete] = useState<string | null>(null);
@@ -71,26 +77,26 @@ export default function NotebooksPage() {
     language: "python",
   });
 
-  const loadNotebooks = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const params: { language?: string } = {};
-      if (languageFilter !== "all") {
-        params.language = languageFilter;
-      }
-      const data = await transformationApi.getNotebooks(params);
-      setNotebooks(data);
-    } catch (error: any) {
-      console.error("Failed to load notebooks:", error);
-      toast.error(error.message || "Failed to load notebooks");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [languageFilter]);
+  // Use hooks instead of manual loading
+  const {
+    data: notebooksData = [],
+    isLoading: notebooksLoading,
+    error: notebooksError,
+    refetch: refetchNotebooks,
+  } = useNotebooks();
+  const createNotebookMutation = useCreateNotebook();
+  const runNotebookMutation = useRunNotebook();
+  const duplicateNotebookMutation = useDuplicateNotebook();
+  const deleteNotebookMutation = useDeleteNotebook();
+  const exportNotebookMutation = useExportNotebook();
 
-  useEffect(() => {
-    loadNotebooks();
-  }, [loadNotebooks]);
+  // Filter notebooks based on language
+  const notebooks = notebooksData.filter((notebook) => {
+    if (languageFilter === "all") return true;
+    return notebook.language === languageFilter;
+  });
+
+  const isLoading = notebooksLoading;
 
   const filteredNotebooks = notebooks.filter((notebook) => {
     const matchesSearch =
@@ -115,9 +121,8 @@ export default function NotebooksPage() {
   const handleCreateNotebook = async () => {
     if (!formData.name.trim()) return;
 
-    setIsActionLoading(true);
     try {
-      await transformationApi.createNotebook({
+      await createNotebookMutation.mutateAsync({
         name: formData.name,
         description: formData.description,
         language: formData.language,
@@ -125,46 +130,35 @@ export default function NotebooksPage() {
       toast.success("Notebook created successfully");
       setIsCreateDialogOpen(false);
       resetForm();
-      await loadNotebooks();
     } catch (error: any) {
       console.error("Failed to create notebook:", error);
       toast.error(error.message || "Failed to create notebook");
-    } finally {
-      setIsActionLoading(false);
     }
   };
 
   const handleRunNotebook = async (notebook: Notebook) => {
-    setIsActionLoading(true);
     try {
-      await transformationApi.runNotebook(notebook.id);
+      await runNotebookMutation.mutateAsync(notebook.id);
       toast.success("Notebook executed successfully");
-      await loadNotebooks();
     } catch (error: any) {
       console.error("Failed to run notebook:", error);
       toast.error(error.message || "Failed to run notebook");
-    } finally {
-      setIsActionLoading(false);
     }
   };
 
   const handleDuplicateNotebook = async (notebook: Notebook) => {
-    setIsActionLoading(true);
     try {
-      await transformationApi.duplicateNotebook(notebook.id);
+      await duplicateNotebookMutation.mutateAsync(notebook.id);
       toast.success("Notebook duplicated successfully");
-      await loadNotebooks();
     } catch (error: any) {
       console.error("Failed to duplicate notebook:", error);
       toast.error(error.message || "Failed to duplicate notebook");
-    } finally {
-      setIsActionLoading(false);
     }
   };
 
   const handleExportNotebook = async (notebook: Notebook) => {
     try {
-      const exportData = await transformationApi.exportNotebook(notebook.id);
+      const exportData = await exportNotebookMutation.mutateAsync(notebook.id);
 
       // Create download link
       const blob = new Blob([JSON.stringify(exportData.content, null, 2)], {
@@ -186,17 +180,13 @@ export default function NotebooksPage() {
   const handleDeleteNotebook = async () => {
     if (!notebookToDelete) return;
 
-    setIsActionLoading(true);
     try {
-      await transformationApi.deleteNotebook(notebookToDelete);
+      await deleteNotebookMutation.mutateAsync(notebookToDelete);
       toast.success("Notebook deleted successfully");
       setNotebookToDelete(null);
-      await loadNotebooks();
     } catch (error: any) {
       console.error("Failed to delete notebook:", error);
       toast.error(error.message || "Failed to delete notebook");
-    } finally {
-      setIsActionLoading(false);
     }
   };
 
@@ -212,7 +202,7 @@ export default function NotebooksPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Notebooks</h1>
+          <h1 className="text-xl font-semibold">Notebooks</h1>
           <p className="text-sm text-muted-foreground">
             Interactive notebooks for data exploration and transformation
           </p>
@@ -290,7 +280,7 @@ export default function NotebooksPage() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={loadNotebooks}
+                onClick={() => refetchNotebooks()}
                 disabled={isLoading}
               >
                 <IconRefresh

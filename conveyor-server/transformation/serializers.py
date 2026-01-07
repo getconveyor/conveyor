@@ -1,4 +1,42 @@
 from rest_framework import serializers
+from authentication.serializers import UserSerializer
+from .models import Workflow, WorkflowStep, WorkflowRun
+
+# --- Workflow Serializers ---
+class WorkflowStepSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkflowStep
+        fields = [
+            'id', 'workflow', 'name', 'type', 'config', 'order', 'error_handling', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class WorkflowRunSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkflowRun
+        fields = [
+            'id', 'workflow', 'status', 'started_at', 'completed_at', 'logs', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class WorkflowSerializer(serializers.ModelSerializer):
+    steps = WorkflowStepSerializer(many=True, read_only=True)
+    runs = WorkflowRunSerializer(many=True, read_only=True)
+    created_by_details = UserSerializer(source='created_by', read_only=True)
+
+    class Meta:
+        model = Workflow
+        fields = [
+            'id', 'workspace', 'name', 'description', 'schedule', 'status',
+            'created_by', 'created_by_details', 'created_at', 'updated_at',
+            'steps', 'runs'
+        ]
+        read_only_fields = [
+            'id', 'created_at', 'updated_at', 'created_by', 'created_by_details', 'steps', 'runs'
+        ]
+from rest_framework import serializers
 from .models import Transformation, TransformationRule, DataQualityCheck, DataQualityResult, Notebook
 from authentication.serializers import UserSerializer
 from integration.serializers import PipelineListSerializer

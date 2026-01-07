@@ -235,7 +235,7 @@ export default function CatalogPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Data Catalog</h1>
+          <h1 className="text-xl font-semibold">Data Catalog</h1>
           <p className="text-sm text-muted-foreground">
             Discover and manage data assets
           </p>

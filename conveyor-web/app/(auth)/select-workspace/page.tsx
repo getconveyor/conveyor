@@ -233,7 +233,7 @@ export default function SelectWorkspacePage() {
 
           {/* Workspaces */}
           {workspaces.length > 0 ? (
-            <div className="space-y-4 mb-8">
+            <div className="space-y-4 mb-6">
               {workspaces.map((workspace, index) => (
                 <button
                   key={workspace.id}
@@ -250,7 +250,7 @@ export default function SelectWorkspacePage() {
                     animationDelay: `${index * 100}ms`,
                   }}
                 >
-                  <div className="p-6 flex items-center gap-5">
+                  <div className="p-5 flex items-center gap-5">
                     {/* Workspace Icon */}
                     <div
                       className={cn(
@@ -317,7 +317,7 @@ export default function SelectWorkspacePage() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-16 mb-8 rounded-2xl border border-dashed border-border bg-card/30">
+            <div className="text-center py-16 mb-6 rounded-2xl border border-dashed border-border bg-card/30">
               <div className="h-20 w-20 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-6">
                 <IconBuildingSkyscraper className="h-10 w-10 text-muted-foreground" />
               </div>

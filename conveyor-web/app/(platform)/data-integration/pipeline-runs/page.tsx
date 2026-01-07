@@ -15,7 +15,12 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { integrationApi, PipelineRun, Pipeline } from "@/lib/api/integration";
+import {
+  usePipelineRuns,
+  usePipelines,
+  useCancelPipelineRun,
+} from "@/hooks/use-integration";
+import { PipelineRun, Pipeline } from "@/lib/api/integration";
 import { toast } from "sonner";
 import { ColDef } from "ag-grid-community";
 import { Card, CardContent } from "@/components/ui/card";
@@ -124,6 +129,37 @@ export default function PipelineRunsPage() {
   const [isFetching, setIsFetching] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Use hooks instead of manual loading
+  const {
+    data: runsData = [],
+    isLoading: runsLoading,
+    error: runsError,
+    refetch: refetchRuns,
+  } = usePipelineRuns();
+  const {
+    data: pipelinesData = [],
+    isLoading: pipelinesLoading,
+    error: pipelinesError,
+  } = usePipelines();
+  const cancelRunMutation = useCancelPipelineRun();
+
+  // Update local state when hook data changes
+  useEffect(() => {
+    setRuns(runsData);
+    setPipelines(pipelinesData);
+    setIsFetching(runsLoading || pipelinesLoading);
+    if (runsError || pipelinesError) {
+      toast.error("Failed to load pipeline data");
+    }
+  }, [
+    runsData,
+    pipelinesData,
+    runsLoading,
+    pipelinesLoading,
+    runsError,
+    pipelinesError,
+  ]);
+
   const filteredRuns = useMemo(() => {
     return runs.filter((run) => {
       const matchesStatus =
@@ -145,43 +181,15 @@ export default function PipelineRunsPage() {
   );
 
   useEffect(() => {
-    if (currentWorkspace) {
-      loadRuns();
-      loadPipelines();
-    }
+    // Data loading is now handled by hooks
   }, [currentWorkspace]);
-
-  async function loadRuns() {
-    if (!currentWorkspace) return;
-    try {
-      setIsFetching(true);
-      const data = await integrationApi.getPipelineRuns();
-      setRuns(data);
-    } catch (error: any) {
-      console.error("Failed to load pipeline runs:", error);
-      toast.error(error.message || "Failed to load pipeline runs");
-    } finally {
-      setIsFetching(false);
-    }
-  }
-
-  async function loadPipelines() {
-    if (!currentWorkspace) return;
-    try {
-      const data = await integrationApi.getPipelines();
-      setPipelines(data);
-    } catch (error: any) {
-      console.error("Failed to load pipelines:", error);
-    }
-  }
 
   const handleCancelRun = async () => {
     if (!runToCancel) return;
     setIsLoading(true);
     try {
-      await integrationApi.cancelPipelineRun(runToCancel);
+      await cancelRunMutation.mutateAsync(runToCancel);
       toast.success("Pipeline run cancelled successfully");
-      await loadRuns();
       setRunToCancel(null);
     } catch (error: any) {
       console.error("Failed to cancel pipeline run:", error);
@@ -401,7 +409,7 @@ export default function PipelineRunsPage() {
         data={filteredRuns}
         columns={columns}
         loading={isFetching}
-        onRefresh={loadRuns}
+        onRefresh={() => refetchRuns()}
         pagination
         pageSize={20}
         height={500}

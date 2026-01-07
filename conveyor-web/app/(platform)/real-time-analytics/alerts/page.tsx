@@ -200,7 +200,7 @@ export default function RealTimeAlertsPage() {
       <>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Real-time Alerts</h1>
+            <h1 className="text-xl font-semibold">Real-time Alerts</h1>
             <p className="text-sm text-muted-foreground">
               Monitor and configure automated alert rules
             </p>
@@ -236,7 +236,7 @@ export default function RealTimeAlertsPage() {
       <>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Real-time Alerts</h1>
+            <h1 className="text-xl font-semibold">Real-time Alerts</h1>
             <p className="text-sm text-muted-foreground">
               Monitor and configure automated alert rules
             </p>
@@ -259,7 +259,7 @@ export default function RealTimeAlertsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Real-time Alerts</h1>
+          <h1 className="text-xl font-semibold">Real-time Alerts</h1>
           <p className="text-sm text-muted-foreground">
             Monitor and configure automated alert rules
           </p>
@@ -352,7 +352,7 @@ export default function RealTimeAlertsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Alerts</p>
-                <p className="text-2xl font-bold">
+                <p className="text-2xl font-semibold">
                   {summary?.total || alerts.length}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">

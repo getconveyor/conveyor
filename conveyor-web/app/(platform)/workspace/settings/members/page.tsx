@@ -69,7 +69,7 @@ export default function MembersPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Team Members</h1>
+            <h1 className="text-xl font-semibold tracking-tight">Team Members</h1>
             <p className="text-muted-foreground mt-2">
               Manage who has access to {currentWorkspace.name}
             </p>

@@ -154,6 +154,94 @@ class SourceViewSet(viewsets.ModelViewSet):
                 'source_id': str(source.id)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @action(detail=True, methods=['post'])
+    def preview(self, request, pk=None):
+        """
+        Preview sample data from a source stream/table.
+
+        Request body:
+            - stream: Name of the stream/table to preview
+            - limit: Maximum number of rows to return (default: 10, max: 100)
+
+        Returns sample data rows and schema information.
+        """
+        from integration.connectors import ConnectorRegistry
+        from integration.exceptions import ConnectorError, DataReadError
+
+        source = self.get_object()
+        stream = request.data.get('stream')
+        limit = min(int(request.data.get('limit', 10)), 100)
+
+        if not stream:
+            return Response({
+                'status': 'error',
+                'message': 'Stream name is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            connector = ConnectorRegistry.create(source)
+            
+            # First discover schema for this stream
+            discovery = connector.discover()
+            stream_schema = discovery.schemas.get(stream, {})
+            
+            if not stream_schema:
+                connector.close()
+                return Response({
+                    'status': 'error',
+                    'message': f'Stream "{stream}" not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Read sample data
+            records = []
+            try:
+                for i, record_msg in enumerate(connector.read(stream, stream_schema, None)):
+                    if i >= limit:
+                        break
+                    records.append(record_msg.record)
+            except Exception as e:
+                connector.close()
+                return Response({
+                    'status': 'error',
+                    'message': f'Error reading data: {str(e)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            connector.close()
+
+            # Extract column info from schema
+            columns = []
+            if 'properties' in stream_schema:
+                for col_name, col_info in stream_schema['properties'].items():
+                    columns.append({
+                        'name': col_name,
+                        'type': col_info.get('type', 'string'),
+                        'nullable': col_name not in stream_schema.get('required', [])
+                    })
+
+            return Response({
+                'status': 'success',
+                'source_id': str(source.id),
+                'stream': stream,
+                'columns': columns,
+                'records': records,
+                'record_count': len(records),
+                'truncated': len(records) >= limit
+            })
+
+        except ConnectorError as e:
+            return Response({
+                'status': 'error',
+                'message': f'Connector error: {str(e)}',
+                'source_id': str(source.id)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'message': f'Unexpected error: {str(e)}',
+                'source_id': str(source.id)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class PipelineViewSet(viewsets.ModelViewSet):
     """

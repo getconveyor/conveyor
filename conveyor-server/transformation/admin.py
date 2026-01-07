@@ -1,5 +1,33 @@
 from django.contrib import admin
-from .models import Transformation, TransformationRule, DataQualityCheck, DataQualityResult, Notebook
+from .models import Transformation, TransformationRule, DataQualityCheck, DataQualityResult, Notebook, Workflow, WorkflowStep, WorkflowRun
+
+# --- Workflow Admin ---
+class WorkflowStepInline(admin.TabularInline):
+    model = WorkflowStep
+    extra = 0
+    fields = ('name', 'type', 'order')
+
+@admin.register(Workflow)
+class WorkflowAdmin(admin.ModelAdmin):
+    list_display = ('name', 'workspace', 'status', 'created_by', 'created_at')
+    list_filter = ('status', 'workspace', 'created_at')
+    search_fields = ('name', 'description', 'workspace__name')
+    readonly_fields = ('id', 'created_at', 'updated_at')
+    inlines = [WorkflowStepInline]
+
+@admin.register(WorkflowStep)
+class WorkflowStepAdmin(admin.ModelAdmin):
+    list_display = ('name', 'workflow', 'type', 'order', 'created_at')
+    list_filter = ('type', 'workflow')
+    search_fields = ('name', 'workflow__name')
+    readonly_fields = ('id', 'created_at', 'updated_at')
+
+@admin.register(WorkflowRun)
+class WorkflowRunAdmin(admin.ModelAdmin):
+    list_display = ('workflow', 'status', 'started_at', 'completed_at', 'created_at')
+    list_filter = ('status', 'workflow')
+    search_fields = ('workflow__name',)
+    readonly_fields = ('id', 'created_at', 'updated_at')
 
 
 class TransformationRuleInline(admin.TabularInline):

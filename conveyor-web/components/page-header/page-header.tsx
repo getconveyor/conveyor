@@ -74,22 +74,22 @@ export function PageHeader({
 
       {/* Header row */}
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-3">
           {/* Icon */}
           {Icon && (
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Icon className="h-6 w-6" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-foreground">
+              <Icon className="h-5 w-5" />
             </div>
           )}
 
           {/* Title and description */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
               {badge}
             </div>
             {description && (
-              <p className="text-muted-foreground">{description}</p>
+              <p className="text-sm text-muted-foreground">{description}</p>
             )}
           </div>
         </div>

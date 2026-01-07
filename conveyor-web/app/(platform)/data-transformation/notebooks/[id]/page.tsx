@@ -36,7 +36,12 @@ import {
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { transformationApi, Notebook } from "@/lib/api/transformation";
+import { Notebook } from "@/lib/api/transformation";
+import {
+  useNotebook,
+  useUpdateNotebook,
+  useRunNotebook,
+} from "@/hooks/use-transformation";
 
 interface Cell {
   cell_type: "code" | "markdown";
@@ -50,27 +55,25 @@ export default function NotebookEditorPage() {
   const params = useParams();
   const notebookId = params.id as string;
 
-  const [notebook, setNotebook] = useState<Notebook | null>(null);
   const [cells, setCells] = useState<Cell[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
   const [activeCell, setActiveCell] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
 
-  const fetchNotebook = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await transformationApi.getNotebook(notebookId);
-      setNotebook(data);
-      setTitleInput(data.name);
+  const { data: notebook, isLoading } = useNotebook(notebookId);
+  const updateNotebookMutation = useUpdateNotebook();
+  const runNotebookMutation = useRunNotebook();
+
+  // Initialize cells when notebook data is loaded
+  useEffect(() => {
+    if (notebook) {
+      setTitleInput(notebook.name);
 
       // Initialize cells from notebook content
-      if (data.content && data.content.cells) {
+      if (notebook.content && notebook.content.cells) {
         setCells(
-          data.content.cells.map((cell: any) => ({
+          notebook.content.cells.map((cell: any) => ({
             cell_type: (cell.cell_type === "code" ||
             cell.cell_type === "markdown"
               ? cell.cell_type
@@ -83,32 +86,21 @@ export default function NotebookEditorPage() {
       } else {
         setCells([{ cell_type: "code", source: "", outputs: [] }]);
       }
-    } catch (error: any) {
-      console.error("Failed to fetch notebook:", error);
-      toast.error("Failed to load notebook", {
-        description: error.message || "Please try again",
-      });
-      router.push("/data-transformation/notebooks");
-    } finally {
-      setIsLoading(false);
     }
-  }, [notebookId, router]);
-
-  useEffect(() => {
-    fetchNotebook();
-  }, [fetchNotebook]);
+  }, [notebook]);
 
   const handleSave = async () => {
     if (!notebook) return;
 
-    setIsSaving(true);
     try {
-      await transformationApi.updateNotebook(notebookId, {
-        name: titleInput,
-        content: { cells },
+      await updateNotebookMutation.mutateAsync({
+        notebookId,
+        data: {
+          name: titleInput,
+          content: { cells },
+        },
       });
 
-      setNotebook({ ...notebook, name: titleInput });
       setHasChanges(false);
       toast.success("Notebook saved");
     } catch (error: any) {
@@ -116,8 +108,6 @@ export default function NotebookEditorPage() {
       toast.error("Failed to save notebook", {
         description: error.message || "Please try again",
       });
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -127,18 +117,14 @@ export default function NotebookEditorPage() {
     // Save first
     await handleSave();
 
-    setIsRunning(true);
     try {
-      await transformationApi.runNotebook(notebookId);
+      await runNotebookMutation.mutateAsync(notebookId);
       toast.success("Notebook execution started");
-      fetchNotebook();
     } catch (error: any) {
       console.error("Failed to run notebook:", error);
       toast.error("Failed to run notebook", {
         description: error.message || "Please try again",
       });
-    } finally {
-      setIsRunning(false);
     }
   };
 
@@ -304,9 +290,9 @@ export default function NotebookEditorPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleSave}
-                  disabled={isSaving || !hasChanges}
+                  disabled={updateNotebookMutation.isPending || !hasChanges}
                 >
-                  {isSaving ? (
+                  {updateNotebookMutation.isPending ? (
                     <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <IconDeviceFloppy className="mr-2 h-4 w-4" />
@@ -319,8 +305,12 @@ export default function NotebookEditorPage() {
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" onClick={handleRun} disabled={isRunning}>
-                  {isRunning ? (
+                <Button
+                  size="sm"
+                  onClick={handleRun}
+                  disabled={runNotebookMutation.isPending}
+                >
+                  {runNotebookMutation.isPending ? (
                     <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <IconPlayerPlay className="mr-2 h-4 w-4" />

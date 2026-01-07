@@ -45,12 +45,13 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import {
-  monitoringApi,
-  SystemHealth,
-  Alert,
-  SystemOverview,
-} from "@/lib/api/monitoring";
-import { integrationApi, PipelineRun } from "@/lib/api/integration";
+  useSystemOverview,
+  useSystemHealth,
+  useAlerts,
+} from "@/hooks/use-monitoring";
+import { usePipelineRuns } from "@/hooks/use-integration";
+import { SystemHealth, Alert, SystemOverview } from "@/lib/api/monitoring";
+import { PipelineRun } from "@/lib/api/integration";
 import { formatDistanceToNow } from "date-fns";
 
 const chartConfig = {
@@ -102,43 +103,44 @@ function formatBytes(bytes: number): string {
 
 export default function MonitoringOverviewPage() {
   const [timeRange, setTimeRange] = useState("24h");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Data states
-  const [overview, setOverview] = useState<SystemOverview | null>(null);
-  const [health, setHealth] = useState<SystemHealth[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [recentRuns, setRecentRuns] = useState<PipelineRun[]>([]);
+  // Use hooks instead of manual loading
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    error: overviewError,
+    refetch: refetchOverview,
+  } = useSystemOverview();
+  const {
+    data: health = [],
+    isLoading: healthLoading,
+    error: healthError,
+    refetch: refetchHealth,
+  } = useSystemHealth();
+  const {
+    data: alerts = [],
+    isLoading: alertsLoading,
+    error: alertsError,
+    refetch: refetchAlerts,
+  } = useAlerts("active");
+  const {
+    data: runsData = [],
+    isLoading: runsLoading,
+    error: runsError,
+    refetch: refetchRuns,
+  } = usePipelineRuns();
 
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const loading =
+    overviewLoading || healthLoading || alertsLoading || runsLoading;
+  const error = overviewError || healthError || alertsError || runsError;
+  const recentRuns = runsData.slice(0, 5);
 
-      const [overviewData, healthData, alertsData, runsData] =
-        await Promise.all([
-          monitoringApi.getSystemOverview(),
-          monitoringApi.getCurrentHealth(),
-          monitoringApi.getAlerts({ status: "active" }),
-          integrationApi.getPipelineRuns(),
-        ]);
-
-      setOverview(overviewData);
-      setHealth(healthData);
-      setAlerts(alertsData);
-      setRecentRuns(runsData.slice(0, 5));
-    } catch (err) {
-      console.error("Failed to fetch monitoring data:", err);
-      setError("Failed to load monitoring data");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const handleRefresh = () => {
+    refetchOverview();
+    refetchHealth();
+    refetchAlerts();
+    refetchRuns();
+  };
 
   // Transform data for charts
   const resourceUsageData =
@@ -223,7 +225,7 @@ export default function MonitoringOverviewPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Monitoring Overview</h1>
+          <h1 className="text-xl font-semibold">Monitoring Overview</h1>
           <p className="text-sm text-muted-foreground">
             Platform health and performance metrics
           </p>
@@ -243,7 +245,7 @@ export default function MonitoringOverviewPage() {
           <Button
             variant="outline"
             size="icon"
-            onClick={fetchData}
+            onClick={handleRefresh}
             disabled={loading}
           >
             <IconRefresh
@@ -256,8 +258,10 @@ export default function MonitoringOverviewPage() {
       {error && (
         <Card className="border-destructive">
           <CardContent className="pt-6">
-            <p className="text-destructive">{error}</p>
-            <Button variant="outline" onClick={fetchData} className="mt-4">
+            <p className="text-destructive">
+              {error?.message || "An error occurred"}
+            </p>
+            <Button variant="outline" onClick={handleRefresh} className="mt-4">
               Retry
             </Button>
           </CardContent>
@@ -276,7 +280,9 @@ export default function MonitoringOverviewPage() {
                   <p className="text-xs text-muted-foreground">
                     Active Workflows
                   </p>
-                  <p className="text-2xl font-bold">{stats.activeWorkflows}</p>
+                  <p className="text-2xl font-semibold">
+                    {stats.activeWorkflows}
+                  </p>
                 </div>
                 <IconActivity className="h-8 w-8 text-blue-500 opacity-20" />
               </div>
@@ -291,7 +297,7 @@ export default function MonitoringOverviewPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Running Now</p>
-                  <p className="text-2xl font-bold">{stats.runningJobs}</p>
+                  <p className="text-2xl font-semibold">{stats.runningJobs}</p>
                 </div>
                 <IconClock className="h-8 w-8 text-blue-500 opacity-20" />
               </div>
@@ -340,7 +346,7 @@ export default function MonitoringOverviewPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Avg Duration</p>
-                  <p className="text-2xl font-bold">{stats.avgDuration}</p>
+                  <p className="text-2xl font-semibold">{stats.avgDuration}</p>
                 </div>
                 <IconTrendingUp className="h-8 w-8 text-purple-500 opacity-20" />
               </div>
@@ -357,7 +363,9 @@ export default function MonitoringOverviewPage() {
                   <p className="text-xs text-muted-foreground">
                     Data Processed
                   </p>
-                  <p className="text-2xl font-bold">{stats.dataProcessed}</p>
+                  <p className="text-2xl font-semibold">
+                    {stats.dataProcessed}
+                  </p>
                 </div>
                 <IconDatabase className="h-8 w-8 text-orange-500 opacity-20" />
               </div>

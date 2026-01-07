@@ -50,6 +50,7 @@ import {
   CreatePipelineData,
 } from "@/lib/api/integration";
 import { getNamespaces, Namespace } from "@/lib/api/warehouse";
+import { useSourceSchema, useCreatePipeline } from "@/hooks/use-integration";
 import { cn } from "@/lib/utils";
 
 interface PipelineCreateDialogProps {
@@ -89,12 +90,17 @@ export function PipelineCreateDialog({
   const [namespaces, setNamespaces] = useState<Namespace[]>([]);
   const [isFetchingNamespaces, setIsFetchingNamespaces] = useState(false);
 
-  // Schema discovery state
-  const [isDiscovering, setIsDiscovering] = useState(false);
-  const [discoveredSchema, setDiscoveredSchema] = useState<SourceSchema | null>(
-    null
-  );
-  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  // Use hooks instead of manual loading
+  const {
+    data: sourceSchema,
+    isLoading: isDiscovering,
+    error: schemaError,
+  } = useSourceSchema(sourceId);
+  const createPipelineMutation = useCreatePipeline();
+
+  // Schema discovery state - now using hook
+  const discoveredSchema = sourceSchema;
+  const discoveryError = schemaError?.message || null;
 
   // Table selection state
   const [syncMode, setSyncMode] = useState<SyncMode>("selected");
@@ -108,9 +114,6 @@ export function PipelineCreateDialog({
   const [expandedSchemas, setExpandedSchemas] = useState<Set<string>>(
     new Set()
   );
-
-  // Submission state
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch available namespaces when dialog opens
   const fetchNamespacesData = useCallback(async () => {
@@ -150,42 +153,12 @@ export function PipelineCreateDialog({
       setLayer("bronze");
       setSchemaNamespace("");
       setSchedule("");
-      setDiscoveredSchema(null);
-      setDiscoveryError(null);
       setSelectedStreams(new Set());
       setTableNameOverrides({});
       setSearchQuery("");
       setSyncMode("selected");
     }
   }, [open, fetchNamespacesData]);
-
-  // Discover schema when source changes
-  const handleDiscoverSchema = useCallback(async () => {
-    if (!sourceId) return;
-
-    setIsDiscovering(true);
-    setDiscoveryError(null);
-
-    try {
-      const schema = await integrationApi.getSourceSchema(sourceId);
-      setDiscoveredSchema(schema);
-
-      // Auto-expand first schema if available
-      const schemas = new Set(
-        schema.streams.map((s) => s.schema || "default").filter(Boolean)
-      );
-      if (schemas.size > 0) {
-        setExpandedSchemas(new Set([Array.from(schemas)[0]]));
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to discover schema";
-      setDiscoveryError(message);
-      toast.error(message);
-    } finally {
-      setIsDiscovering(false);
-    }
-  }, [sourceId]);
 
   // Group streams by schema
   const groupedStreams = discoveredSchema?.streams.reduce((acc, stream) => {
@@ -273,8 +246,6 @@ export function PipelineCreateDialog({
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
       // Create pipeline with streams config
       const pipelineData: CreatePipelineData = {
@@ -303,7 +274,7 @@ export function PipelineCreateDialog({
         },
       };
 
-      await integrationApi.createPipeline(pipelineData);
+      await createPipelineMutation.mutateAsync(pipelineData);
       toast.success(
         `Pipeline created with ${streamsToSync.length} table${
           streamsToSync.length > 1 ? "s" : ""
@@ -315,12 +286,10 @@ export function PipelineCreateDialog({
       const message =
         error instanceof Error ? error.message : "Failed to create pipeline";
       toast.error(message);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
-  // Move to table selection step and trigger discovery
+  // Move to table selection step
   const handleNextStep = useCallback(async () => {
     if (!name.trim()) {
       toast.error("Please enter a pipeline name");
@@ -332,32 +301,18 @@ export function PipelineCreateDialog({
     }
     setStep("tables");
 
-    // Trigger schema discovery if not already done
-    if (!discoveredSchema && !isDiscovering) {
-      setIsDiscovering(true);
-      setDiscoveryError(null);
-
-      try {
-        const schema = await integrationApi.getSourceSchema(sourceId);
-        setDiscoveredSchema(schema);
-
-        // Auto-expand first schema if available
-        const schemas = new Set(
-          schema.streams.map((s) => s.schema || "default").filter(Boolean)
-        );
-        if (schemas.size > 0) {
-          setExpandedSchemas(new Set([Array.from(schemas)[0]]));
-        }
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Failed to discover schema";
-        setDiscoveryError(message);
-        toast.error(message);
-      } finally {
-        setIsDiscovering(false);
+    // Auto-expand first schema if available when schema is loaded
+    if (discoveredSchema) {
+      const schemas = new Set(
+        discoveredSchema.streams
+          .map((s) => s.schema || "default")
+          .filter(Boolean)
+      );
+      if (schemas.size > 0) {
+        setExpandedSchemas(new Set([Array.from(schemas)[0]]));
       }
     }
-  }, [name, sourceId, discoveredSchema, isDiscovering]);
+  }, [name, sourceId, discoveredSchema]);
 
   const selectedSource = sources.find((s) => s.id === sourceId);
 
@@ -543,23 +498,6 @@ export function PipelineCreateDialog({
               </div>
             )}
 
-            {discoveryError && !isDiscovering && (
-              <div className="flex items-center justify-between gap-2 p-4 border rounded-lg bg-destructive/10">
-                <div className="flex items-center gap-2 text-sm text-destructive">
-                  <IconAlertCircle className="h-4 w-4" />
-                  {discoveryError}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDiscoverSchema}
-                >
-                  <IconRefresh className="mr-2 h-4 w-4" />
-                  Retry
-                </Button>
-              </div>
-            )}
-
             {discoveredSchema && !isDiscovering && (
               <div className="flex items-center justify-between gap-4 text-sm bg-green-500/10 text-green-700 dark:text-green-400 p-3 rounded-md">
                 <div className="flex items-center gap-2">
@@ -579,15 +517,6 @@ export function PipelineCreateDialog({
                     schema(s)
                   </span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDiscoverSchema}
-                  disabled={isDiscovering}
-                >
-                  <IconRefresh className="mr-2 h-4 w-4" />
-                  Refresh
-                </Button>
               </div>
             )}
 
@@ -802,7 +731,7 @@ export function PipelineCreateDialog({
             <Button
               variant="outline"
               onClick={() => setStep("config")}
-              disabled={isSubmitting}
+              disabled={createPipelineMutation.isPending}
             >
               Back
             </Button>
@@ -810,7 +739,7 @@ export function PipelineCreateDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={isSubmitting}
+            disabled={createPipelineMutation.isPending}
           >
             Cancel
           </Button>
@@ -826,11 +755,11 @@ export function PipelineCreateDialog({
             <Button
               onClick={handleSubmit}
               disabled={
-                isSubmitting ||
+                createPipelineMutation.isPending ||
                 (syncMode === "selected" && selectedStreams.size === 0)
               }
             >
-              {isSubmitting ? (
+              {createPipelineMutation.isPending ? (
                 <>
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creating Pipeline...

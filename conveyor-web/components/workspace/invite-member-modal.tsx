@@ -1,8 +1,7 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useWorkspace } from '@/contexts/WorkspaceContext'
-import { workspaceApi } from '@/lib/api/workspace'
+import { useState } from "react";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   Dialog,
   DialogContent,
@@ -10,77 +9,85 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useInviteWorkspaceMember } from "@/hooks/use-workspace";
 
 interface InviteMemberModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onInvited?: () => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onInvited?: () => void;
 }
 
-export function InviteMemberModal({ open, onOpenChange, onInvited }: InviteMemberModalProps) {
-  const { currentWorkspace } = useWorkspace()
-  const [email, setEmail] = useState('')
-  const [role, setRole] = useState<'admin' | 'developer' | 'analyst' | 'viewer'>('viewer')
-  const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+export function InviteMemberModal({
+  open,
+  onOpenChange,
+  onInvited,
+}: InviteMemberModalProps) {
+  const { currentWorkspace } = useWorkspace();
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<
+    "admin" | "developer" | "analyst" | "viewer"
+  >("viewer");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  const inviteMutation = useInviteWorkspaceMember();
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!currentWorkspace) return
+    e.preventDefault();
+    if (!currentWorkspace) return;
 
-    setLoading(true)
-    setError('')
-    setSuccess(false)
+    setError("");
+    setSuccess(false);
 
     try {
-      await workspaceApi.inviteMember(currentWorkspace.id, {
-        email,
-        role,
-        message: message || undefined,
-      })
+      await inviteMutation.mutateAsync({
+        workspaceId: currentWorkspace.id,
+        data: {
+          email,
+          role,
+          message: message || undefined,
+        },
+      });
 
-      setSuccess(true)
+      setSuccess(true);
       setTimeout(() => {
-        onInvited?.()
-        handleClose()
-      }, 1500)
+        onInvited?.();
+        handleClose();
+      }, 1500);
     } catch (err: any) {
-      console.error('Failed to invite member:', err)
+      console.error("Failed to invite member:", err);
       if (err.response?.data?.error) {
-        setError(err.response.data.error)
+        setError(err.response.data.error);
       } else if (err.response?.data?.email) {
-        setError(err.response.data.email[0])
+        setError(err.response.data.email[0]);
       } else {
-        setError(err.message || 'Failed to invite member')
+        setError(err.message || "Failed to invite member");
       }
-    } finally {
-      setLoading(false)
     }
   }
 
   function handleClose() {
-    setEmail('')
-    setRole('viewer')
-    setMessage('')
-    setError('')
-    setSuccess(false)
-    onOpenChange(false)
+    setEmail("");
+    setRole("viewer");
+    setMessage("");
+    setError("");
+    setSuccess(false);
+    onOpenChange(false);
   }
 
   return (
@@ -89,8 +96,8 @@ export function InviteMemberModal({ open, onOpenChange, onInvited }: InviteMembe
         <DialogHeader>
           <DialogTitle>Invite Team Member</DialogTitle>
           <DialogDescription>
-            Send an invitation to join {currentWorkspace?.name}. They will receive an email with
-            instructions to accept.
+            Send an invitation to join {currentWorkspace?.name}. They will
+            receive an email with instructions to accept.
           </DialogDescription>
         </DialogHeader>
 
@@ -105,7 +112,7 @@ export function InviteMemberModal({ open, onOpenChange, onInvited }: InviteMembe
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={loading || success}
+                disabled={inviteMutation.isPending || success}
               />
             </div>
 
@@ -114,7 +121,7 @@ export function InviteMemberModal({ open, onOpenChange, onInvited }: InviteMembe
               <Select
                 value={role}
                 onValueChange={(value: any) => setRole(value)}
-                disabled={loading || success}
+                disabled={inviteMutation.isPending || success}
               >
                 <SelectTrigger id="role">
                   <SelectValue />
@@ -164,7 +171,7 @@ export function InviteMemberModal({ open, onOpenChange, onInvited }: InviteMembe
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={3}
-                disabled={loading || success}
+                disabled={inviteMutation.isPending || success}
               />
             </div>
 
@@ -178,22 +185,34 @@ export function InviteMemberModal({ open, onOpenChange, onInvited }: InviteMembe
             {success && (
               <Alert>
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <AlertDescription>Invitation sent successfully!</AlertDescription>
+                <AlertDescription>
+                  Invitation sent successfully!
+                </AlertDescription>
               </Alert>
             )}
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={inviteMutation.isPending}
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || success}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {success ? 'Invited!' : 'Send Invitation'}
+            <Button
+              type="submit"
+              disabled={inviteMutation.isPending || success}
+            >
+              {inviteMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {success ? "Invited!" : "Send Invitation"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

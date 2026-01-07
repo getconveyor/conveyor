@@ -245,7 +245,7 @@ export default function ExperimentsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">ML Experiments</h1>
+          <h1 className="text-xl font-semibold">ML Experiments</h1>
           <p className="text-sm text-muted-foreground">
             Track and compare machine learning experiments
           </p>

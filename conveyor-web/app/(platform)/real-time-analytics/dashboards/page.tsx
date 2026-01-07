@@ -103,7 +103,7 @@ export default function RealTimeDashboardsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Real-time Dashboards</h1>
+          <h1 className="text-xl font-semibold">Real-time Dashboards</h1>
           <p className="text-sm text-muted-foreground">
             Live metrics and instant data visualization
           </p>
@@ -158,7 +158,7 @@ export default function RealTimeDashboardsPage() {
                   <p className="text-sm text-muted-foreground">
                     Running Pipelines
                   </p>
-                  <p className="text-2xl font-bold">
+                  <p className="text-2xl font-semibold">
                     {dashboard?.running_pipelines || 0}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -179,7 +179,7 @@ export default function RealTimeDashboardsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Throughput</p>
-                  <p className="text-2xl font-bold">
+                  <p className="text-2xl font-semibold">
                     {dashboard?.total_throughput?.toFixed(1) || 0}/s
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -200,7 +200,7 @@ export default function RealTimeDashboardsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Avg Latency</p>
-                  <p className="text-2xl font-bold">
+                  <p className="text-2xl font-semibold">
                     {dashboard?.avg_latency_ms?.toFixed(0) || 0}ms
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">

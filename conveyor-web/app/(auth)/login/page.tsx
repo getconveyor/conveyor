@@ -43,7 +43,7 @@ export default function LoginPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 px-4">
         <div className="w-full max-w-md">
           {/* Logo/Brand */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-6">
             <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-2">
               Conveyor
             </h1>

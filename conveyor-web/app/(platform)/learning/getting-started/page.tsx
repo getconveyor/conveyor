@@ -39,11 +39,11 @@ export default function GettingStartedPage() {
   return (
     <>
       <div className="flex items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10">
-          <IconRocket className="h-6 w-6 text-blue-500" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+          <IconRocket className="h-5 w-5 text-muted-foreground" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Getting Started</h1>
+          <h1 className="text-xl font-semibold">Getting Started</h1>
           <p className="text-sm text-muted-foreground">
             Your journey to mastering the data platform begins here
           </p>

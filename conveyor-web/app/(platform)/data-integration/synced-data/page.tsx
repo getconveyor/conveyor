@@ -15,7 +15,12 @@ import {
   IconDownload,
 } from "@tabler/icons-react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { integrationApi, DataSource } from "@/lib/api/integration";
+import {
+  useDataSources,
+  useSyncDataSource,
+  useDeleteDataSource,
+} from "@/hooks/use-integration";
+import { DataSource } from "@/lib/api/integration";
 import { toast } from "sonner";
 import {
   Card,
@@ -80,6 +85,25 @@ export default function SyncedDataPage() {
   const [isFetching, setIsFetching] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Use hooks instead of manual loading
+  const {
+    data: dataSourcesData = [],
+    isLoading: dataSourcesLoading,
+    error: dataSourcesError,
+    refetch: refetchDataSources,
+  } = useDataSources();
+  const syncMutation = useSyncDataSource();
+  const deleteMutation = useDeleteDataSource();
+
+  // Update local state when hook data changes
+  useEffect(() => {
+    setDataSources(dataSourcesData);
+    setIsFetching(dataSourcesLoading);
+    if (dataSourcesError) {
+      toast.error("Failed to load data sources");
+    }
+  }, [dataSourcesData, dataSourcesLoading, dataSourcesError]);
+
   const filteredDataSources = dataSources.filter((ds) => {
     const matchesSearch =
       ds.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -96,36 +120,11 @@ export default function SyncedDataPage() {
     error: dataSources.filter((d) => d.status === "error").length,
   };
 
-  // Load data sources from API
-  useEffect(() => {
-    if (currentWorkspace) {
-      loadDataSources();
-    }
-  }, [currentWorkspace]);
-
-  async function loadDataSources() {
-    if (!currentWorkspace) return;
-
-    try {
-      setIsFetching(true);
-      const data = await integrationApi.getDataSources();
-      setDataSources(data);
-    } catch (error: any) {
-      console.error("Failed to load data sources:", error);
-      toast.error(error.message || "Failed to load data sources");
-    } finally {
-      setIsFetching(false);
-    }
-  }
-
   const handleSyncDataSource = async (id: string, name: string) => {
     setIsLoading(true);
     try {
-      await integrationApi.syncDataSource(id);
+      await syncMutation.mutateAsync(id);
       toast.success(`Sync started for "${name}"`);
-
-      // Reload data sources after triggering sync
-      await loadDataSources();
     } catch (error: any) {
       console.error("Failed to sync data source:", error);
       toast.error(error.message || "Failed to sync data source");
@@ -139,12 +138,8 @@ export default function SyncedDataPage() {
 
     setIsLoading(true);
     try {
-      await integrationApi.deleteDataSource(dataSourceToDelete);
+      await deleteMutation.mutateAsync(dataSourceToDelete);
       toast.success("Data source deleted successfully");
-
-      // Reload data sources after deletion
-      await loadDataSources();
-
       setDataSourceToDelete(null);
     } catch (error: any) {
       console.error("Failed to delete data source:", error);
@@ -158,7 +153,7 @@ export default function SyncedDataPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Synced Data</h1>
+          <h1 className="text-xl font-semibold">Synced Data</h1>
           <p className="text-sm text-muted-foreground">
             Manage synced data from your sources
           </p>
@@ -236,7 +231,7 @@ export default function SyncedDataPage() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={loadDataSources}
+                onClick={() => refetchDataSources()}
                 disabled={isFetching}
               >
                 <IconRefresh
@@ -375,7 +370,6 @@ export default function SyncedDataPage() {
             <AlertDialogTitle>Delete Data Source</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete this data source? This action
-              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

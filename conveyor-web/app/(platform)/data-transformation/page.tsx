@@ -23,8 +23,10 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { transformationApi, Notebook } from "@/lib/api/transformation";
-import { integrationApi, PipelineRun } from "@/lib/api/integration";
+import { useNotebooks } from "@/hooks/use-transformation";
+import { usePipelineRuns } from "@/hooks/use-integration";
+import { Notebook } from "@/lib/api/transformation";
+import { PipelineRun } from "@/lib/api/integration";
 
 export default function DataTransformationPage() {
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
@@ -32,22 +34,37 @@ export default function DataTransformationPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const [notebooksData, runsData] = await Promise.all([
-        transformationApi.getNotebooks(),
-        integrationApi.getPipelineRuns(),
-      ]);
-      setNotebooks(notebooksData);
-      setPipelineRuns(runsData);
-    } catch (err) {
-      console.error("Failed to load transformation data:", err);
+  // Use hooks instead of manual loading
+  const {
+    data: notebooksData = [],
+    isLoading: notebooksLoading,
+    error: notebooksError,
+  } = useNotebooks();
+  const {
+    data: runsData = [],
+    isLoading: runsLoading,
+    error: runsError,
+  } = usePipelineRuns();
+
+  // Update local state when hook data changes
+  useEffect(() => {
+    setNotebooks(notebooksData);
+    setPipelineRuns(runsData);
+    setIsLoading(notebooksLoading || runsLoading);
+    if (notebooksError || runsError) {
       setError("Failed to load data");
-    } finally {
-      setIsLoading(false);
     }
+  }, [
+    notebooksData,
+    runsData,
+    notebooksLoading,
+    runsLoading,
+    notebooksError,
+    runsError,
+  ]);
+
+  const loadData = useCallback(async () => {
+    // No longer needed - hooks handle this
   }, []);
 
   useEffect(() => {
@@ -150,11 +167,11 @@ export default function DataTransformationPage() {
     <>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-500/10">
-            <IconTransform className="h-6 w-6 text-purple-500" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+            <IconTransform className="h-5 w-5 text-muted-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Data Transformation</h1>
+            <h1 className="text-xl font-semibold">Data Transformation</h1>
             <p className="text-sm text-muted-foreground">
               Transform and process your data with notebooks and jobs
             </p>
@@ -201,7 +218,7 @@ export default function DataTransformationPage() {
                   <stat.icon className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stat.value}</div>
+                  <div className="text-2xl font-semibold">{stat.value}</div>
                   <p className="text-xs text-muted-foreground mt-1">
                     {stat.change}
                   </p>
@@ -211,11 +228,11 @@ export default function DataTransformationPage() {
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+            <h2 className="text-base font-medium mb-3">Quick Actions</h2>
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
               {quickActions.map((action) => (
                 <Link key={action.title} href={action.href}>
-                  <Card className="hover:shadow-md transition-all hover:border-primary cursor-pointer h-full">
+                  <Card className="hover:bg-accent/50 transition-colors cursor-pointer h-full">
                     <CardContent className="p-4">
                       <div className="flex flex-col gap-3">
                         <div
@@ -355,7 +372,7 @@ export default function DataTransformationPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-6 md:grid-cols-3">
+              <div className="grid gap-5 md:grid-cols-3">
                 <div>
                   <h3 className="font-semibold mb-3 flex items-center gap-2">
                     <IconCode className="h-4 w-4 text-green-500" />

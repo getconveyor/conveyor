@@ -62,7 +62,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { integrationApi, Pipeline } from "@/lib/api/integration";
+import { usePipelines } from "@/hooks/use-pipelines";
+import { Pipeline } from "@/lib/api/integration";
 
 type WorkflowStatus = "running" | "idle" | "failed" | "success";
 
@@ -97,7 +98,7 @@ const mapPipelineToWorkflow = (pipeline: Pipeline): Workflow => {
   const status: WorkflowStatus =
     pipeline.status === "running"
       ? "running"
-      : pipeline.status === "error"
+      : pipeline.status === "failed"
       ? "failed"
       : pipeline.status === "active"
       ? "success"
@@ -143,18 +144,27 @@ export default function WorkflowsPage() {
     template: "",
   });
 
-  const loadWorkflows = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const pipelines = await integrationApi.getPipelines();
+  // Use hook instead of manual loading
+  const {
+    data: pipelines = [],
+    isLoading: pipelinesLoading,
+    error: pipelinesError,
+  } = usePipelines();
+
+  // Update local state when hook data changes
+  useEffect(() => {
+    if (pipelines.length >= 0) {
       setWorkflows(pipelines.map(mapPipelineToWorkflow));
-    } catch (err) {
-      console.error("Failed to load workflows:", err);
-      setError("Failed to load workflows");
-    } finally {
       setIsLoading(false);
     }
+    if (pipelinesError) {
+      setError("Failed to load workflows");
+      setIsLoading(false);
+    }
+  }, [pipelines, pipelinesError]);
+
+  const loadWorkflows = useCallback(async () => {
+    // No longer needed - hook handles this
   }, []);
 
   useEffect(() => {
@@ -316,7 +326,7 @@ export default function WorkflowsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Workflows</h1>
+          <h1 className="text-xl font-semibold">Workflows</h1>
           <p className="text-sm text-muted-foreground">
             Design and manage data transformation workflows
           </p>

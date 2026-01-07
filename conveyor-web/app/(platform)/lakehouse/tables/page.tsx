@@ -124,7 +124,7 @@ export default function TablesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Table Explorer</h1>
+          <h1 className="text-xl font-semibold">Table Explorer</h1>
           <p className="text-sm text-muted-foreground">
             Browse and manage Iceberg tables across all layers
           </p>
@@ -265,7 +265,7 @@ export default function TablesPage() {
                   {layerTables.map((table) => (
                     <Card
                       key={table.full_name}
-                      className="hover:shadow-md transition-shadow"
+                      className="hover:bg-accent/30 transition-colors"
                     >
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">

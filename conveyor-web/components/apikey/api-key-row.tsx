@@ -1,8 +1,8 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { apiKeyApi, ApiKey } from '@/lib/api/apikey'
-import { Button } from '@/components/ui/button'
+import { useState } from "react";
+import { ApiKey } from "@/lib/api/apikey";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,43 +12,44 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
-import { Loader2, Trash2, Key, Clock } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Trash2, Key, Clock } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useDeleteApiKey } from "@/hooks/use-apikey";
 
 interface ApiKeyRowProps {
-  apiKey: ApiKey
-  onDelete: () => void
+  apiKey: ApiKey;
+  onDelete: () => void;
 }
 
 export function ApiKeyRow({ apiKey, onDelete }: ApiKeyRowProps) {
-  const { toast } = useToast()
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const { toast } = useToast();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const isExpired = apiKey.expires_at && new Date(apiKey.expires_at) < new Date()
-  const neverUsed = !apiKey.last_used
+  const deleteMutation = useDeleteApiKey();
+
+  const isExpired =
+    apiKey.expires_at && new Date(apiKey.expires_at) < new Date();
+  const neverUsed = !apiKey.last_used;
 
   async function handleDelete() {
-    setDeleting(true)
     try {
-      await apiKeyApi.deleteApiKey(apiKey.id)
+      await deleteMutation.mutateAsync(apiKey.id);
       toast({
-        title: 'API key deleted',
+        title: "API key deleted",
         description: `${apiKey.name} has been deleted successfully.`,
-      })
-      onDelete()
-      setShowDeleteDialog(false)
+      });
+      onDelete();
+      setShowDeleteDialog(false);
     } catch (error: any) {
-      console.error('Failed to delete API key:', error)
+      console.error("Failed to delete API key:", error);
       toast({
-        title: 'Failed to delete API key',
-        description: error.message || 'An error occurred while deleting the API key.',
-        variant: 'destructive',
-      })
-    } finally {
-      setDeleting(false)
+        title: "Failed to delete API key",
+        description:
+          error.message || "An error occurred while deleting the API key.",
+        variant: "destructive",
+      });
     }
   }
 
@@ -105,9 +106,9 @@ export function ApiKeyRow({ apiKey, onDelete }: ApiKeyRowProps) {
             variant="ghost"
             size="icon"
             onClick={() => setShowDeleteDialog(true)}
-            disabled={deleting}
+            disabled={deleteMutation.isPending}
           >
-            {deleting ? (
+            {deleteMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Trash2 className="h-4 w-4 text-destructive" />
@@ -121,22 +122,28 @@ export function ApiKeyRow({ apiKey, onDelete }: ApiKeyRowProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete API Key?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{apiKey.name}"? This action cannot be undone and any applications using this key will lose access.
+              Are you sure you want to delete "{apiKey.name}"? This action
+              cannot be undone and any applications using this key will lose
+              access.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              disabled={deleting}
+              disabled={deleteMutation.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {deleteMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }

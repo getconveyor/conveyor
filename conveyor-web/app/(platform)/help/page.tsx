@@ -207,7 +207,7 @@ export default function HelpPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Help Center</h1>
+          <h1 className="text-xl font-semibold">Help Center</h1>
           <p className="text-sm text-muted-foreground">
             Find guides, tutorials, and documentation
           </p>
@@ -271,7 +271,7 @@ export default function HelpPage() {
 
           {/* Categories */}
           <div>
-            <h2 className="text-lg font-semibold mb-4">Browse by Category</h2>
+            <h2 className="text-base font-medium mb-3">Browse by Category</h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {categories.map((category) => (
                 <Card
@@ -308,7 +308,7 @@ export default function HelpPage() {
             <Card className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-blue-200 dark:border-blue-800">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
-                  <IconVideo className="h-6 w-6 text-blue-500" />
+                  <IconVideo className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <h3 className="font-semibold">Video Tutorials</h3>
                     <p className="text-sm text-muted-foreground mt-1">
@@ -325,7 +325,7 @@ export default function HelpPage() {
             <Card className="bg-gradient-to-br from-green-500/10 to-teal-500/10 border-green-200 dark:border-green-800">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
-                  <IconCode className="h-6 w-6 text-green-500" />
+                  <IconCode className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <h3 className="font-semibold">API Reference</h3>
                     <p className="text-sm text-muted-foreground mt-1">
@@ -342,7 +342,7 @@ export default function HelpPage() {
             <Card className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-200 dark:border-orange-800">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
-                  <IconHelp className="h-6 w-6 text-orange-500" />
+                  <IconHelp className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <h3 className="font-semibold">Contact Support</h3>
                     <p className="text-sm text-muted-foreground mt-1">

@@ -40,7 +40,7 @@ export default function GoldLayerPage() {
       <div>
         <div className="flex items-center gap-3 mb-2">
           <span className="text-4xl">🥇</span>
-          <h1 className="text-3xl font-bold tracking-tight">Gold Layer</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Gold Layer</h1>
         </div>
         <p className="text-muted-foreground">
           Business-ready aggregated data • Optimized for reporting • Production metrics and KPIs
@@ -115,7 +115,7 @@ export default function GoldLayerPage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredTables.map((table) => (
-              <Card key={table.full_name} className="hover:shadow-md transition-shadow">
+              <Card key={table.full_name} className="hover:bg-accent/30 transition-colors">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <IconTable className="h-5 w-5 text-muted-foreground mt-0.5" />

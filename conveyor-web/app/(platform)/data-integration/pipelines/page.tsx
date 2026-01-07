@@ -128,7 +128,7 @@ export default function PipelinesPage() {
     () => ({
       total: pipelines.length,
       running: pipelines.filter((p) => p.status === "running").length,
-      failed: pipelines.filter((p) => p.status === "error").length,
+      failed: pipelines.filter((p) => p.status === "failed").length,
       paused: pipelines.filter((p) => p.status === "paused").length,
     }),
     [pipelines]
@@ -638,7 +638,7 @@ export default function PipelinesPage() {
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="running">Running</SelectItem>
-              <SelectItem value="error">Error</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
               <SelectItem value="paused">Paused</SelectItem>
               <SelectItem value="idle">Idle</SelectItem>
             </SelectContent>

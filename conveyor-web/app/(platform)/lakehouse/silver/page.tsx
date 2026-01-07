@@ -40,7 +40,7 @@ export default function SilverLayerPage() {
       <div>
         <div className="flex items-center gap-3 mb-2">
           <span className="text-4xl">🥈</span>
-          <h1 className="text-3xl font-bold tracking-tight">Silver Layer</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Silver Layer</h1>
         </div>
         <p className="text-muted-foreground">
           Cleaned and validated data • Standardized formats • Quality checks applied
@@ -115,7 +115,7 @@ export default function SilverLayerPage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredTables.map((table) => (
-              <Card key={table.full_name} className="hover:shadow-md transition-shadow">
+              <Card key={table.full_name} className="hover:bg-accent/30 transition-colors">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <IconTable className="h-5 w-5 text-muted-foreground mt-0.5" />

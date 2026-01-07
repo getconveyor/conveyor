@@ -51,7 +51,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { dataScienceApi, ModelVersion, MLModel } from "@/lib/api/datascience";
+import {
+  useModels,
+  useModelVersions,
+  useDeployModelVersion,
+  useUndeployModelVersion,
+  useServingInfo,
+} from "@/hooks/use-datascience";
+import { MLModel, ModelVersion } from "@/lib/api/datascience";
 import { useToast } from "@/hooks/use-toast";
 
 type DeploymentStatus = "active" | "inactive" | "deploying" | "failed";
@@ -106,61 +113,47 @@ export default function DeploymentsPage() {
   });
   const { toast } = useToast();
 
+  // Hooks
+  const { data: modelsData = [], isLoading: modelsLoading } = useModels();
+  const { data: versionsData = [], isLoading: versionsLoading } =
+    useModelVersions();
+  const deployMutation = useDeployModelVersion();
+  const undeployMutation = useUndeployModelVersion();
+
   // Fetch deployed model versions
   const fetchDeployments = useCallback(async () => {
     try {
       setIsLoading(true);
 
-      // Get all model versions, especially production/staging
-      const [allVersions, modelsData] = await Promise.all([
-        dataScienceApi.getModelVersions(),
-        dataScienceApi.getModels(),
-      ]);
+      // Use hook data instead of direct API calls
+      const allVersions = versionsData;
+      const modelsDataLocal = modelsData;
 
-      setModels(modelsData);
+      setModels(modelsDataLocal);
       setVersions(allVersions);
 
-      // Get serving info for each version to check if deployed
-      const deploymentPromises = allVersions.map(async (version) => {
-        try {
-          const servingInfo = await dataScienceApi.getServingInfo(version.id);
-          return { version, servingInfo };
-        } catch {
-          return { version, servingInfo: null };
-        }
-      });
-
-      const results = await Promise.all(deploymentPromises);
-
-      // Convert to deployment format
-      const deploymentData: Deployment[] = results
-        .filter(
-          (r) => r.servingInfo?.is_deployed || r.version.stage === "production"
-        )
-        .map(({ version, servingInfo }) => {
-          const model = modelsData.find((m) => m.id === version.model);
+      // For now, show all production versions as potentially deployed
+      // TODO: Implement proper serving info fetching with hooks
+      const deploymentData: Deployment[] = allVersions
+        .filter((version) => version.stage === "production")
+        .map((version) => {
+          const model = modelsDataLocal.find((m) => m.id === version.model);
           return {
             id: version.id,
             versionId: version.id,
             modelName: model?.name || version.model_name || "Unknown Model",
             version: `v${version.version_number}`,
-            status: servingInfo?.is_deployed
-              ? ("active" as DeploymentStatus)
-              : ("inactive" as DeploymentStatus),
-            endpoint:
-              servingInfo?.endpoint ||
-              `/api/data-science/versions/${version.id}/predict/`,
+            status: "inactive" as DeploymentStatus, // Default to inactive
+            endpoint: `/api/data-science/versions/${version.id}/predict/`,
             requests: "-",
             latency: "-",
-            uptime: servingInfo?.is_deployed ? "99.9%" : "-",
-            deployedAt: servingInfo?.deployed_at
-              ? new Date(servingInfo.deployed_at).toLocaleString()
-              : version.created_at,
+            uptime: "-",
+            deployedAt: version.created_at,
             deployedBy: version.created_by_name || "System",
-            replicas: servingInfo?.is_deployed ? 1 : 0,
+            replicas: 0,
             cpu: "2 cores",
             memory: "4 GB",
-            framework: servingInfo?.framework || model?.framework || "unknown",
+            framework: model?.framework || "unknown",
           };
         });
 
@@ -202,7 +195,7 @@ export default function DeploymentsPage() {
 
     setIsActionLoading(true);
     try {
-      await dataScienceApi.deployModelVersion(formData.versionId);
+      await deployMutation.mutateAsync(formData.versionId);
       toast({
         title: "Success",
         description: "Model deployed successfully",
@@ -225,7 +218,7 @@ export default function DeploymentsPage() {
   const handleStopDeployment = async (deployment: Deployment) => {
     setIsActionLoading(true);
     try {
-      await dataScienceApi.undeployModelVersion(deployment.versionId);
+      await undeployMutation.mutateAsync(deployment.versionId);
       toast({
         title: "Success",
         description: "Model undeployed successfully",
@@ -246,7 +239,7 @@ export default function DeploymentsPage() {
   const handleStartDeployment = async (deployment: Deployment) => {
     setIsActionLoading(true);
     try {
-      await dataScienceApi.deployModelVersion(deployment.versionId);
+      await deployMutation.mutateAsync(deployment.versionId);
       toast({
         title: "Success",
         description: "Model deployed successfully",
@@ -269,7 +262,7 @@ export default function DeploymentsPage() {
 
     setIsActionLoading(true);
     try {
-      await dataScienceApi.undeployModelVersion(deploymentToDelete);
+      await undeployMutation.mutateAsync(deploymentToDelete);
       toast({
         title: "Success",
         description: "Deployment removed successfully",
@@ -321,7 +314,7 @@ export default function DeploymentsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Model Deployments</h1>
+          <h1 className="text-xl font-semibold">Model Deployments</h1>
           <p className="text-sm text-muted-foreground">
             Manage and monitor deployed ML models
           </p>

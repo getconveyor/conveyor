@@ -170,7 +170,7 @@ export default function DataAnalyticsPage() {
             <IconChartBar className="h-6 w-6 text-emerald-500" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Data Analytics</h1>
+            <h1 className="text-xl font-semibold">Data Analytics</h1>
             <p className="text-sm text-muted-foreground">
               Interactive dashboards, reports, and visualizations for data
               exploration
@@ -195,7 +195,7 @@ export default function DataAnalyticsPage() {
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className="text-2xl font-semibold">{stat.value}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 {stat.change}
               </p>
@@ -205,11 +205,11 @@ export default function DataAnalyticsPage() {
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+        <h2 className="text-base font-medium mb-3">Quick Actions</h2>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           {quickActions.map((action) => (
             <Link key={action.title} href={action.href}>
-              <Card className="hover:shadow-md transition-all hover:border-primary cursor-pointer h-full">
+              <Card className="hover:bg-accent/50 transition-colors cursor-pointer h-full">
                 <CardContent className="p-4">
                   <div className="flex flex-col gap-3">
                     <div
@@ -342,7 +342,7 @@ export default function DataAnalyticsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-3">
             <div>
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 <IconChartPie className="h-4 w-4 text-blue-500" />

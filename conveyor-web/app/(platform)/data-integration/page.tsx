@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { useEffect, useState } from "react"
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
   IconArrowsExchange,
   IconDatabase,
@@ -12,52 +12,78 @@ import {
   IconTrendingUp,
   IconPlayerPlay,
   IconSettings,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { integrationApi, Pipeline, DataSource } from "@/lib/api/integration"
-import { Skeleton } from "@/components/ui/skeleton"
-import { formatDistanceToNow } from "date-fns"
+} from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useDataSources, usePipelines } from "@/hooks/use-integration";
+import { Pipeline, DataSource } from "@/lib/api/integration";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatDistanceToNow } from "date-fns";
 
 export default function DataIntegrationPage() {
-  const [loading, setLoading] = useState(true)
-  const [pipelines, setPipelines] = useState<Pipeline[]>([])
-  const [dataSources, setDataSources] = useState<DataSource[]>([])
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true);
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [dataSources, setDataSources] = useState<DataSource[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
+  // Use hooks instead of manual loading
+  const {
+    data: pipelinesData = [],
+    isLoading: pipelinesLoading,
+    error: pipelinesError,
+  } = usePipelines();
+  const {
+    data: sourcesData = [],
+    isLoading: sourcesLoading,
+    error: sourcesError,
+  } = useDataSources();
+
+  // Update local state when hook data changes
   useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true)
-        const [pipelinesData, sourcesData] = await Promise.all([
-          integrationApi.getPipelines(),
-          integrationApi.getDataSources()
-        ])
-        setPipelines(pipelinesData)
-        setDataSources(sourcesData)
-      } catch (err) {
-        console.error("Failed to load integration data:", err)
-        setError("Failed to load dashboard data")
-      } finally {
-        setLoading(false)
-      }
+    setPipelines(pipelinesData);
+    setDataSources(sourcesData);
+    setLoading(pipelinesLoading || sourcesLoading);
+    if (pipelinesError || sourcesError) {
+      setError("Failed to load dashboard data");
     }
-
-    loadData()
-  }, [])
+  }, [
+    pipelinesData,
+    sourcesData,
+    pipelinesLoading,
+    sourcesLoading,
+    pipelinesError,
+    sourcesError,
+  ]);
 
   // Calculate stats
-  const activePipelines = pipelines.filter(p => p.status === 'active' || p.status === 'running').length
-  const connectedSources = dataSources.filter(s => s.status === 'active').length
+  const activePipelines = pipelines.filter(
+    (p) => p.status === "active" || p.status === "running"
+  ).length;
+  const connectedSources = dataSources.filter(
+    (s) => s.status === "active"
+  ).length;
 
   // Calculate success rate
-  const completedRuns = pipelines.reduce((acc, p) => acc + (p.run_count || 0), 0)
-  const successRate = completedRuns > 0
-    ? Math.round(pipelines.reduce((acc, p) => acc + (p.success_rate || 0), 0) / pipelines.length)
-    : 100
+  const completedRuns = pipelines.reduce(
+    (acc, p) => acc + (p.run_count || 0),
+    0
+  );
+  const successRate =
+    completedRuns > 0
+      ? Math.round(
+          pipelines.reduce((acc, p) => acc + (p.success_rate || 0), 0) /
+            pipelines.length
+        )
+      : 100;
 
-  const failedRuns = pipelines.filter(p => p.status === 'error').length
+  const failedRuns = pipelines.filter((p) => p.status === "failed").length;
 
   const stats = [
     {
@@ -88,11 +114,15 @@ export default function DataIntegrationPage() {
       icon: IconAlertTriangle,
       trend: failedRuns > 0 ? "down" : "neutral",
     },
-  ]
+  ];
 
   const recentPipelines = [...pipelines]
-    .sort((a, b) => new Date(b.last_run || 0).getTime() - new Date(a.last_run || 0).getTime())
-    .slice(0, 5)
+    .sort(
+      (a, b) =>
+        new Date(b.last_run || 0).getTime() -
+        new Date(a.last_run || 0).getTime()
+    )
+    .slice(0, 5);
 
   const quickActions = [
     {
@@ -116,20 +146,27 @@ export default function DataIntegrationPage() {
       href: "/data-integration/schedules",
       color: "text-green-500",
     },
-  ]
+  ];
 
   // Status badge helper
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'running': return 'default'
-      case 'active': return 'default'
-      case 'success': return 'outline'
-      case 'error': return 'destructive'
-      case 'failed': return 'destructive'
-      case 'paused': return 'secondary'
-      default: return 'outline'
+      case "running":
+        return "default";
+      case "active":
+        return "default";
+      case "success":
+        return "outline";
+      case "error":
+        return "destructive";
+      case "failed":
+        return "destructive";
+      case "paused":
+        return "secondary";
+      default:
+        return "outline";
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -150,18 +187,18 @@ export default function DataIntegrationPage() {
         </div>
         <Skeleton className="h-64" />
       </div>
-    )
+    );
   }
 
   return (
     <>
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10">
-            <IconArrowsExchange className="h-6 w-6 text-blue-500" />
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+            <IconArrowsExchange className="h-5 w-5 text-muted-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Data Integration</h1>
+            <h1 className="text-xl font-semibold">Data Integration</h1>
             <p className="text-sm text-muted-foreground">
               Orchestrate data movement across sources and destinations
             </p>
@@ -176,36 +213,42 @@ export default function DataIntegrationPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
         {stats.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {stat.title}
+              </CardTitle>
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">{stat.change}</p>
+              <div className="text-2xl font-semibold">{stat.value}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stat.change}
+              </p>
             </CardContent>
           </Card>
         ))}
       </div>
 
       {/* Quick Actions */}
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+      <div className="mb-6">
+        <h2 className="text-base font-medium mb-3">Quick Actions</h2>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           {quickActions.map((action) => (
             <Link key={action.title} href={action.href}>
-              <Card className="hover:shadow-md transition-all hover:border-primary cursor-pointer h-full">
+              <Card className="hover:bg-accent/50 transition-colors cursor-pointer h-full">
                 <CardContent className="p-4">
                   <div className="flex flex-col gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-opacity-10 ${action.color}`}>
-                      <action.icon className={`h-5 w-5 ${action.color}`} />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted">
+                      <action.icon className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-semibold text-sm mb-1">{action.title}</p>
-                      <p className="text-xs text-muted-foreground">{action.description}</p>
+                      <p className="font-medium text-sm mb-1">{action.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {action.description}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -233,19 +276,32 @@ export default function DataIntegrationPage() {
                 <IconArrowsExchange className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>No pipelines found</p>
                 <Button variant="link" asChild className="mt-2">
-                  <Link href="/data-integration/pipelines/new">Create your first pipeline</Link>
+                  <Link href="/data-integration/pipelines/new">
+                    Create your first pipeline
+                  </Link>
                 </Button>
               </div>
             ) : (
               <div className="space-y-3">
                 {recentPipelines.map((pipeline) => (
-                  <div key={pipeline.id} className="flex items-center justify-between p-3 rounded-lg border">
+                  <div
+                    key={pipeline.id}
+                    className="flex items-center justify-between p-3 rounded-lg border"
+                  >
                     <div className="flex items-center gap-3">
                       <IconPlayerPlay className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="font-medium text-sm">{pipeline.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {pipeline.destination_name || pipeline.destination_details?.name || 'Unknown'} • {pipeline.last_run ? formatDistanceToNow(new Date(pipeline.last_run), { addSuffix: true }) : 'Never ran'}
+                          {pipeline.destination_name ||
+                            pipeline.destination_details?.name ||
+                            "Unknown"}{" "}
+                          •{" "}
+                          {pipeline.last_run
+                            ? formatDistanceToNow(new Date(pipeline.last_run), {
+                                addSuffix: true,
+                              })
+                            : "Never ran"}
                         </p>
                       </div>
                     </div>
@@ -275,28 +331,36 @@ export default function DataIntegrationPage() {
                   <div className="h-2 w-2 rounded-full bg-green-500" />
                   <span className="text-sm">Pipeline Orchestrator</span>
                 </div>
-                <Badge variant="outline" className="text-green-600 text-xs">Healthy</Badge>
+                <Badge variant="outline" className="text-green-600 text-xs">
+                  Healthy
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-green-500" />
                   <span className="text-sm">Connection Pool</span>
                 </div>
-                <Badge variant="outline" className="text-green-600 text-xs">Healthy</Badge>
+                <Badge variant="outline" className="text-green-600 text-xs">
+                  Healthy
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-green-500" />
                   <span className="text-sm">Scheduler Service</span>
                 </div>
-                <Badge variant="outline" className="text-green-600 text-xs">Healthy</Badge>
+                <Badge variant="outline" className="text-green-600 text-xs">
+                  Healthy
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-green-500" />
                   <span className="text-sm">Data Catalog Sync</span>
                 </div>
-                <Badge variant="outline" className="text-green-600 text-xs">Healthy</Badge>
+                <Badge variant="outline" className="text-green-600 text-xs">
+                  Healthy
+                </Badge>
               </div>
             </div>
 
@@ -308,7 +372,8 @@ export default function DataIntegrationPage() {
                     System Optimal
                   </p>
                   <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
-                    All systems are running normally. No incidents reported in the last 24 hours.
+                    All systems are running normally. No incidents reported in
+                    the last 24 hours.
                   </p>
                 </div>
               </div>
@@ -322,11 +387,12 @@ export default function DataIntegrationPage() {
         <CardHeader>
           <CardTitle>Platform Capabilities</CardTitle>
           <CardDescription>
-            Build ETL/ELT pipelines to ingest data from databases, APIs, files, and SaaS applications
+            Build ETL/ELT pipelines to ingest data from databases, APIs, files,
+            and SaaS applications
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2">
             <div>
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 <IconCheck className="h-4 w-4 text-green-500" />
@@ -359,5 +425,5 @@ export default function DataIntegrationPage() {
         </CardContent>
       </Card>
     </>
-  )
+  );
 }

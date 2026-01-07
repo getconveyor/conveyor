@@ -181,10 +181,10 @@ export default function NamespacesPage() {
   };
 
   return (
-    <div className="flex-1 space-y-6 p-6">
+    <div className="flex-1 space-y-6 p-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Namespaces</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Namespaces</h1>
           <p className="text-muted-foreground">
             Manage Trino namespaces for your data lakehouse projects
           </p>

@@ -168,11 +168,11 @@ export default function DataGovernancePage() {
     <>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-500/10">
-            <IconShield className="h-6 w-6 text-amber-500" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+            <IconShield className="h-5 w-5 text-muted-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Data Governance</h1>
+            <h1 className="text-xl font-semibold">Data Governance</h1>
             <p className="text-sm text-muted-foreground">
               Manage data quality, lineage, compliance, and access control
               across your platform
@@ -197,7 +197,7 @@ export default function DataGovernancePage() {
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className="text-2xl font-semibold">{stat.value}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 {stat.change}
               </p>
@@ -207,11 +207,11 @@ export default function DataGovernancePage() {
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+        <h2 className="text-base font-medium mb-3">Quick Actions</h2>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           {quickActions.map((action) => (
             <Link key={action.title} href={action.href}>
-              <Card className="hover:shadow-md transition-all hover:border-primary cursor-pointer h-full">
+              <Card className="hover:bg-accent/50 transition-colors cursor-pointer h-full">
                 <CardContent className="p-4">
                   <div className="flex flex-col gap-3">
                     <div
@@ -435,7 +435,7 @@ export default function DataGovernancePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-3">
             <div>
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 <IconBook className="h-4 w-4 text-blue-500" />

@@ -277,7 +277,7 @@ export default function NotebooksPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">ML Notebooks</h1>
+          <h1 className="text-xl font-semibold">ML Notebooks</h1>
           <p className="text-sm text-muted-foreground">
             Interactive notebooks for machine learning experiments
           </p>

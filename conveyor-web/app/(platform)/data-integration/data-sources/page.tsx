@@ -26,6 +26,8 @@ import {
   IconTrash,
   IconExternalLink,
   IconLoader2,
+  IconEye,
+  IconTable,
 } from "@tabler/icons-react";
 import {
   Card,
@@ -71,6 +73,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
 
 type SourceStatus = "active" | "inactive" | "error" | "testing";
@@ -179,6 +190,22 @@ export default function SourcesPage() {
     id: string;
     name: string;
   } | null>(null);
+
+  // Preview state
+  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
+  const [previewSource, setPreviewSource] = useState<Source | null>(null);
+  const [previewStreams, setPreviewStreams] = useState<
+    Array<{ name: string; namespace?: string }>
+  >([]);
+  const [selectedStream, setSelectedStream] = useState<string>("");
+  const [previewData, setPreviewData] = useState<{
+    columns: Array<{ name: string; type: string; nullable: boolean }>;
+    records: Record<string, any>[];
+    record_count: number;
+    truncated: boolean;
+  } | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [isLoadingStreams, setIsLoadingStreams] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -439,6 +466,55 @@ export default function SourcesPage() {
     }
   };
 
+  const handlePreviewData = async (source: Source) => {
+    setPreviewSource(source);
+    setPreviewStreams([]);
+    setSelectedStream("");
+    setPreviewData(null);
+    setIsPreviewDialogOpen(true);
+    setIsLoadingStreams(true);
+
+    try {
+      // First, fetch schema to get available streams
+      const schema = await integrationApi.getSourceSchema(source.id);
+      setPreviewStreams(schema.streams || []);
+      if (schema.streams?.length > 0) {
+        setSelectedStream(schema.streams[0].name);
+      }
+    } catch (error: any) {
+      console.error("Failed to load schema:", error);
+      toast.error(error.message || "Failed to load available tables/streams");
+    } finally {
+      setIsLoadingStreams(false);
+    }
+  };
+
+  const handleLoadPreview = async () => {
+    if (!previewSource || !selectedStream) return;
+
+    setIsLoadingPreview(true);
+    setPreviewData(null);
+
+    try {
+      const result = await integrationApi.previewSourceData(
+        previewSource.id,
+        selectedStream,
+        20
+      );
+      setPreviewData({
+        columns: result.columns,
+        records: result.records,
+        record_count: result.record_count,
+        truncated: result.truncated,
+      });
+    } catch (error: any) {
+      console.error("Failed to preview data:", error);
+      toast.error(error.message || "Failed to preview data");
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -635,6 +711,13 @@ export default function SourcesPage() {
                               <IconRefresh className="mr-2 h-4 w-4" />
                               Test Connection
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handlePreviewData(source)}
+                              disabled={source.status !== "active"}
+                            >
+                              <IconEye className="mr-2 h-4 w-4" />
+                              Preview Data
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive"
@@ -820,7 +903,7 @@ export default function SourcesPage() {
                     return (
                       <Card
                         key={sourceType.id}
-                        className="hover:shadow-md transition-shadow"
+                        className="hover:bg-accent/30 transition-colors"
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start gap-3 mb-3">
@@ -1441,6 +1524,161 @@ export default function SourcesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Preview Data Dialog */}
+      <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconEye className="h-5 w-5" />
+              Preview Data
+            </DialogTitle>
+            <DialogDescription>
+              {previewSource?.name} - Preview sample data from your source
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-hidden flex flex-col gap-4">
+            {/* Stream Selection */}
+            <div className="flex items-end gap-4">
+              <div className="flex-1">
+                <Label htmlFor="stream-select" className="text-sm font-medium">
+                  Select Table/Stream
+                </Label>
+                <Select
+                  value={selectedStream}
+                  onValueChange={setSelectedStream}
+                  disabled={isLoadingStreams}
+                >
+                  <SelectTrigger id="stream-select" className="mt-1.5">
+                    <SelectValue placeholder="Select a table or stream" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {previewStreams.map((stream) => (
+                      <SelectItem key={stream.name} value={stream.name}>
+                        <div className="flex items-center gap-2">
+                          <IconTable className="h-4 w-4 text-muted-foreground" />
+                          {stream.namespace
+                            ? `${stream.namespace}.${stream.name}`
+                            : stream.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={handleLoadPreview}
+                disabled={!selectedStream || isLoadingPreview}
+              >
+                {isLoadingPreview ? (
+                  <>
+                    <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <IconEye className="mr-2 h-4 w-4" />
+                    Load Preview
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Loading State */}
+            {isLoadingStreams && (
+              <div className="flex items-center justify-center py-12">
+                <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+
+            {/* No Streams Found */}
+            {!isLoadingStreams && previewStreams.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <IconTable className="h-12 w-12 mb-4 opacity-50" />
+                <p>No tables or streams found in this source.</p>
+                <p className="text-sm">
+                  Make sure the connection is active and has accessible data.
+                </p>
+              </div>
+            )}
+
+            {/* Preview Data */}
+            {previewData && (
+              <div className="flex-1 overflow-hidden border rounded-lg">
+                <ScrollArea className="h-[400px]">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm">
+                      <TableRow>
+                        {previewData.columns.map((col) => (
+                          <TableHead
+                            key={col.name}
+                            className="whitespace-nowrap"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-semibold">{col.name}</span>
+                              <span className="text-xs text-muted-foreground font-normal">
+                                {col.type}
+                                {col.nullable ? " (nullable)" : ""}
+                              </span>
+                            </div>
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {previewData.records.map((record, idx) => (
+                        <TableRow key={idx}>
+                          {previewData.columns.map((col) => (
+                            <TableCell
+                              key={col.name}
+                              className="font-mono text-sm max-w-[300px] truncate"
+                              title={String(record[col.name] ?? "")}
+                            >
+                              {record[col.name] === null ? (
+                                <span className="text-muted-foreground italic">
+                                  null
+                                </span>
+                              ) : typeof record[col.name] === "object" ? (
+                                <span className="text-xs">
+                                  {JSON.stringify(record[col.name])}
+                                </span>
+                              ) : (
+                                String(record[col.name])
+                              )}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+                <div className="px-4 py-2 bg-muted/50 border-t text-xs text-muted-foreground">
+                  Showing {previewData.record_count} rows
+                  {previewData.truncated && " (truncated to 20 rows)"}
+                </div>
+              </div>
+            )}
+
+            {/* No Data Message */}
+            {previewData && previewData.records.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <IconTable className="h-8 w-8 mb-2 opacity-50" />
+                <p>No data found in this table.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsPreviewDialogOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

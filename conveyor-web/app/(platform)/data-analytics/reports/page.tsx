@@ -215,7 +215,7 @@ export default function ReportsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Reports</h1>
+          <h1 className="text-xl font-semibold">Reports</h1>
           <p className="text-sm text-muted-foreground">
             Create, schedule, and manage data reports
           </p>
@@ -355,7 +355,7 @@ export default function ReportsPage() {
         {filteredReports.map((report) => {
           const FormatIcon = getFormatIcon(report.format);
           return (
-            <Card key={report.id} className="hover:shadow-md transition-shadow">
+            <Card key={report.id} className="hover:bg-accent/30 transition-colors">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">

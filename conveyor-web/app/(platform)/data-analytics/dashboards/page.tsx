@@ -210,7 +210,7 @@ export default function DashboardsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Dashboards</h1>
+          <h1 className="text-xl font-semibold">Dashboards</h1>
           <p className="text-sm text-muted-foreground">
             Create and manage custom analytics dashboards
           </p>
@@ -292,7 +292,7 @@ export default function DashboardsPage() {
           {dashboards.map((dashboard) => (
             <Card
               key={dashboard.id}
-              className="hover:shadow-md transition-shadow"
+              className="hover:bg-accent/30 transition-colors"
             >
               <CardHeader>
                 <div className="flex items-start justify-between">

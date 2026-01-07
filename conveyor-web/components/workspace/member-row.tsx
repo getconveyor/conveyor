@@ -1,25 +1,25 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useWorkspace } from '@/contexts/WorkspaceContext'
-import { workspaceApi, WorkspaceMember } from '@/lib/api/workspace'
-import { MemberStatusBadge } from './member-status-badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
+import { useState } from "react";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { WorkspaceMember } from "@/lib/api/workspace";
+import { MemberStatusBadge } from "./member-status-badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,170 +29,210 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
-import { MoreVertical, Loader2, UserX, UserCheck, UserMinus, Trash2 } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import {
+  MoreVertical,
+  Loader2,
+  UserX,
+  UserCheck,
+  UserMinus,
+  Trash2,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import {
+  useUpdateWorkspaceMemberRole,
+  useSuspendWorkspaceMember,
+  useActivateWorkspaceMember,
+  useDeactivateWorkspaceMember,
+  useRemoveWorkspaceMember,
+} from "@/hooks/use-workspace";
 
 interface MemberRowProps {
-  member: WorkspaceMember
-  onUpdate: () => void
+  member: WorkspaceMember;
+  onUpdate: () => void;
 }
 
-export function MemberRow({ member, onUpdate }: MemberRowProps) {
-  const { currentWorkspace, canManageMembers } = useWorkspace()
-  const { toast } = useToast()
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [showRemoveDialog, setShowRemoveDialog] = useState(false)
+export const MemberRow = ({ member, onUpdate }: MemberRowProps) => {
+  const { currentWorkspace, canManageMembers } = useWorkspace();
+  const { toast } = useToast();
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
 
-  const isOwner = member.role === 'owner'
-  const canManage = canManageMembers && !isOwner
+  const updateRoleMutation = useUpdateWorkspaceMemberRole();
+  const suspendMutation = useSuspendWorkspaceMember();
+  const activateMutation = useActivateWorkspaceMember();
+  const deactivateMutation = useDeactivateWorkspaceMember();
+  const removeMutation = useRemoveWorkspaceMember();
+
+  const isOwner = member.role === "owner";
+  const canManage = canManageMembers && !isOwner;
+  const isUpdating =
+    updateRoleMutation.isPending ||
+    suspendMutation.isPending ||
+    activateMutation.isPending ||
+    deactivateMutation.isPending ||
+    removeMutation.isPending;
 
   function getInitials(name: string): string {
     return name
-      .split(' ')
+      .split(" ")
       .map((n) => n[0])
-      .join('')
+      .join("")
       .toUpperCase()
-      .slice(0, 2)
+      .slice(0, 2);
   }
 
   async function handleRoleChange(newRole: string) {
-    if (!currentWorkspace || !canManage) return
+    if (!currentWorkspace || !canManage) return;
 
-    setIsUpdating(true)
     try {
-      await workspaceApi.updateMemberRole(currentWorkspace.id, member.id, newRole)
+      await updateRoleMutation.mutateAsync({
+        workspaceId: currentWorkspace.id,
+        memberId: member.id,
+        role: newRole,
+      });
       toast({
-        title: 'Role updated',
+        title: "Role updated",
         description: `${member.user.full_name}'s role has been updated to ${newRole}.`,
-      })
-      onUpdate()
+      });
+      onUpdate();
     } catch (error: any) {
-      console.error('Failed to update role:', error)
+      console.error("Failed to update role:", error);
       toast({
-        title: 'Failed to update role',
-        description: error.message || 'An error occurred while updating the role.',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsUpdating(false)
+        title: "Failed to update role",
+        description:
+          error.message || "An error occurred while updating the role.",
+        variant: "destructive",
+      });
     }
   }
 
   async function handleSuspend() {
-    if (!currentWorkspace || !canManage) return
+    if (!currentWorkspace || !canManage) return;
 
-    setIsUpdating(true)
     try {
-      await workspaceApi.suspendMember(currentWorkspace.id, member.id)
+      await suspendMutation.mutateAsync({
+        workspaceId: currentWorkspace.id,
+        memberId: member.id,
+      });
       toast({
-        title: 'Member suspended',
+        title: "Member suspended",
         description: `${member.user.full_name} has been suspended.`,
-      })
-      onUpdate()
+      });
+      onUpdate();
     } catch (error: any) {
-      console.error('Failed to suspend member:', error)
+      console.error("Failed to suspend member:", error);
       toast({
-        title: 'Failed to suspend member',
-        description: error.message || 'An error occurred while suspending the member.',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsUpdating(false)
+        title: "Failed to suspend member",
+        description:
+          error.message || "An error occurred while suspending the member.",
+        variant: "destructive",
+      });
     }
   }
 
   async function handleActivate() {
-    if (!currentWorkspace || !canManage) return
+    if (!currentWorkspace || !canManage) return;
 
-    setIsUpdating(true)
     try {
-      await workspaceApi.activateMember(currentWorkspace.id, member.id)
+      await activateMutation.mutateAsync({
+        workspaceId: currentWorkspace.id,
+        memberId: member.id,
+      });
       toast({
-        title: 'Member activated',
+        title: "Member activated",
         description: `${member.user.full_name} has been activated.`,
-      })
-      onUpdate()
+      });
+      onUpdate();
     } catch (error: any) {
-      console.error('Failed to activate member:', error)
+      console.error("Failed to activate member:", error);
       toast({
-        title: 'Failed to activate member',
-        description: error.message || 'An error occurred while activating the member.',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsUpdating(false)
+        title: "Failed to activate member",
+        description:
+          error.message || "An error occurred while activating the member.",
+        variant: "destructive",
+      });
     }
   }
 
   async function handleDeactivate() {
-    if (!currentWorkspace || !canManage) return
+    if (!currentWorkspace || !canManage) return;
 
-    setIsUpdating(true)
     try {
-      await workspaceApi.deactivateMember(currentWorkspace.id, member.id)
+      await deactivateMutation.mutateAsync({
+        workspaceId: currentWorkspace.id,
+        memberId: member.id,
+      });
       toast({
-        title: 'Member deactivated',
+        title: "Member deactivated",
         description: `${member.user.full_name} has been deactivated.`,
-      })
-      onUpdate()
+      });
+      onUpdate();
     } catch (error: any) {
-      console.error('Failed to deactivate member:', error)
+      console.error("Failed to deactivate member:", error);
       toast({
-        title: 'Failed to deactivate member',
-        description: error.message || 'An error occurred while deactivating the member.',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsUpdating(false)
+        title: "Failed to deactivate member",
+        description:
+          error.message || "An error occurred while deactivating the member.",
+        variant: "destructive",
+      });
     }
   }
 
   async function handleRemove() {
-    if (!currentWorkspace || !canManage) return
+    if (!currentWorkspace || !canManage) return;
 
-    setIsUpdating(true)
     try {
-      await workspaceApi.removeMember(currentWorkspace.id, member.id)
+      await removeMutation.mutateAsync({
+        workspaceId: currentWorkspace.id,
+        memberId: member.id,
+      });
       toast({
-        title: 'Member removed',
+        title: "Member removed",
         description: `${member.user.full_name} has been removed from the workspace.`,
-      })
-      onUpdate()
-      setShowRemoveDialog(false)
+      });
+      onUpdate();
+      setShowRemoveDialog(false);
     } catch (error: any) {
-      console.error('Failed to remove member:', error)
+      console.error("Failed to remove member:", error);
       toast({
-        title: 'Failed to remove member',
-        description: error.message || 'An error occurred while removing the member.',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsUpdating(false)
+        title: "Failed to remove member",
+        description:
+          error.message || "An error occurred while removing the member.",
+        variant: "destructive",
+      });
     }
   }
 
   return (
-    <>
+    <div>
       <div className="flex items-center justify-between p-4 border-b last:border-b-0 hover:bg-muted/50 transition-colors">
         <div className="flex items-center gap-4 flex-1">
           <Avatar>
-            <AvatarImage src={member.user.avatar || undefined} alt={member.user.full_name} />
-            <AvatarFallback>{getInitials(member.user.full_name)}</AvatarFallback>
+            <AvatarImage
+              src={member.user.avatar || undefined}
+              alt={member.user.full_name}
+            />
+            <AvatarFallback>
+              {getInitials(member.user.full_name)}
+            </AvatarFallback>
           </Avatar>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <p className="font-medium text-sm truncate">{member.user.full_name}</p>
+              <p className="font-medium text-sm truncate">
+                {member.user.full_name}
+              </p>
               {isOwner && (
                 <Badge variant="secondary" className="text-xs">
                   Owner
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground truncate">{member.user.email}</p>
-            {member.status === 'invited' && member.invited_at && (
+            <p className="text-sm text-muted-foreground truncate">
+              {member.user.email}
+            </p>
+            {member.status === "invited" && member.invited_at && (
               <p className="text-xs text-muted-foreground mt-1">
                 Invited {new Date(member.invited_at).toLocaleDateString()}
               </p>
@@ -220,7 +260,9 @@ export function MemberRow({ member, onUpdate }: MemberRowProps) {
               </SelectContent>
             </Select>
           ) : (
-            <div className="w-[130px] text-sm text-muted-foreground capitalize">{member.role}</div>
+            <div className="w-[130px] text-sm text-muted-foreground capitalize">
+              {member.role}
+            </div>
           )}
 
           {canManage && (
@@ -235,7 +277,7 @@ export function MemberRow({ member, onUpdate }: MemberRowProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {member.status === 'active' && (
+                {member.status === "active" && (
                   <>
                     <DropdownMenuItem onClick={handleSuspend}>
                       <UserMinus className="mr-2 h-4 w-4" />
@@ -248,7 +290,8 @@ export function MemberRow({ member, onUpdate }: MemberRowProps) {
                   </>
                 )}
 
-                {(member.status === 'suspended' || member.status === 'deactivated') && (
+                {(member.status === "suspended" ||
+                  member.status === "deactivated") && (
                   <DropdownMenuItem onClick={handleActivate}>
                     <UserCheck className="mr-2 h-4 w-4" />
                     Activate
@@ -274,8 +317,9 @@ export function MemberRow({ member, onUpdate }: MemberRowProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove member?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove {member.user.full_name} from this workspace? This
-              action cannot be undone. They will lose all access to workspace resources.
+              Are you sure you want to remove {member.user.full_name} from this
+              workspace? This action cannot be undone. They will lose all access
+              to workspace resources.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -291,6 +335,6 @@ export function MemberRow({ member, onUpdate }: MemberRowProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
-  )
-}
+    </div>
+  );
+};

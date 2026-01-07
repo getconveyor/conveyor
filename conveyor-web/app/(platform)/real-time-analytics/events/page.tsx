@@ -164,7 +164,7 @@ export default function EventsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Event Stream</h1>
+          <h1 className="text-xl font-semibold">Event Stream</h1>
           <p className="text-sm text-muted-foreground">
             Real-time event monitoring and analytics
           </p>
@@ -207,7 +207,7 @@ export default function EventsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Events</p>
-                  <p className="text-2xl font-bold">{events.length}</p>
+                  <p className="text-2xl font-semibold">{events.length}</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Last {timeRange}
                   </p>
@@ -226,7 +226,7 @@ export default function EventsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">User Actions</p>
-                  <p className="text-2xl font-bold">
+                  <p className="text-2xl font-semibold">
                     {eventTypeCounts.user_action}
                   </p>
                 </div>
@@ -244,7 +244,7 @@ export default function EventsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">API Calls</p>
-                  <p className="text-2xl font-bold">
+                  <p className="text-2xl font-semibold">
                     {eventTypeCounts.api_call}
                   </p>
                 </div>

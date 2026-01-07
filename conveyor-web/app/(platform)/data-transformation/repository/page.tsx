@@ -54,7 +54,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { transformationApi, Notebook } from "@/lib/api/transformation";
+import { Notebook } from "@/lib/api/transformation";
+import {
+  useNotebooks,
+  useCreateNotebook,
+  useDeleteNotebook,
+  useDuplicateNotebook,
+  useRunNotebook,
+  useExportNotebook,
+} from "@/hooks/use-transformation";
 import { useToast } from "@/hooks/use-toast";
 
 interface RepositoryItem {
@@ -71,13 +79,17 @@ interface RepositoryItem {
 }
 
 export default function RepositoryPage() {
-  const [repositoryItems, setRepositoryItems] = useState<RepositoryItem[]>([]);
+  const { data: notebooks, isLoading } = useNotebooks();
+  const createNotebookMutation = useCreateNotebook();
+  const deleteNotebookMutation = useDeleteNotebook();
+  const duplicateNotebookMutation = useDuplicateNotebook();
+  const runNotebookMutation = useRunNotebook();
+  const exportNotebookMutation = useExportNotebook();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [languageFilter, setLanguageFilter] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const { toast } = useToast();
 
@@ -87,41 +99,20 @@ export default function RepositoryPage() {
     language: "python",
   });
 
-  const fetchNotebooks = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const notebooks = await transformationApi.getNotebooks();
-
-      // Convert notebooks to repository items
-      const items: RepositoryItem[] = notebooks.map((notebook: Notebook) => ({
-        id: notebook.id,
-        name: notebook.name,
-        type: "file" as const,
-        language: notebook.language,
-        lastCommit: notebook.description || "No description",
-        author: notebook.created_by_name || "Unknown",
-        branch: "main",
-        size: `${notebook.cell_count} cells`,
-        status: notebook.status,
-        cellCount: notebook.cell_count,
-      }));
-
-      setRepositoryItems(items);
-    } catch (error) {
-      console.error("Failed to fetch notebooks:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch notebooks",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    fetchNotebooks();
-  }, [fetchNotebooks]);
+  const repositoryItems: RepositoryItem[] = (notebooks || []).map(
+    (notebook: Notebook) => ({
+      id: notebook.id,
+      name: notebook.name,
+      type: "file" as const,
+      language: notebook.language,
+      lastCommit: notebook.description || "No description",
+      author: notebook.created_by_name || "Unknown",
+      branch: "main",
+      size: `${notebook.cell_count} cells`,
+      status: notebook.status,
+      cellCount: notebook.cell_count,
+    })
+  );
 
   const filteredItems = repositoryItems.filter((item) => {
     const matchesSearch = item.name
@@ -142,10 +133,8 @@ export default function RepositoryPage() {
 
   const handleCreateItem = async () => {
     if (!formData.name.trim()) return;
-
-    setIsActionLoading(true);
     try {
-      await transformationApi.createNotebook({
+      await createNotebookMutation.mutateAsync({
         name: formData.name,
         description: formData.description,
         language: formData.language,
@@ -156,7 +145,6 @@ export default function RepositoryPage() {
       });
       setIsCreateDialogOpen(false);
       resetForm();
-      fetchNotebooks();
     } catch (error) {
       console.error("Failed to create notebook:", error);
       toast({
@@ -164,23 +152,18 @@ export default function RepositoryPage() {
         description: "Failed to create notebook",
         variant: "destructive",
       });
-    } finally {
-      setIsActionLoading(false);
     }
   };
 
   const handleDeleteItem = async () => {
     if (!itemToDelete) return;
-
-    setIsActionLoading(true);
     try {
-      await transformationApi.deleteNotebook(itemToDelete);
+      await deleteNotebookMutation.mutateAsync(itemToDelete);
       toast({
         title: "Success",
         description: "Notebook deleted successfully",
       });
       setItemToDelete(null);
-      fetchNotebooks();
     } catch (error) {
       console.error("Failed to delete notebook:", error);
       toast({
@@ -188,20 +171,16 @@ export default function RepositoryPage() {
         description: "Failed to delete notebook",
         variant: "destructive",
       });
-    } finally {
-      setIsActionLoading(false);
     }
   };
 
   const handleDuplicateItem = async (item: RepositoryItem) => {
-    setIsActionLoading(true);
     try {
-      await transformationApi.duplicateNotebook(item.id);
+      await duplicateNotebookMutation.mutateAsync(item.id);
       toast({
         title: "Success",
         description: "Notebook duplicated successfully",
       });
-      fetchNotebooks();
     } catch (error) {
       console.error("Failed to duplicate notebook:", error);
       toast({
@@ -209,20 +188,16 @@ export default function RepositoryPage() {
         description: "Failed to duplicate notebook",
         variant: "destructive",
       });
-    } finally {
-      setIsActionLoading(false);
     }
   };
 
   const handleRunNotebook = async (item: RepositoryItem) => {
-    setIsActionLoading(true);
     try {
-      await transformationApi.runNotebook(item.id);
+      await runNotebookMutation.mutateAsync(item.id);
       toast({
         title: "Success",
         description: "Notebook execution started",
       });
-      fetchNotebooks();
     } catch (error) {
       console.error("Failed to run notebook:", error);
       toast({
@@ -230,14 +205,12 @@ export default function RepositoryPage() {
         description: "Failed to run notebook",
         variant: "destructive",
       });
-    } finally {
-      setIsActionLoading(false);
     }
   };
 
   const handleExportNotebook = async (item: RepositoryItem) => {
     try {
-      const result = await transformationApi.exportNotebook(item.id);
+      const result = await exportNotebookMutation.mutateAsync(item.id);
       // Create download link
       const blob = new Blob([JSON.stringify(result.content, null, 2)], {
         type: "application/json",
@@ -282,7 +255,7 @@ export default function RepositoryPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Repository</h1>
+          <h1 className="text-xl font-semibold">Repository</h1>
           <p className="text-sm text-muted-foreground">
             Transformation notebooks and scripts
           </p>
@@ -361,16 +334,6 @@ export default function RepositoryPage() {
                   <SelectItem value="r">R</SelectItem>
                 </SelectContent>
               </Select>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => fetchNotebooks()}
-                disabled={isLoading}
-              >
-                <IconRefresh
-                  className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-                />
-              </Button>
             </div>
           </div>
         </CardHeader>

@@ -116,7 +116,7 @@ export default function HistoryPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Query History</h1>
+          <h1 className="text-xl font-semibold">Query History</h1>
           <p className="text-sm text-muted-foreground">
             View and manage your executed Trino queries
           </p>

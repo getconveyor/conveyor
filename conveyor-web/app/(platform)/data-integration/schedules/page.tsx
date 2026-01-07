@@ -302,7 +302,7 @@ export default function SchedulesPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Schedules</h1>
+          <h1 className="text-xl font-semibold">Schedules</h1>
           <p className="text-sm text-muted-foreground">
             Manage pipeline execution schedules
           </p>
@@ -549,79 +549,109 @@ export default function SchedulesPage() {
         modal
       >
         <DialogContent
-          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          className="max-w-xl"
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
-          <DialogHeader>
-            <DialogTitle>
-              {editingSchedule ? "Edit Schedule" : "Create Schedule"}
-            </DialogTitle>
-            <DialogDescription>
-              {editingSchedule
-                ? "Update the schedule configuration."
-                : "Create a new schedule to automate pipeline execution."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="schedule-name">Schedule Name</Label>
-              <Input
-                id="schedule-name"
-                placeholder="e.g., Daily Customer Sync"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-              />
+          <DialogHeader className="pb-4 border-b">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <IconCalendar className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg">
+                  {editingSchedule ? "Edit Schedule" : "Create Schedule"}
+                </DialogTitle>
+                <DialogDescription className="text-sm">
+                  {editingSchedule
+                    ? "Update the schedule configuration."
+                    : "Automate pipeline execution with a schedule."}
+                </DialogDescription>
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="schedule-pipeline">Pipeline</Label>
-              <Select
-                value={formData.pipeline}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, pipeline: value })
-                }
-              >
-                <SelectTrigger id="schedule-pipeline">
-                  <SelectValue placeholder="Select pipeline" />
-                </SelectTrigger>
-                <SelectContent>
-                  {pipelines.length === 0 ? (
-                    <SelectItem value="none" disabled>
-                      No pipelines available
-                    </SelectItem>
-                  ) : (
-                    pipelines.map((pipeline) => (
-                      <SelectItem key={pipeline.id} value={pipeline.id}>
-                        {pipeline.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Select the pipeline to schedule
-              </p>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Basic Information */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Basic Information
+              </h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="schedule-name"
+                    className="text-sm font-medium"
+                  >
+                    Schedule Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="schedule-name"
+                    placeholder="e.g., Daily Customer Sync"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    className="h-10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="schedule-pipeline"
+                    className="text-sm font-medium"
+                  >
+                    Pipeline <span className="text-destructive">*</span>
+                  </Label>
+                  <Select
+                    value={formData.pipeline}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, pipeline: value })
+                    }
+                  >
+                    <SelectTrigger id="schedule-pipeline" className="h-10">
+                      <SelectValue placeholder="Select a pipeline" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pipelines.length === 0 ? (
+                        <SelectItem value="none" disabled>
+                          No pipelines available
+                        </SelectItem>
+                      ) : (
+                        pipelines.map((pipeline) => (
+                          <SelectItem key={pipeline.id} value={pipeline.id}>
+                            {pipeline.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
 
-            {/* Schedule Builder Component */}
-            <div className="border rounded-lg p-4 bg-muted/30">
-              <ScheduleBuilder
-                scheduleType={formData.schedule_type}
-                scheduleConfig={formData.schedule_config}
-                timezone={formData.timezone}
-                onScheduleTypeChange={handleScheduleTypeChange}
-                onScheduleConfigChange={(config) =>
-                  setFormData({ ...formData, schedule_config: config })
-                }
-                onTimezoneChange={(tz) =>
-                  setFormData({ ...formData, timezone: tz })
-                }
-              />
+            {/* Schedule Configuration */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Schedule Configuration
+              </h4>
+              <div className="rounded-lg border bg-muted/20 p-4">
+                <ScheduleBuilder
+                  scheduleType={formData.schedule_type}
+                  scheduleConfig={formData.schedule_config}
+                  timezone={formData.timezone}
+                  onScheduleTypeChange={handleScheduleTypeChange}
+                  onScheduleConfigChange={(config) =>
+                    setFormData({ ...formData, schedule_config: config })
+                  }
+                  onTimezoneChange={(tz) =>
+                    setFormData({ ...formData, timezone: tz })
+                  }
+                />
+              </div>
             </div>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="pt-4 border-t gap-2 sm:gap-0">
             <Button
               variant="outline"
               onClick={() => {
