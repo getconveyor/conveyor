@@ -42,7 +42,9 @@ const WORKSPACE_KEY = "currentWorkspaceId";
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [tokens, setTokens] = useState<AuthTokens | null>(null);
-  const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
+  const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -63,7 +65,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           // Load workspace if available
           if (storedWorkspaceId) {
-            setCurrentWorkspace({ id: storedWorkspaceId, name: "Current Workspace" });
+            setCurrentWorkspace({
+              id: storedWorkspaceId,
+              name: "Current Workspace",
+            });
           }
 
           // Optionally refresh the user data from the server
@@ -74,8 +79,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(freshUser);
             localStorage.setItem(USER_KEY, JSON.stringify(freshUser));
           } catch (error) {
-            // If getting fresh user fails, keep using stored user
+            // If getting fresh user fails, clear user and tokens
             console.error("Failed to refresh user data:", error);
+            setUser(null);
+            setTokens(null);
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
+            localStorage.removeItem(WORKSPACE_KEY);
           }
         }
       } catch (error) {

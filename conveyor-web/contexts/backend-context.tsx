@@ -26,11 +26,11 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
   const checkHealth = useCallback(async () => {
     setChecking(true);
     try {
-      const healthList: SystemHealth[] = await monitoringApi.getCurrentHealth();
+      const healthList: SystemHealth = await monitoringApi.getServerHealth();
+      console.log(healthList);
+
       // Consider healthy if all services are healthy, or at least one is healthy
-      const isHealthy =
-        healthList.length > 0 &&
-        healthList.every((h) => h.status === "healthy");
+      const isHealthy = healthList.status === "healthy";
       setHealthy(isHealthy);
     } catch {
       setHealthy(false);

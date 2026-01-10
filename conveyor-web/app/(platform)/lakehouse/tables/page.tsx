@@ -28,6 +28,7 @@ export default function TablesPage() {
   const { token, currentWorkspace } = useAuth();
   const [tables, setTables] = useState<IcebergTable[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [layerFilter, setLayerFilter] = useState<string>("all");
 
@@ -67,10 +68,12 @@ export default function TablesPage() {
 
   useEffect(() => {
     loadTables();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layerFilter, selectedNamespace]);
 
   const loadTables = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const params: {
         layer?: "bronze" | "silver" | "gold";
@@ -84,7 +87,12 @@ export default function TablesPage() {
       }
       const response = await listTables(params);
       setTables(response.tables);
-    } catch (error) {
+    } catch (error: any) {
+      setError(
+        error?.message ||
+          "Failed to load tables. Please check your connection and try again."
+      );
+      setTables([]);
       console.error("Failed to load tables:", error);
     } finally {
       setIsLoading(false);
@@ -213,6 +221,15 @@ export default function TablesPage() {
               <IconRefresh className="h-4 w-4 animate-spin" />
               <span>Loading tables...</span>
             </div>
+          </CardContent>
+        </Card>
+      ) : error ? (
+        <Card>
+          <CardContent className="p-12 text-center text-destructive">
+            <p className="mb-2">{error}</p>
+            <Button variant="outline" size="sm" onClick={loadTables}>
+              Retry
+            </Button>
           </CardContent>
         </Card>
       ) : filteredTables.length === 0 ? (

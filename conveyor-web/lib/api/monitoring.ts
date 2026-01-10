@@ -106,6 +106,11 @@ export interface AuditLogSummary {
 // API Client
 export const monitoringApi = {
   // System Health
+  async getServerHealth(): Promise<SystemHealth> {
+    return apiClient.get<SystemHealth>("/health/");
+  },
+
+  // System Health
   async getCurrentHealth(): Promise<SystemHealth[]> {
     return apiClient.get<SystemHealth[]>(
       "/api/monitoring/health/current/",

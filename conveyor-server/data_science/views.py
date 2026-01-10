@@ -1335,6 +1335,9 @@ def _add_feature_group_actions():
         
         return Response(stats)
     
+    # Set the function name to match the attribute name
+    statistics.__name__ = 'feature_statistics'
+    
     @action(detail=True, methods=['post'])
     def sync_online(self, request, pk=None):
         """Sync features to online store."""
@@ -1467,6 +1470,9 @@ def _add_feature_view_actions():
                 'rows': [],
                 'error': str(e)
             })
+    
+    # Set the function name to match the attribute name
+    preview.__name__ = 'preview_data'
     
     return create_training_dataset, preview
 

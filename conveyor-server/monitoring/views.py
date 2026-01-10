@@ -372,7 +372,7 @@ class MetricSnapshotViewSet(viewsets.ModelViewSet):
         # Calculate metrics
         today = timezone.now().date()
         queries_today = QueryHistory.objects.filter(
-            executed_at__date=today
+            completed_at__date=today
         ).count() if workspace_id else 0
         
         overview = {
