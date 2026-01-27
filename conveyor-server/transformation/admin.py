@@ -1,5 +1,33 @@
 from django.contrib import admin
-from .models import Transformation, TransformationRule, DataQualityCheck, DataQualityResult
+from .models import Transformation, TransformationRule, DataQualityCheck, DataQualityResult, Notebook, Workflow, WorkflowStep, WorkflowRun
+
+# --- Workflow Admin ---
+class WorkflowStepInline(admin.TabularInline):
+    model = WorkflowStep
+    extra = 0
+    fields = ('name', 'type', 'order')
+
+@admin.register(Workflow)
+class WorkflowAdmin(admin.ModelAdmin):
+    list_display = ('name', 'workspace', 'status', 'created_by', 'created_at')
+    list_filter = ('status', 'workspace', 'created_at')
+    search_fields = ('name', 'description', 'workspace__name')
+    readonly_fields = ('id', 'created_at', 'updated_at')
+    inlines = [WorkflowStepInline]
+
+@admin.register(WorkflowStep)
+class WorkflowStepAdmin(admin.ModelAdmin):
+    list_display = ('name', 'workflow', 'type', 'order', 'created_at')
+    list_filter = ('type', 'workflow')
+    search_fields = ('name', 'workflow__name')
+    readonly_fields = ('id', 'created_at', 'updated_at')
+
+@admin.register(WorkflowRun)
+class WorkflowRunAdmin(admin.ModelAdmin):
+    list_display = ('workflow', 'status', 'started_at', 'completed_at', 'created_at')
+    list_filter = ('status', 'workflow')
+    search_fields = ('workflow__name',)
+    readonly_fields = ('id', 'created_at', 'updated_at')
 
 
 class TransformationRuleInline(admin.TabularInline):
@@ -107,5 +135,36 @@ class DataQualityResultAdmin(admin.ModelAdmin):
         ('Details', {
             'fields': ('error_message', 'details'),
             'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(Notebook)
+class NotebookAdmin(admin.ModelAdmin):
+    """Admin interface for Notebook model"""
+
+    list_display = ('name', 'language', 'kernel', 'workspace', 'cell_count',
+                   'status', 'last_executed', 'created_by', 'created_at', 'updated_at')
+    list_filter = ('language', 'status', 'workspace', 'created_at')
+    search_fields = ('name', 'description', 'workspace__name', 'created_by__username')
+    readonly_fields = ('id', 'created_at', 'updated_at', 'last_executed', 'status')
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('id', 'workspace', 'name', 'description')
+        }),
+        ('Configuration', {
+            'fields': ('language', 'kernel', 'cell_count', 'status')
+        }),
+        ('Content', {
+            'fields': ('content',),
+            'classes': ('collapse',)
+        }),
+        ('Execution', {
+            'fields': ('last_executed',),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created_by', 'created_at', 'updated_at')
         }),
     )

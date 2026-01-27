@@ -57,26 +57,26 @@ class ConnectorRegistry:
         return decorator
 
     @classmethod
-    def create(cls, connection: 'Connection') -> BaseConnector:
+    def create(cls, source: 'Source') -> BaseConnector:
         """
-        Create a connector instance for a given connection.
+        Create a connector instance for a given source.
 
         Args:
-            connection: Django Connection model instance
+            source: Django Source model instance
 
         Returns:
             Instantiated connector
 
         Raises:
-            ConnectorNotFoundError: If no connector is registered for the connection type
+            ConnectorNotFoundError: If no connector is registered for the source type
 
         Example:
-            >>> from integration.models import Connection
-            >>> connection = Connection.objects.get(id=123)
-            >>> connector = ConnectorRegistry.create(connection)
+            >>> from integration.models import Source
+            >>> source = Source.objects.get(id=123)
+            >>> connector = ConnectorRegistry.create(source)
             >>> result = connector.test()
         """
-        connector_type = connection.connector_type
+        connector_type = source.connector_type
 
         if connector_type not in cls._registry:
             available = ', '.join(cls._registry.keys()) or 'none'
@@ -86,7 +86,7 @@ class ConnectorRegistry:
             )
 
         connector_class = cls._registry[connector_type]
-        return connector_class(connection)
+        return connector_class(source)
 
     @classmethod
     def get_registered_types(cls) -> list:

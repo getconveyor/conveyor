@@ -8,39 +8,6 @@ interface PaginatedResponse<T> {
   results: T[];
 }
 
-// Types
-export interface Plan {
-  id: string;
-  name: string;
-  description: string;
-  plan_type: "free" | "starter" | "professional" | "enterprise";
-  price_monthly: string;
-  price_yearly: string;
-  max_users: number;
-  max_pipelines: number;
-  max_storage_gb: number;
-  max_queries_per_day: number;
-  features: Record<string, any>;
-  is_active: boolean;
-}
-
-export interface Subscription {
-  id: string;
-  workspace: string;
-  workspace_name: string;
-  plan: Plan;
-  status: "trialing" | "active" | "past_due" | "cancelled" | "expired";
-  billing_cycle: "monthly" | "yearly";
-  current_period_start: string;
-  current_period_end: string;
-  trial_start: string | null;
-  trial_end: string | null;
-  cancelled_at: string | null;
-  usage_data: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface WorkspaceMemberUser {
   id: string;
   email: string;
@@ -82,7 +49,6 @@ export interface Workspace {
   status: "active" | "suspended" | "trial" | "cancelled";
   settings: Record<string, any>;
   member_count: number;
-  subscription: Subscription;
   created_at: string;
   updated_at: string;
 }
@@ -91,7 +57,6 @@ export interface CreateWorkspaceData {
   name: string;
   slug: string;
   description?: string;
-  plan_id: string;
 }
 
 export interface InviteMemberData {
@@ -116,18 +81,6 @@ export interface MemberActionResponse {
 
 // API Client
 export const workspaceApi = {
-  // Plans
-  async getPlans(): Promise<Plan[]> {
-    const response = await apiClient.get<PaginatedResponse<Plan>>(
-      "/api/plans/"
-    );
-    return response.results;
-  },
-
-  async getPlan(planId: string): Promise<Plan> {
-    return apiClient.get(`/api/plans/${planId}/`);
-  },
-
   // Workspaces
   async getWorkspaces(): Promise<Workspace[]> {
     const response = await apiClient.get<PaginatedResponse<Workspace>>(
@@ -149,11 +102,18 @@ export const workspaceApi = {
     workspaceId: string,
     data: Partial<Workspace>
   ): Promise<Workspace> {
-    return apiClient.patch(`/api/workspaces/${workspaceId}/`, data, getAuthOptions());
+    return apiClient.patch(
+      `/api/workspaces/${workspaceId}/`,
+      data,
+      getAuthOptions()
+    );
   },
 
   async deleteWorkspace(workspaceId: string): Promise<void> {
-    return apiClient.delete(`/api/workspaces/${workspaceId}/`, getAuthOptions());
+    return apiClient.delete(
+      `/api/workspaces/${workspaceId}/`,
+      getAuthOptions()
+    );
   },
 
   async switchWorkspace(workspaceId: string): Promise<{
@@ -161,14 +121,13 @@ export const workspaceApi = {
     workspace: Workspace;
     membership: WorkspaceMember;
   }> {
-    return apiClient.post("/api/workspaces/switch/", {
-      workspace_id: workspaceId,
-    }, getAuthOptions());
-  },
-
-  // Subscription
-  async getSubscription(workspaceId: string): Promise<Subscription> {
-    return apiClient.get(`/api/workspaces/${workspaceId}/subscription/`, getAuthOptions());
+    return apiClient.post(
+      "/api/workspaces/switch/",
+      {
+        workspace_id: workspaceId,
+      },
+      getAuthOptions()
+    );
   },
 
   // Members

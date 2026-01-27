@@ -11,7 +11,8 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
-from decouple import config, Csv
+from decouple import config, Csv, UndefinedValueError
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,13 +21,45 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-^yut#&k*_^d(m8e4z9l(cq_1*2a38re5j&*2g%!8a$%ni94%)k')
-
-# SECURITY WARNING: don't run with debug turned on in production!
+# SECURITY: Require SECRET_KEY in production
+_default_secret_key = 'django-insecure-^yut#&k*_^d(m8e4z9l(cq_1*2a38re5j&*2g%!8a$%ni94%)k'
 DEBUG = config('DEBUG', default=True, cast=bool)
 
+if DEBUG:
+    SECRET_KEY = config('SECRET_KEY', default=_default_secret_key)
+else:
+    # In production, SECRET_KEY must be explicitly set
+    try:
+        SECRET_KEY = config('SECRET_KEY')
+        if SECRET_KEY == _default_secret_key:
+            raise ValueError("SECRET_KEY must be changed from default in production")
+    except UndefinedValueError:
+        print("ERROR: SECRET_KEY environment variable is required in production!", file=sys.stderr)
+        sys.exit(1)
+
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+
+# Security settings for production
+if not DEBUG:
+    # HTTPS settings
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    
+    # Cookie security
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = True
+    
+    # HSTS settings
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+    # Content security
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = 'DENY'
 
 
 # Application definition
@@ -46,6 +79,8 @@ INSTALLED_APPS = [
     'django_filters',
     'channels',  # Django Channels for WebSocket support
     'drf_spectacular',  # API Documentation
+    'django_extensions',  # Django Extensions for management commands
+    'django_prometheus',  # Prometheus metrics
     # Conveyor Apps
     'authentication',
     'integration',
@@ -60,6 +95,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'django_prometheus.middleware.PrometheusBeforeMiddleware',  # Must be first
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -69,6 +105,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'conveyor_server.json_error_middleware.JsonErrorMiddleware',
+    'conveyor_server.observability_middleware.RequestLoggingMiddleware',
+    'django_prometheus.middleware.PrometheusAfterMiddleware',  # Must be last
 ]
 
 ROOT_URLCONF = 'conveyor_server.urls'
@@ -193,7 +232,7 @@ REST_FRAMEWORK = {
         'user': '1000/hour',
     },
     # Error handling
-    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+    'EXCEPTION_HANDLER': 'conveyor_server.exception_handler.custom_exception_handler',
     # API Documentation
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
@@ -285,6 +324,12 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
+# Celery task retry settings
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_TASK_DEFAULT_RETRY_DELAY = 60  # 1 minute
+CELERY_TASK_MAX_RETRIES = 3
+
 # CORS Configuration
 # https://github.com/adamchainz/django-cors-headers
 
@@ -295,6 +340,20 @@ CORS_ALLOWED_ORIGINS = config(
 )
 
 CORS_ALLOW_CREDENTIALS = True
+
+# Production CORS validation
+if not DEBUG:
+    # In production, require explicit CORS_ALLOWED_ORIGINS
+    if not config('CORS_ALLOWED_ORIGINS', default=''):
+        import warnings
+        warnings.warn(
+            "CORS_ALLOWED_ORIGINS not set in production. "
+            "API will only accept requests from explicitly allowed origins."
+        )
+    CORS_ALLOW_ALL_ORIGINS = False
+else:
+    # In development, allow localhost variants
+    CORS_ALLOW_ALL_ORIGINS = False
 
 # Django Channels Configuration for WebSocket support
 # https://channels.readthedocs.io/
@@ -316,6 +375,9 @@ CHANNEL_LAYERS = {
 # Encryption Configuration
 # Generate key with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ENCRYPTION_KEY = config('ENCRYPTION_KEY', default=None)
+
+# API Rate Limiting
+API_RATE_LIMIT = config('API_RATE_LIMIT', default=200000, cast=int)  # requests per hour
 
 # ETL Engine Configuration
 CONVEYOR_ETL = {

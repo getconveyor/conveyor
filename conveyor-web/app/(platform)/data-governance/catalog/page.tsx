@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react";
 import {
   IconPlus,
   IconSearch,
@@ -13,25 +13,26 @@ import {
   IconTag,
   IconUser,
   IconLoader2,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+  IconAlertCircle,
+} from "@tabler/icons-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -39,7 +40,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,93 +50,57 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { governanceApi, DataAsset as ApiDataAsset } from "@/lib/api/governance";
 
 interface DataAsset {
-  id: string
-  name: string
-  type: string
-  description: string
-  owner: string
-  database: string
-  schema: string
-  tags: string[]
-  sensitivity: string
-  lastModified: string
-  rowCount: string
-  size: string
+  id: string;
+  name: string;
+  type: string;
+  description: string;
+  owner: string;
+  database: string;
+  schema: string;
+  tags: string[];
+  sensitivity: string;
+  lastModified: string;
+  rowCount: string;
+  size: string;
 }
 
-const initialAssets: DataAsset[] = [
-  {
-    id: "1",
-    name: "customer_profiles",
-    type: "Table",
-    description: "Customer demographic and profile information",
-    owner: "Jane Smith",
-    database: "production",
-    schema: "customer_data",
-    tags: ["pii", "customer", "core"],
-    sensitivity: "High",
-    lastModified: "2 hours ago",
-    rowCount: "2.4M",
-    size: "18 GB",
-  },
-  {
-    id: "2",
-    name: "sales_transactions",
-    type: "Table",
-    description: "Historical sales transaction records",
-    owner: "John Doe",
-    database: "production",
-    schema: "sales",
-    tags: ["financial", "transactions"],
+const mapApiAssetToDataAsset = (asset: ApiDataAsset): DataAsset => {
+  return {
+    id: asset.id,
+    name: asset.name,
+    type: asset.asset_type || "table",
+    description: asset.description || "",
+    owner: asset.owner_name || "Unknown",
+    database: "default",
+    schema: asset.schema_name || "public",
+    tags:
+      asset.tags_list ||
+      (asset.tags ? asset.tags.split(",").map((t) => t.trim()) : []),
     sensitivity: "Medium",
-    lastModified: "1 day ago",
-    rowCount: "12.8M",
-    size: "96 GB",
-  },
-  {
-    id: "3",
-    name: "product_catalog",
-    type: "Table",
-    description: "Complete product inventory and catalog",
-    owner: "Sarah Wilson",
-    database: "production",
-    schema: "product_data",
-    tags: ["catalog", "product"],
-    sensitivity: "Low",
-    lastModified: "3 days ago",
-    rowCount: "156K",
-    size: "2.4 GB",
-  },
-  {
-    id: "4",
-    name: "analytics_events",
-    type: "Dataset",
-    description: "User behavior and analytics events",
-    owner: "Mike Johnson",
-    database: "analytics",
-    schema: "events",
-    tags: ["analytics", "events", "behavior"],
-    sensitivity: "Medium",
-    lastModified: "1 week ago",
-    rowCount: "45.2M",
-    size: "234 GB",
-  },
-]
+    lastModified: asset.updated_at
+      ? new Date(asset.updated_at).toLocaleString()
+      : "Unknown",
+    rowCount: "-",
+    size: "-",
+  };
+};
 
 export default function CatalogPage() {
-  const [assets, setAssets] = useState<DataAsset[]>(initialAssets)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [typeFilter, setTypeFilter] = useState<string>("all")
-  const [isLoading, setIsLoading] = useState(false)
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [assetToDelete, setAssetToDelete] = useState<string | null>(null)
-  const [selectedAsset, setSelectedAsset] = useState<DataAsset | null>(null)
+  const [assets, setAssets] = useState<DataAsset[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [assetToDelete, setAssetToDelete] = useState<string | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<DataAsset | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     type: "Table",
@@ -143,27 +108,46 @@ export default function CatalogPage() {
     database: "",
     schema: "",
     owner: "",
-  })
+  });
+
+  const loadAssets = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const apiAssets = await governanceApi.getAssets();
+      setAssets(apiAssets.map(mapApiAssetToDataAsset));
+    } catch (err) {
+      console.error("Failed to load assets:", err);
+      setError("Failed to load data catalog");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAssets();
+  }, [loadAssets]);
 
   const filteredAssets = assets.filter((asset) => {
-    const matchesSearch = asset.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      asset.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesType = typeFilter === "all" || asset.type === typeFilter
-    return matchesSearch && matchesType
-  })
+    const matchesSearch =
+      asset.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      asset.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = typeFilter === "all" || asset.type === typeFilter;
+    return matchesSearch && matchesType;
+  });
 
   const stats = {
     total: assets.length,
-    tables: assets.filter(a => a.type === "Table").length,
-    datasets: assets.filter(a => a.type === "Dataset").length,
-    highSensitivity: assets.filter(a => a.sensitivity === "High").length,
-  }
+    tables: assets.filter((a) => a.type === "Table").length,
+    datasets: assets.filter((a) => a.type === "Dataset").length,
+    highSensitivity: assets.filter((a) => a.sensitivity === "High").length,
+  };
 
   const handleCreateAsset = async () => {
-    if (!formData.name.trim()) return
+    if (!formData.name.trim()) return;
 
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    setIsLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     const newAsset: DataAsset = {
       id: Date.now().toString(),
@@ -178,46 +162,53 @@ export default function CatalogPage() {
       lastModified: "Just now",
       rowCount: "0",
       size: "0 GB",
-    }
+    };
 
-    setAssets([newAsset, ...assets])
-    setIsLoading(false)
-    setIsCreateDialogOpen(false)
-    resetForm()
-  }
+    setAssets([newAsset, ...assets]);
+    setIsLoading(false);
+    setIsCreateDialogOpen(false);
+    resetForm();
+  };
 
   const handleEditAsset = async () => {
-    if (!selectedAsset || !formData.name.trim()) return
+    if (!selectedAsset || !formData.name.trim()) return;
 
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 800))
+    setIsLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
-    setAssets(assets =>
-      assets.map(a =>
+    setAssets((assets) =>
+      assets.map((a) =>
         a.id === selectedAsset.id
-          ? { ...a, name: formData.name, description: formData.description, owner: formData.owner, database: formData.database, schema: formData.schema }
+          ? {
+              ...a,
+              name: formData.name,
+              description: formData.description,
+              owner: formData.owner,
+              database: formData.database,
+              schema: formData.schema,
+            }
           : a
       )
-    )
-    setIsLoading(false)
-    setIsEditDialogOpen(false)
-    setSelectedAsset(null)
-    resetForm()
-  }
+    );
+    setIsLoading(false);
+    setIsEditDialogOpen(false);
+    setSelectedAsset(null);
+    resetForm();
+  };
 
   const handleDeleteAsset = async () => {
-    if (!assetToDelete) return
+    if (!assetToDelete) return;
 
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 600))
+    setIsLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 600));
 
-    setAssets(assets => assets.filter(a => a.id !== assetToDelete))
-    setIsLoading(false)
-    setAssetToDelete(null)
-  }
+    setAssets((assets) => assets.filter((a) => a.id !== assetToDelete));
+    setIsLoading(false);
+    setAssetToDelete(null);
+  };
 
   const openEditDialog = (asset: DataAsset) => {
-    setSelectedAsset(asset)
+    setSelectedAsset(asset);
     setFormData({
       name: asset.name,
       type: asset.type,
@@ -225,9 +216,9 @@ export default function CatalogPage() {
       database: asset.database,
       schema: asset.schema,
       owner: asset.owner,
-    })
-    setIsEditDialogOpen(true)
-  }
+    });
+    setIsEditDialogOpen(true);
+  };
 
   const resetForm = () => {
     setFormData({
@@ -237,14 +228,14 @@ export default function CatalogPage() {
       database: "",
       schema: "",
       owner: "",
-    })
-  }
+    });
+  };
 
   return (
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Data Catalog</h1>
+          <h1 className="text-xl font-semibold">Data Catalog</h1>
           <p className="text-sm text-muted-foreground">
             Discover and manage data assets
           </p>
@@ -259,26 +250,40 @@ export default function CatalogPage() {
       <div className="grid gap-2 md:grid-cols-4">
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Total Assets</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Total Assets
+            </div>
             <div className="text-xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Tables</div>
-            <div className="text-xl font-bold text-blue-500">{stats.tables}</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Tables
+            </div>
+            <div className="text-xl font-bold text-blue-500">
+              {stats.tables}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Datasets</div>
-            <div className="text-xl font-bold text-green-500">{stats.datasets}</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Datasets
+            </div>
+            <div className="text-xl font-bold text-green-500">
+              {stats.datasets}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">High Sensitivity</div>
-            <div className="text-xl font-bold text-red-500">{stats.highSensitivity}</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              High Sensitivity
+            </div>
+            <div className="text-xl font-bold text-red-500">
+              {stats.highSensitivity}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -329,7 +334,16 @@ export default function CatalogPage() {
                         <Badge variant="outline" className="text-xs">
                           {asset.type}
                         </Badge>
-                        <Badge variant={asset.sensitivity === "High" ? "destructive" : asset.sensitivity === "Medium" ? "secondary" : "outline"} className="text-xs">
+                        <Badge
+                          variant={
+                            asset.sensitivity === "High"
+                              ? "destructive"
+                              : asset.sensitivity === "Medium"
+                              ? "secondary"
+                              : "outline"
+                          }
+                          className="text-xs"
+                        >
                           {asset.sensitivity}
                         </Badge>
                       </div>
@@ -338,7 +352,11 @@ export default function CatalogPage() {
                       </p>
                       <div className="flex flex-wrap gap-1 mb-2">
                         {asset.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
+                          <Badge
+                            key={tag}
+                            variant="secondary"
+                            className="text-xs"
+                          >
                             <IconTag className="h-2.5 w-2.5 mr-1" />
                             {tag}
                           </Badge>
@@ -377,7 +395,12 @@ export default function CatalogPage() {
                     <div className="flex items-center gap-1.5">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={isLoading}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            disabled={isLoading}
+                          >
                             {isLoading ? (
                               <IconLoader2 className="h-4 w-4 animate-spin" />
                             ) : (
@@ -390,7 +413,9 @@ export default function CatalogPage() {
                             <IconEye className="mr-2 h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openEditDialog(asset)}>
+                          <DropdownMenuItem
+                            onClick={() => openEditDialog(asset)}
+                          >
                             <IconEdit className="mr-2 h-4 w-4" />
                             Edit Metadata
                           </DropdownMenuItem>
@@ -418,21 +443,50 @@ export default function CatalogPage() {
       </Card>
 
       {/* Create Asset Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={(open) => { if (!open) { setIsCreateDialogOpen(false); resetForm() }}} modal>
-        <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+      <Dialog
+        open={isCreateDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsCreateDialogOpen(false);
+            resetForm();
+          }
+        }}
+        modal
+      >
+        <DialogContent
+          className="max-w-md"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>Add Data Asset</DialogTitle>
-            <DialogDescription>Register a new data asset in the catalog</DialogDescription>
+            <DialogDescription>
+              Register a new data asset in the catalog
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="asset-name">Asset Name</Label>
-              <Input id="asset-name" placeholder="e.g., customer_profiles" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+              <Input
+                id="asset-name"
+                placeholder="e.g., customer_profiles"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="type">Type</Label>
-              <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-                <SelectTrigger id="type"><SelectValue /></SelectTrigger>
+              <Select
+                value={formData.type}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, type: value })
+                }
+              >
+                <SelectTrigger id="type">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Table">Table</SelectItem>
                   <SelectItem value="Dataset">Dataset</SelectItem>
@@ -444,34 +498,96 @@ export default function CatalogPage() {
             <div className="grid grid-cols-2 gap-2">
               <div className="grid gap-2">
                 <Label htmlFor="database">Database</Label>
-                <Input id="database" placeholder="production" value={formData.database} onChange={(e) => setFormData({ ...formData, database: e.target.value })} />
+                <Input
+                  id="database"
+                  placeholder="production"
+                  value={formData.database}
+                  onChange={(e) =>
+                    setFormData({ ...formData, database: e.target.value })
+                  }
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="schema">Schema</Label>
-                <Input id="schema" placeholder="public" value={formData.schema} onChange={(e) => setFormData({ ...formData, schema: e.target.value })} />
+                <Input
+                  id="schema"
+                  placeholder="public"
+                  value={formData.schema}
+                  onChange={(e) =>
+                    setFormData({ ...formData, schema: e.target.value })
+                  }
+                />
               </div>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="owner">Owner</Label>
-              <Input id="owner" placeholder="Current User" value={formData.owner} onChange={(e) => setFormData({ ...formData, owner: e.target.value })} />
+              <Input
+                id="owner"
+                placeholder="Current User"
+                value={formData.owner}
+                onChange={(e) =>
+                  setFormData({ ...formData, owner: e.target.value })
+                }
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea id="description" placeholder="Describe the data asset..." rows={3} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
+              <Textarea
+                id="description"
+                placeholder="Describe the data asset..."
+                rows={3}
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsCreateDialogOpen(false); resetForm() }} disabled={isLoading}>Cancel</Button>
-            <Button onClick={handleCreateAsset} disabled={!formData.name.trim() || isLoading}>
-              {isLoading ? <><IconLoader2 className="mr-2 h-4 w-4 animate-spin" />Adding...</> : "Add Asset"}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCreateDialogOpen(false);
+                resetForm();
+              }}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateAsset}
+              disabled={!formData.name.trim() || isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add Asset"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Edit Asset Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open) { setIsEditDialogOpen(false); setSelectedAsset(null); resetForm() }}} modal>
-        <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsEditDialogOpen(false);
+            setSelectedAsset(null);
+            resetForm();
+          }
+        }}
+        modal
+      >
+        <DialogContent
+          className="max-w-md"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>Edit Asset Metadata</DialogTitle>
             <DialogDescription>Update data asset information</DialogDescription>
@@ -479,51 +595,115 @@ export default function CatalogPage() {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="edit-asset-name">Asset Name</Label>
-              <Input id="edit-asset-name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+              <Input
+                id="edit-asset-name"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+              />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-database">Database</Label>
-                <Input id="edit-database" value={formData.database} onChange={(e) => setFormData({ ...formData, database: e.target.value })} />
+                <Input
+                  id="edit-database"
+                  value={formData.database}
+                  onChange={(e) =>
+                    setFormData({ ...formData, database: e.target.value })
+                  }
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-schema">Schema</Label>
-                <Input id="edit-schema" value={formData.schema} onChange={(e) => setFormData({ ...formData, schema: e.target.value })} />
+                <Input
+                  id="edit-schema"
+                  value={formData.schema}
+                  onChange={(e) =>
+                    setFormData({ ...formData, schema: e.target.value })
+                  }
+                />
               </div>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-owner">Owner</Label>
-              <Input id="edit-owner" value={formData.owner} onChange={(e) => setFormData({ ...formData, owner: e.target.value })} />
+              <Input
+                id="edit-owner"
+                value={formData.owner}
+                onChange={(e) =>
+                  setFormData({ ...formData, owner: e.target.value })
+                }
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-description">Description</Label>
-              <Textarea id="edit-description" rows={3} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
+              <Textarea
+                id="edit-description"
+                rows={3}
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedAsset(null); resetForm() }} disabled={isLoading}>Cancel</Button>
-            <Button onClick={handleEditAsset} disabled={!formData.name.trim() || isLoading}>
-              {isLoading ? <><IconLoader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : "Save Changes"}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                setSelectedAsset(null);
+                resetForm();
+              }}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditAsset}
+              disabled={!formData.name.trim() || isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!assetToDelete} onOpenChange={(open) => !open && setAssetToDelete(null)}>
+      <AlertDialog
+        open={!!assetToDelete}
+        onOpenChange={(open) => !open && setAssetToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Data Asset?</AlertDialogTitle>
-            <AlertDialogDescription>This will remove this asset from the catalog. This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This will remove this asset from the catalog. This action cannot
+              be undone.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteAsset} disabled={isLoading}>
-              {isLoading ? <><IconLoader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</> : "Delete Asset"}
+              {isLoading ? (
+                <>
+                  <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Asset"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }

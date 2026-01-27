@@ -1,6 +1,7 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   IconPlus,
   IconSearch,
@@ -13,25 +14,25 @@ import {
   IconPlayerPlay,
   IconCode,
   IconLoader2,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+} from "@tabler/icons-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -39,7 +40,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,210 +50,159 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-
-interface Notebook {
-  id: string
-  name: string
-  description: string
-  kernel: string
-  lastModified: string
-  createdBy: string
-  cellCount: number
-  language: string
-}
-
-const initialNotebooks: Notebook[] = [
-  {
-    id: "1",
-    name: "Customer Segmentation Analysis",
-    description: "Cluster analysis for customer segmentation using K-means",
-    kernel: "Python 3.11",
-    lastModified: "2 hours ago",
-    createdBy: "Jane Smith",
-    cellCount: 24,
-    language: "python",
-  },
-  {
-    id: "2",
-    name: "Sales Forecasting Model",
-    description: "Time series forecasting using ARIMA and Prophet",
-    kernel: "Python 3.11",
-    lastModified: "1 day ago",
-    createdBy: "John Doe",
-    cellCount: 18,
-    language: "python",
-  },
-  {
-    id: "3",
-    name: "Data Quality Exploration",
-    description: "Exploratory data analysis for quality checks",
-    kernel: "Python 3.11",
-    lastModified: "3 days ago",
-    createdBy: "Sarah Wilson",
-    cellCount: 32,
-    language: "python",
-  },
-  {
-    id: "4",
-    name: "SQL Query Development",
-    description: "Complex SQL queries for data transformation",
-    kernel: "SQL",
-    lastModified: "1 week ago",
-    createdBy: "Mike Johnson",
-    cellCount: 15,
-    language: "sql",
-  },
-  {
-    id: "5",
-    name: "Feature Engineering Pipeline",
-    description: "Feature extraction and transformation for ML models",
-    kernel: "Python 3.11",
-    lastModified: "2 weeks ago",
-    createdBy: "Tom Brown",
-    cellCount: 28,
-    language: "python",
-  },
-]
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  useNotebooks,
+  useCreateNotebook,
+  useRunNotebook,
+  useDuplicateNotebook,
+  useDeleteNotebook,
+  useExportNotebook,
+} from "@/hooks/use-transformation";
+import { Notebook } from "@/lib/api/transformation";
+import { toast } from "sonner";
 
 export default function NotebooksPage() {
-  const [notebooks, setNotebooks] = useState<Notebook[]>(initialNotebooks)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [languageFilter, setLanguageFilter] = useState<string>("all")
-  const [isLoading, setIsLoading] = useState(false)
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [notebookToDelete, setNotebookToDelete] = useState<string | null>(null)
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [languageFilter, setLanguageFilter] = useState<string>("all");
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [notebookToDelete, setNotebookToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     language: "python",
-  })
+  });
+
+  // Use hooks instead of manual loading
+  const {
+    data: notebooksData = [],
+    isLoading: notebooksLoading,
+    error: notebooksError,
+    refetch: refetchNotebooks,
+  } = useNotebooks();
+  const createNotebookMutation = useCreateNotebook();
+  const runNotebookMutation = useRunNotebook();
+  const duplicateNotebookMutation = useDuplicateNotebook();
+  const deleteNotebookMutation = useDeleteNotebook();
+  const exportNotebookMutation = useExportNotebook();
+
+  // Filter notebooks based on language
+  const notebooks = notebooksData.filter((notebook) => {
+    if (languageFilter === "all") return true;
+    return notebook.language === languageFilter;
+  });
+
+  const isLoading = notebooksLoading;
 
   const filteredNotebooks = notebooks.filter((notebook) => {
-    const matchesSearch = notebook.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      notebook.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesLanguage = languageFilter === "all" || notebook.language === languageFilter
-    return matchesSearch && matchesLanguage
-  })
+    const matchesSearch =
+      notebook.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      notebook.description.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSearch;
+  });
 
   const stats = {
     total: notebooks.length,
-    python: notebooks.filter(n => n.language === "python").length,
-    sql: notebooks.filter(n => n.language === "sql").length,
-    avgCells: notebooks.length > 0
-      ? Math.round(notebooks.reduce((acc, n) => acc + n.cellCount, 0) / notebooks.length)
-      : 0,
-  }
+    python: notebooks.filter((n) => n.language === "python").length,
+    sql: notebooks.filter((n) => n.language === "sql").length,
+    avgCells:
+      notebooks.length > 0
+        ? Math.round(
+            notebooks.reduce((acc, n) => acc + n.cell_count, 0) /
+              notebooks.length
+          )
+        : 0,
+  };
 
   const handleCreateNotebook = async () => {
-    if (!formData.name.trim()) return
+    if (!formData.name.trim()) return;
 
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    const newNotebook: Notebook = {
-      id: Date.now().toString(),
-      name: formData.name,
-      description: formData.description,
-      kernel: formData.language === "python" ? "Python 3.11" : "SQL",
-      lastModified: "Just now",
-      createdBy: "Current User",
-      cellCount: 1,
-      language: formData.language,
+    try {
+      await createNotebookMutation.mutateAsync({
+        name: formData.name,
+        description: formData.description,
+        language: formData.language,
+      });
+      toast.success("Notebook created successfully");
+      setIsCreateDialogOpen(false);
+      resetForm();
+    } catch (error: any) {
+      console.error("Failed to create notebook:", error);
+      toast.error(error.message || "Failed to create notebook");
     }
-
-    setNotebooks([newNotebook, ...notebooks])
-    setIsLoading(false)
-    setIsCreateDialogOpen(false)
-    resetForm()
-  }
+  };
 
   const handleRunNotebook = async (notebook: Notebook) => {
-    setIsLoading(true)
-    // Simulate running all cells
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
-    setNotebooks(notebooks =>
-      notebooks.map(n =>
-        n.id === notebook.id
-          ? { ...n, lastModified: "Just now" }
-          : n
-      )
-    )
-    setIsLoading(false)
-  }
+    try {
+      await runNotebookMutation.mutateAsync(notebook.id);
+      toast.success("Notebook executed successfully");
+    } catch (error: any) {
+      console.error("Failed to run notebook:", error);
+      toast.error(error.message || "Failed to run notebook");
+    }
+  };
 
   const handleDuplicateNotebook = async (notebook: Notebook) => {
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    const duplicatedNotebook: Notebook = {
-      ...notebook,
-      id: Date.now().toString(),
-      name: `${notebook.name} (Copy)`,
-      lastModified: "Just now",
+    try {
+      await duplicateNotebookMutation.mutateAsync(notebook.id);
+      toast.success("Notebook duplicated successfully");
+    } catch (error: any) {
+      console.error("Failed to duplicate notebook:", error);
+      toast.error(error.message || "Failed to duplicate notebook");
     }
-    setNotebooks([duplicatedNotebook, ...notebooks])
-    setIsLoading(false)
-  }
+  };
 
-  const handleExportNotebook = (notebook: Notebook) => {
-    // Create a simple notebook JSON structure
-    const notebookData = {
-      metadata: {
-        kernelspec: {
-          name: notebook.language,
-          display_name: notebook.kernel,
-        },
-      },
-      cells: Array.from({ length: notebook.cellCount }, (_, i) => ({
-        cell_type: "code",
-        execution_count: null,
-        metadata: {},
-        source: [`# Cell ${i + 1}\n`],
-        outputs: [],
-      })),
+  const handleExportNotebook = async (notebook: Notebook) => {
+    try {
+      const exportData = await exportNotebookMutation.mutateAsync(notebook.id);
+
+      // Create download link
+      const blob = new Blob([JSON.stringify(exportData.content, null, 2)], {
+        type: "application/json",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = exportData.filename;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("Notebook exported successfully");
+    } catch (error: any) {
+      console.error("Failed to export notebook:", error);
+      toast.error(error.message || "Failed to export notebook");
     }
-
-    // Create download link
-    const blob = new Blob([JSON.stringify(notebookData, null, 2)], { type: "application/json" })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${notebook.name.replace(/\s+/g, "_")}.ipynb`
-    a.click()
-    window.URL.revokeObjectURL(url)
-  }
+  };
 
   const handleDeleteNotebook = async () => {
-    if (!notebookToDelete) return
+    if (!notebookToDelete) return;
 
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 600))
-
-    setNotebooks(notebooks => notebooks.filter(n => n.id !== notebookToDelete))
-    setIsLoading(false)
-    setNotebookToDelete(null)
-  }
+    try {
+      await deleteNotebookMutation.mutateAsync(notebookToDelete);
+      toast.success("Notebook deleted successfully");
+      setNotebookToDelete(null);
+    } catch (error: any) {
+      console.error("Failed to delete notebook:", error);
+      toast.error(error.message || "Failed to delete notebook");
+    }
+  };
 
   const resetForm = () => {
     setFormData({
       name: "",
       description: "",
       language: "python",
-    })
-  }
+    });
+  };
 
   return (
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Notebooks</h1>
+          <h1 className="text-xl font-semibold">Notebooks</h1>
           <p className="text-sm text-muted-foreground">
             Interactive notebooks for data exploration and transformation
           </p>
@@ -267,25 +217,35 @@ export default function NotebooksPage() {
       <div className="grid gap-2 md:grid-cols-4">
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Total</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Total
+            </div>
             <div className="text-xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Python</div>
-            <div className="text-xl font-bold text-blue-500">{stats.python}</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Python
+            </div>
+            <div className="text-xl font-bold text-blue-500">
+              {stats.python}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">SQL</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              SQL
+            </div>
             <div className="text-xl font-bold text-orange-500">{stats.sql}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Avg Cells</div>
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Avg Cells
+            </div>
             <div className="text-xl font-bold">{stats.avgCells}</div>
           </CardContent>
         </Card>
@@ -317,8 +277,15 @@ export default function NotebooksPage() {
                   <SelectItem value="sql">SQL</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="icon">
-                <IconRefresh className="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => refetchNotebooks()}
+                disabled={isLoading}
+              >
+                <IconRefresh
+                  className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+                />
               </Button>
             </div>
           </div>
@@ -334,7 +301,9 @@ export default function NotebooksPage() {
                         <IconBook className="h-4 w-4 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm line-clamp-1">{notebook.name}</h3>
+                        <h3 className="font-semibold text-sm line-clamp-1">
+                          {notebook.name}
+                        </h3>
                         <Badge variant="secondary" className="text-xs mt-0.5">
                           {notebook.kernel}
                         </Badge>
@@ -342,8 +311,13 @@ export default function NotebooksPage() {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={isLoading}>
-                          {isLoading ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          disabled={isActionLoading}
+                        >
+                          {isActionLoading ? (
                             <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <IconDotsVertical className="h-3.5 w-3.5" />
@@ -351,19 +325,31 @@ export default function NotebooksPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            router.push(
+                              `/data-transformation/notebooks/${notebook.id}`
+                            )
+                          }
+                        >
                           <IconCode className="mr-2 h-4 w-4" />
                           Open Notebook
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleRunNotebook(notebook)}>
+                        <DropdownMenuItem
+                          onClick={() => handleRunNotebook(notebook)}
+                        >
                           <IconPlayerPlay className="mr-2 h-4 w-4" />
                           Run All Cells
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDuplicateNotebook(notebook)}>
+                        <DropdownMenuItem
+                          onClick={() => handleDuplicateNotebook(notebook)}
+                        >
                           <IconCopy className="mr-2 h-4 w-4" />
                           Duplicate
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleExportNotebook(notebook)}>
+                        <DropdownMenuItem
+                          onClick={() => handleExportNotebook(notebook)}
+                        >
                           <IconDownload className="mr-2 h-4 w-4" />
                           Export
                         </DropdownMenuItem>
@@ -384,15 +370,17 @@ export default function NotebooksPage() {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <p className="text-muted-foreground">Cells</p>
-                      <p className="font-medium">{notebook.cellCount}</p>
+                      <p className="font-medium">{notebook.cell_count}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Modified</p>
-                      <p className="font-medium">{notebook.lastModified}</p>
+                      <p className="font-medium">
+                        {new Date(notebook.updated_at).toLocaleDateString()}
+                      </p>
                     </div>
                     <div className="col-span-2">
                       <p className="text-muted-foreground">Created by</p>
-                      <p className="font-medium">{notebook.createdBy}</p>
+                      <p className="font-medium">{notebook.created_by_name}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -407,13 +395,17 @@ export default function NotebooksPage() {
         open={isCreateDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
-            setIsCreateDialogOpen(false)
-            resetForm()
+            setIsCreateDialogOpen(false);
+            resetForm();
           }
         }}
         modal
       >
-        <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+        <DialogContent
+          className="max-w-md"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>Create Notebook</DialogTitle>
             <DialogDescription>
@@ -427,12 +419,19 @@ export default function NotebooksPage() {
                 id="notebook-name"
                 placeholder="e.g., Customer Analysis"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="language">Language/Kernel</Label>
-              <Select value={formData.language} onValueChange={(value) => setFormData({ ...formData, language: value })}>
+              <Select
+                value={formData.language}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, language: value })
+                }
+              >
                 <SelectTrigger id="language">
                   <SelectValue placeholder="Select language" />
                 </SelectTrigger>
@@ -449,7 +448,9 @@ export default function NotebooksPage() {
                 placeholder="Describe what this notebook does..."
                 rows={3}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
               />
             </div>
           </div>
@@ -457,15 +458,18 @@ export default function NotebooksPage() {
             <Button
               variant="outline"
               onClick={() => {
-                setIsCreateDialogOpen(false)
-                resetForm()
+                setIsCreateDialogOpen(false);
+                resetForm();
               }}
-              disabled={isLoading}
+              disabled={isActionLoading}
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateNotebook} disabled={!formData.name.trim() || isLoading}>
-              {isLoading ? (
+            <Button
+              onClick={handleCreateNotebook}
+              disabled={!formData.name.trim() || isActionLoading}
+            >
+              {isActionLoading ? (
                 <>
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creating...
@@ -479,18 +483,27 @@ export default function NotebooksPage() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!notebookToDelete} onOpenChange={(open) => !open && setNotebookToDelete(null)}>
+      <AlertDialog
+        open={!!notebookToDelete}
+        onOpenChange={(open) => !open && setNotebookToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Notebook?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this notebook and all its cells. This action cannot be undone.
+              This will permanently delete this notebook and all its cells. This
+              action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteNotebook} disabled={isLoading}>
-              {isLoading ? (
+            <AlertDialogCancel disabled={isActionLoading}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteNotebook}
+              disabled={isActionLoading}
+            >
+              {isActionLoading ? (
                 <>
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
                   Deleting...
@@ -503,5 +516,5 @@ export default function NotebooksPage() {
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }

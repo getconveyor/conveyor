@@ -147,12 +147,10 @@ export default function DashboardBuilderPage() {
   }
 
   const handleSave = () => {
-    console.log("Saving dashboard:", { name: dashboardName, widgets })
     // In a real app, would save to backend
   }
 
   const handlePreview = () => {
-    console.log("Preview dashboard")
     // In a real app, would open preview modal or navigate to preview page
   }
 
@@ -239,7 +237,7 @@ export default function DashboardBuilderPage() {
         {/* Center Panel - Dashboard Canvas */}
         <div className="flex-1 overflow-auto bg-muted/10">
           <ScrollArea className="h-full">
-            <div className="p-6">
+            <div className="p-5">
               {widgets.length === 0 ? (
                 <div className="flex items-center justify-center h-[400px]">
                   <div className="text-center">

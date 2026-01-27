@@ -1,7 +1,8 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   IconPlus,
   IconBook,
@@ -20,16 +21,23 @@ import {
   IconSearch,
   IconLayoutGrid,
   IconLayoutList,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+  IconRefresh,
+} from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -38,163 +46,214 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { analyticsApi, Exploration } from "@/lib/api/analytics";
+import { formatDistanceToNow } from "date-fns";
 
 interface Workbook {
-  id: string
-  name: string
-  description: string
-  sections: number
-  queries: number
-  visualizations: number
-  createdBy: string
-  createdAt: string
-  lastModified: string
-  collaborators: number
-  isShared: boolean
-  favorite: boolean
-  tags: string[]
+  id: string;
+  name: string;
+  description: string;
+  cellCount: number;
+  createdBy: string;
+  createdAt: string;
+  lastModified: string;
+  sourceType: string;
+  sourceReference: string;
+  favorite: boolean;
 }
 
-const mockWorkbooks: Workbook[] = [
-  {
-    id: "1",
-    name: "Q4 Sales Analysis",
-    description: "Comprehensive analysis of Q4 sales performance across all regions",
-    sections: 8,
-    queries: 12,
-    visualizations: 6,
-    createdBy: "Sarah Johnson",
-    createdAt: "2024-01-10",
-    lastModified: "2 hours ago",
-    collaborators: 3,
-    isShared: true,
-    favorite: true,
-    tags: ["sales", "quarterly"],
-  },
-  {
-    id: "2",
-    name: "Customer Cohort Analysis",
-    description: "Retention and lifetime value analysis by customer cohort",
-    sections: 6,
-    queries: 15,
-    visualizations: 9,
-    createdBy: "Michael Chen",
-    createdAt: "2024-01-08",
-    lastModified: "1 day ago",
-    collaborators: 2,
-    isShared: true,
-    favorite: false,
-    tags: ["customers", "retention"],
-  },
-  {
-    id: "3",
-    name: "Product Performance Dashboard",
-    description: "Real-time product metrics and KPIs",
-    sections: 10,
-    queries: 18,
-    visualizations: 12,
-    createdBy: "Emily Rodriguez",
-    createdAt: "2024-01-05",
-    lastModified: "3 days ago",
-    collaborators: 5,
-    isShared: true,
-    favorite: true,
-    tags: ["products", "metrics"],
-  },
-  {
-    id: "4",
-    name: "Marketing Attribution Model",
-    description: "Multi-touch attribution analysis for marketing campaigns",
-    sections: 5,
-    queries: 8,
-    visualizations: 4,
-    createdBy: "David Kim",
-    createdAt: "2024-01-03",
-    lastModified: "5 days ago",
-    collaborators: 1,
-    isShared: false,
-    favorite: false,
-    tags: ["marketing", "attribution"],
-  },
-  {
-    id: "5",
-    name: "Inventory Optimization",
-    description: "Analysis of inventory levels, turnover, and reorder points",
-    sections: 7,
-    queries: 10,
-    visualizations: 5,
-    createdBy: "Lisa Wang",
-    createdAt: "2024-01-01",
-    lastModified: "1 week ago",
-    collaborators: 2,
-    isShared: true,
-    favorite: false,
-    tags: ["operations", "inventory"],
-  },
-  {
-    id: "6",
-    name: "User Behavior Patterns",
-    description: "Deep dive into user engagement and feature usage patterns",
-    sections: 9,
-    queries: 14,
-    visualizations: 8,
-    createdBy: "James Mitchell",
-    createdAt: "2023-12-28",
-    lastModified: "2 weeks ago",
-    collaborators: 4,
-    isShared: true,
-    favorite: true,
-    tags: ["analytics", "behavior"],
-  },
-]
+// Convert Exploration to Workbook format
+function explorationToWorkbook(exp: Exploration): Workbook {
+  return {
+    id: exp.id,
+    name: exp.name,
+    description: `${exp.source_type} exploration from ${exp.source_reference}`,
+    cellCount: exp.cell_count,
+    createdBy: exp.user_name || "Unknown",
+    createdAt: exp.created_at,
+    lastModified: formatDistanceToNow(new Date(exp.updated_at), {
+      addSuffix: true,
+    }),
+    sourceType: exp.source_type,
+    sourceReference: exp.source_reference,
+    favorite: false, // Would need to store favorites locally or in backend
+  };
+}
 
 export default function WorkbooksPage() {
-  const [workbooks, setWorkbooks] = useState<Workbook[]>(mockWorkbooks)
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const router = useRouter();
+  const [workbooks, setWorkbooks] = useState<Workbook[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-  })
+  });
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+
+  const fetchWorkbooks = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const explorations = await analyticsApi.getExplorations();
+      const workbooksList = explorations.map(explorationToWorkbook);
+      // Restore favorites from localStorage
+      const storedFavorites = localStorage.getItem("workbook-favorites");
+      if (storedFavorites) {
+        const favSet = new Set<string>(JSON.parse(storedFavorites));
+        setFavorites(favSet);
+        // Apply favorites to workbooks
+        workbooksList.forEach((w) => {
+          w.favorite = favSet.has(w.id);
+        });
+      }
+      setWorkbooks(workbooksList);
+    } catch (err) {
+      console.error("Failed to fetch workbooks:", err);
+      setError("Failed to load workbooks");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWorkbooks();
+  }, [fetchWorkbooks]);
 
   const filteredWorkbooks = workbooks.filter(
     (workbook) =>
       workbook.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       workbook.description.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  );
 
-  const handleCreateWorkbook = () => {
-    console.log("Creating workbook:", formData)
-    setCreateDialogOpen(false)
-    setFormData({ name: "", description: "" })
-  }
+  const handleCreateWorkbook = async () => {
+    try {
+      const newExploration = await analyticsApi.createExploration({
+        name: formData.name,
+        state: { description: formData.description },
+        source_type: "workbook",
+        source_reference: "manual",
+      });
+      setCreateDialogOpen(false);
+      setFormData({ name: "", description: "" });
+      // Navigate to the new workbook
+      router.push(`/data-analytics/workbooks/${newExploration.id}`);
+    } catch (err) {
+      console.error("Failed to create workbook:", err);
+    }
+  };
 
   const toggleFavorite = (id: string) => {
-    setWorkbooks(workbooks.map((w) => (w.id === id ? { ...w, favorite: !w.favorite } : w)))
+    const newFavorites = new Set(favorites);
+    if (newFavorites.has(id)) {
+      newFavorites.delete(id);
+    } else {
+      newFavorites.add(id);
+    }
+    setFavorites(newFavorites);
+    localStorage.setItem(
+      "workbook-favorites",
+      JSON.stringify([...newFavorites])
+    );
+    setWorkbooks(
+      workbooks.map((w) =>
+        w.id === id ? { ...w, favorite: newFavorites.has(id) } : w
+      )
+    );
+  };
+
+  const deleteWorkbook = async (id: string) => {
+    try {
+      await analyticsApi.deleteExploration(id);
+      setWorkbooks(workbooks.filter((w) => w.id !== id));
+    } catch (err) {
+      console.error("Failed to delete workbook:", err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold">Workbooks</h1>
+            <p className="text-sm text-muted-foreground">
+              Interactive data analysis and visualization notebooks
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    <Skeleton className="h-16" />
+                    <Skeleton className="h-16" />
+                    <Skeleton className="h-16" />
+                  </div>
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </>
+    );
   }
 
-  const deleteWorkbook = (id: string) => {
-    setWorkbooks(workbooks.filter((w) => w.id !== id))
+  if (error) {
+    return (
+      <>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold">Workbooks</h1>
+            <p className="text-sm text-muted-foreground">
+              Interactive data analysis and visualization notebooks
+            </p>
+          </div>
+        </div>
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <p className="text-destructive">{error}</p>
+            <Button variant="outline" onClick={fetchWorkbooks} className="mt-4">
+              <IconRefresh className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </>
+    );
   }
 
   return (
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Workbooks</h1>
+          <h1 className="text-xl font-semibold">Workbooks</h1>
           <p className="text-sm text-muted-foreground">
             Interactive data analysis and visualization notebooks
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "list")}>
+          <Tabs
+            value={viewMode}
+            onValueChange={(v) => setViewMode(v as "grid" | "list")}
+          >
             <TabsList>
               <TabsTrigger value="grid">
                 <IconLayoutGrid className="h-4 w-4" />
@@ -226,7 +285,9 @@ export default function WorkbooksPage() {
                     id="workbook-name"
                     placeholder="e.g., Sales Analysis"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -235,12 +296,17 @@ export default function WorkbooksPage() {
                     id="workbook-description"
                     placeholder="Describe the purpose of this workbook"
                     value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setCreateDialogOpen(false)}
+                >
                   Cancel
                 </Button>
                 <Button onClick={handleCreateWorkbook}>Create Workbook</Button>
@@ -266,13 +332,18 @@ export default function WorkbooksPage() {
       {viewMode === "grid" ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredWorkbooks.map((workbook) => (
-            <Card key={workbook.id} className="hover:shadow-md transition-shadow">
+            <Card
+              key={workbook.id}
+              className="hover:bg-accent/30 transition-colors"
+            >
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
                       <IconBook className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                      <CardTitle className="text-lg truncate">{workbook.name}</CardTitle>
+                      <CardTitle className="text-lg truncate">
+                        {workbook.name}
+                      </CardTitle>
                     </div>
                     <CardDescription className="line-clamp-2">
                       {workbook.description}
@@ -328,53 +399,29 @@ export default function WorkbooksPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="p-2 bg-muted/50 rounded">
-                      <p className="text-xs text-muted-foreground">Sections</p>
-                      <p className="text-lg font-semibold">{workbook.sections}</p>
-                    </div>
+                  <div className="grid grid-cols-2 gap-2 text-center">
                     <div className="p-2 bg-muted/50 rounded">
                       <div className="flex items-center justify-center gap-1">
                         <IconCode className="h-3 w-3 text-muted-foreground" />
                       </div>
-                      <p className="text-xs text-muted-foreground">Queries</p>
-                      <p className="text-lg font-semibold">{workbook.queries}</p>
+                      <p className="text-xs text-muted-foreground">Cells</p>
+                      <p className="text-lg font-semibold">
+                        {workbook.cellCount}
+                      </p>
                     </div>
                     <div className="p-2 bg-muted/50 rounded">
                       <div className="flex items-center justify-center gap-1">
                         <IconChartBar className="h-3 w-3 text-muted-foreground" />
                       </div>
-                      <p className="text-xs text-muted-foreground">Charts</p>
-                      <p className="text-lg font-semibold">{workbook.visualizations}</p>
+                      <p className="text-xs text-muted-foreground">Source</p>
+                      <p className="text-sm font-semibold truncate">
+                        {workbook.sourceType}
+                      </p>
                     </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1">
-                    {workbook.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-                    <div className="flex items-center gap-2">
-                      <span>{workbook.createdBy}</span>
-                      {workbook.collaborators > 0 && (
-                        <>
-                          <span>•</span>
-                          <div className="flex items-center gap-1">
-                            <IconUsers className="h-3 w-3" />
-                            <span>{workbook.collaborators}</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    {workbook.isShared && (
-                      <Badge variant="outline" className="text-xs">
-                        Shared
-                      </Badge>
-                    )}
+                    <span>{workbook.createdBy}</span>
                   </div>
 
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -411,11 +458,9 @@ export default function WorkbooksPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <p className="font-medium truncate">{workbook.name}</p>
-                        {workbook.isShared && (
-                          <Badge variant="outline" className="text-xs">
-                            Shared
-                          </Badge>
-                        )}
+                        <Badge variant="outline" className="text-xs">
+                          {workbook.sourceType}
+                        </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground line-clamp-1">
                         {workbook.description}
@@ -423,33 +468,13 @@ export default function WorkbooksPage() {
                       <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                         <span>{workbook.createdBy}</span>
                         <span>•</span>
-                        <span>{workbook.sections} sections</span>
-                        <span>•</span>
-                        <span>{workbook.queries} queries</span>
-                        <span>•</span>
-                        <span>{workbook.visualizations} charts</span>
-                        {workbook.collaborators > 0 && (
-                          <>
-                            <span>•</span>
-                            <div className="flex items-center gap-1">
-                              <IconUsers className="h-3 w-3" />
-                              <span>{workbook.collaborators}</span>
-                            </div>
-                          </>
-                        )}
+                        <span>{workbook.cellCount} cells</span>
                         <span>•</span>
                         <span>Modified {workbook.lastModified}</span>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="flex flex-wrap gap-1">
-                      {workbook.tags.slice(0, 2).map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
@@ -457,21 +482,15 @@ export default function WorkbooksPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            router.push(
+                              `/data-analytics/workbooks/${workbook.id}`
+                            )
+                          }
+                        >
                           <IconEye className="h-4 w-4 mr-2" />
                           Open Workbook
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <IconEdit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <IconCopy className="h-4 w-4 mr-2" />
-                          Duplicate
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <IconShare className="h-4 w-4 mr-2" />
-                          Share
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -491,7 +510,7 @@ export default function WorkbooksPage() {
         </Card>
       )}
 
-      {filteredWorkbooks.length === 0 && (
+      {filteredWorkbooks.length === 0 && !loading && (
         <Card>
           <CardContent className="flex items-center justify-center h-[300px]">
             <div className="text-center">
@@ -513,5 +532,5 @@ export default function WorkbooksPage() {
         </Card>
       )}
     </>
-  )
+  );
 }

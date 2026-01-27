@@ -1,11 +1,11 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
-  IconActivity,
   IconArrowsExchange,
   IconBrain,
   IconChartBar,
+  IconDatabase,
   IconInnerShadowTop,
   IconServer,
   IconSettings,
@@ -14,18 +14,21 @@ import {
   IconTransform,
   IconWaveSine,
   IconSchool,
-} from "@tabler/icons-react"
+  IconActivity,
+} from "@tabler/icons-react";
 
-import { NavPlatform } from "@/components/nav-platform"
-import { NavSecondary } from "@/components/nav-secondary"
+import { NavPlatform } from "@/components/nav-platform";
+import { NavSecondary } from "@/components/nav-secondary";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 const data = {
   navMain: [
@@ -40,20 +43,28 @@ const data = {
       icon: IconArrowsExchange,
       items: [
         {
-          title: "Pipelines",
-          url: "/data-integration/pipelines",
+          title: "Overview",
+          url: "/data-integration",
         },
         {
           title: "Connections",
-          url: "/data-integration/connections",
+          url: "/data-integration/data-sources",
+        },
+        {
+          title: "Connectors",
+          url: "/data-integration/source-connectors",
+        },
+        {
+          title: "Pipelines",
+          url: "/data-integration/pipelines",
         },
         {
           title: "Schedules",
           url: "/data-integration/schedules",
         },
         {
-          title: "Data Sources",
-          url: "/data-integration/sources",
+          title: "Run History",
+          url: "/data-integration/pipeline-runs",
         },
       ],
     },
@@ -67,85 +78,55 @@ const data = {
           url: "/data-transformation/notebooks",
         },
         {
-          title: "Jobs",
-          url: "/data-transformation/jobs",
-        },
-        {
           title: "Workflows",
           url: "/data-transformation/workflows",
         },
         {
-          title: "Code Repository",
+          title: "Jobs",
+          url: "/data-transformation/jobs",
+        },
+        {
+          title: "Repository",
           url: "/data-transformation/repository",
         },
-      ],
-    },
-    {
-      title: "Data Lake",
-      url: "/data-lake",
-      icon: IconStack,
-      items: [
         {
-          title: "Explorer",
-          url: "/data-lake/explorer",
-        },
-        {
-          title: "Files & Folders",
-          url: "/data-lake/files",
-        },
-        {
-          title: "Schemas",
-          url: "/data-lake/schemas",
-        },
-        {
-          title: "Storage Settings",
-          url: "/data-lake/storage",
-        },
-      ],
-    },
-    {
-      title: "Data Warehouse",
-      url: "/data-warehouse",
-      icon: IconServer,
-      items: [
-        {
-          title: "SQL Editor",
-          url: "/data-warehouse/editor",
-        },
-        {
-          title: "Tables & Views",
-          url: "/data-warehouse/tables",
-        },
-        {
-          title: "Query History",
-          url: "/data-warehouse/history",
-        },
-        {
-          title: "Performance",
-          url: "/data-warehouse/performance",
-        },
-      ],
-    },
-    {
-      title: "Real-Time Analytics",
-      url: "/real-time-analytics",
-      icon: IconWaveSine,
-      items: [
-        {
-          title: "Streaming Jobs",
+          title: "Streaming",
           url: "/real-time-analytics/streaming",
         },
         {
-          title: "Event Hubs",
+          title: "Events",
           url: "/real-time-analytics/events",
         },
+      ],
+    },
+    {
+      title: "Data Lakehouse",
+      url: "/lakehouse",
+      icon: IconDatabase,
+      items: [
         {
-          title: "Live Dashboards",
-          url: "/real-time-analytics/dashboards",
+          title: "Overview",
+          url: "/lakehouse",
         },
         {
-          title: "Alerts",
-          url: "/real-time-analytics/alerts",
+          title: "SQL Editor",
+          url: "/lakehouse/sql-editor",
+        },
+        {
+          title: "Table Explorer",
+          url: "/lakehouse/tables",
+        },
+        {
+          title: "Query History",
+          url: "/lakehouse/history",
+        },
+        {
+          title: "Namespaces",
+          url: "/lakehouse/namespaces",
+        },
+        {
+          title: "Storage Settings",
+          url: "/lakehouse/storage",
         },
       ],
     },
@@ -155,8 +136,16 @@ const data = {
       icon: IconChartBar,
       items: [
         {
+          title: "Overview",
+          url: "/data-analytics",
+        },
+        {
           title: "Dashboards",
           url: "/data-analytics/dashboards",
+        },
+        {
+          title: "Live Dashboards",
+          url: "/real-time-analytics/dashboards",
         },
         {
           title: "Reports",
@@ -177,6 +166,10 @@ const data = {
       url: "/data-science",
       icon: IconBrain,
       items: [
+        {
+          title: "Overview",
+          url: "/data-science",
+        },
         {
           title: "Notebooks",
           url: "/data-science/notebooks",
@@ -201,6 +194,10 @@ const data = {
       icon: IconShield,
       items: [
         {
+          title: "Overview",
+          url: "/data-governance",
+        },
+        {
           title: "Data Catalog",
           url: "/data-governance/catalog",
         },
@@ -218,6 +215,8 @@ const data = {
         },
       ],
     },
+  ],
+  navSecondary: [
     {
       title: "Monitoring",
       url: "/monitoring",
@@ -225,24 +224,22 @@ const data = {
       items: [
         {
           title: "Overview",
-          url: "/monitoring/overview",
-        },
-        {
-          title: "Pipeline Runs",
-          url: "/monitoring/pipelines",
+          url: "/monitoring",
         },
         {
           title: "System Health",
           url: "/monitoring/health",
         },
         {
-          title: "Alerts & Logs",
+          title: "Logs",
           url: "/monitoring/logs",
+        },
+        {
+          title: "Alerts",
+          url: "/monitoring/alerts",
         },
       ],
     },
-  ],
-  navSecondary: [
     {
       title: "Learning",
       url: "/learning",
@@ -283,14 +280,10 @@ const data = {
           title: "Integrations",
           url: "/settings/integrations",
         },
-        {
-          title: "Billing",
-          url: "/settings/billing",
-        },
       ],
     },
   ],
-}
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -314,6 +307,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavPlatform items={data.navMain} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <ThemeToggle variant="sidebar" />
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

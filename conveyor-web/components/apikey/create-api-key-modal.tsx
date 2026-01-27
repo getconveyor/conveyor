@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { apiKeyApi, ApiKeyWithKey } from '@/lib/api/apikey'
+import { useState } from "react";
+import { ApiKeyWithKey } from "@/lib/api/apikey";
 import {
   Dialog,
   DialogContent,
@@ -9,89 +9,104 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, AlertCircle, Copy, CheckCircle2, Eye, EyeOff } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Loader2,
+  AlertCircle,
+  Copy,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useCreateApiKey } from "@/hooks/use-apikey";
 
 interface CreateApiKeyModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onCreated?: () => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated?: () => void;
 }
 
-export function CreateApiKeyModal({ open, onOpenChange, onCreated }: CreateApiKeyModalProps) {
-  const { toast } = useToast()
+export function CreateApiKeyModal({
+  open,
+  onOpenChange,
+  onCreated,
+}: CreateApiKeyModalProps) {
+  const { toast } = useToast();
+  const createMutation = useCreateApiKey();
 
-  const [name, setName] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [createdKey, setCreatedKey] = useState<ApiKeyWithKey | null>(null)
-  const [showKey, setShowKey] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [createdKey, setCreatedKey] = useState<ApiKeyWithKey | null>(null);
+  const [showKey, setShowKey] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault();
 
-    setLoading(true)
-    setError('')
+    setError("");
 
     try {
-      const apiKey = await apiKeyApi.createApiKey({ name })
-      setCreatedKey(apiKey)
+      const apiKey = await createMutation.mutateAsync({ name });
+      setCreatedKey(apiKey);
       toast({
-        title: 'API key created',
-        description: 'Make sure to copy your API key now. You won\'t be able to see it again!',
-      })
+        title: "API key created",
+        description:
+          "Make sure to copy your API key now. You won't be able to see it again!",
+      });
+      onCreated?.();
     } catch (err: any) {
-      console.error('Failed to create API key:', err)
-      const errorMessage = err.response?.data?.name?.[0] || err.response?.data?.detail || err.message || 'Failed to create API key'
-      setError(errorMessage)
+      console.error("Failed to create API key:", err);
+      const errorMessage =
+        err.response?.data?.name?.[0] ||
+        err.response?.data?.detail ||
+        err.message ||
+        "Failed to create API key";
+      setError(errorMessage);
       toast({
-        title: 'Failed to create API key',
+        title: "Failed to create API key",
         description: errorMessage,
-        variant: 'destructive',
-      })
-    } finally {
-      setLoading(false)
+        variant: "destructive",
+      });
     }
   }
 
   async function handleCopy() {
-    if (!createdKey) return
+    if (!createdKey) return;
 
     try {
-      await navigator.clipboard.writeText(createdKey.key)
-      setCopied(true)
+      await navigator.clipboard.writeText(createdKey.key);
+      setCopied(true);
       toast({
-        title: 'Copied!',
-        description: 'API key copied to clipboard',
-      })
+        title: "Copied!",
+        description: "API key copied to clipboard",
+      });
 
-      setTimeout(() => setCopied(false), 2000)
+      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err)
+      console.error("Failed to copy:", err);
       toast({
-        title: 'Failed to copy',
-        description: 'Could not copy to clipboard',
-        variant: 'destructive',
-      })
+        title: "Failed to copy",
+        description: "Could not copy to clipboard",
+        variant: "destructive",
+      });
     }
   }
 
   function handleClose() {
     if (createdKey) {
-      onCreated?.()
+      onCreated?.();
     }
-    setName('')
-    setError('')
-    setCreatedKey(null)
-    setShowKey(false)
-    setCopied(false)
-    onOpenChange(false)
+    setName("");
+    setError("");
+    setCreatedKey(null);
+    setShowKey(false);
+    setCopied(false);
+    onOpenChange(false);
   }
 
   return (
@@ -99,12 +114,12 @@ export function CreateApiKeyModal({ open, onOpenChange, onCreated }: CreateApiKe
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
-            {createdKey ? 'API Key Created' : 'Create API Key'}
+            {createdKey ? "API Key Created" : "Create API Key"}
           </DialogTitle>
           <DialogDescription>
             {createdKey
-              ? 'Copy your API key now. For security reasons, you won\'t be able to see it again.'
-              : 'Create a new API key for programmatic access to your account.'}
+              ? "Copy your API key now. For security reasons, you won't be able to see it again."
+              : "Create a new API key for programmatic access to your account."}
           </DialogDescription>
         </DialogHeader>
 
@@ -118,7 +133,7 @@ export function CreateApiKeyModal({ open, onOpenChange, onCreated }: CreateApiKe
                   placeholder="Production Server, CI/CD Pipeline, etc."
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  disabled={loading}
+                  disabled={createMutation.isPending}
                   required
                   autoFocus
                 />
@@ -130,7 +145,8 @@ export function CreateApiKeyModal({ open, onOpenChange, onCreated }: CreateApiKe
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Important:</strong> The API key will only be shown once. Make sure to copy and store it securely.
+                  <strong>Important:</strong> The API key will only be shown
+                  once. Make sure to copy and store it securely.
                 </AlertDescription>
               </Alert>
 
@@ -143,11 +159,18 @@ export function CreateApiKeyModal({ open, onOpenChange, onCreated }: CreateApiKe
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                disabled={createMutation.isPending}
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Create API Key
               </Button>
             </DialogFooter>
@@ -168,7 +191,7 @@ export function CreateApiKeyModal({ open, onOpenChange, onCreated }: CreateApiKe
                   <Input
                     value={createdKey.key}
                     readOnly
-                    type={showKey ? 'text' : 'password'}
+                    type={showKey ? "text" : "password"}
                     className="font-mono text-sm pr-10"
                   />
                   <Button
@@ -204,7 +227,8 @@ export function CreateApiKeyModal({ open, onOpenChange, onCreated }: CreateApiKe
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                <strong>Warning:</strong> This is the only time you'll see this key. Store it securely - we cannot recover it if lost.
+                <strong>Warning:</strong> This is the only time you'll see this
+                key. Store it securely - we cannot recover it if lost.
               </AlertDescription>
             </Alert>
 
@@ -213,7 +237,9 @@ export function CreateApiKeyModal({ open, onOpenChange, onCreated }: CreateApiKe
               <div className="space-y-1 text-sm text-muted-foreground">
                 <div className="flex justify-between">
                   <span>Name:</span>
-                  <span className="font-medium text-foreground">{createdKey.name}</span>
+                  <span className="font-medium text-foreground">
+                    {createdKey.name}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Created:</span>
@@ -224,7 +250,9 @@ export function CreateApiKeyModal({ open, onOpenChange, onCreated }: CreateApiKe
                 <div className="flex justify-between">
                   <span>Expires:</span>
                   <span className="font-medium text-foreground">
-                    {createdKey.expires_at ? new Date(createdKey.expires_at).toLocaleString() : 'Never'}
+                    {createdKey.expires_at
+                      ? new Date(createdKey.expires_at).toLocaleString()
+                      : "Never"}
                   </span>
                 </div>
               </div>
@@ -234,12 +262,10 @@ export function CreateApiKeyModal({ open, onOpenChange, onCreated }: CreateApiKe
 
         {createdKey && (
           <DialogFooter>
-            <Button onClick={handleClose}>
-              Done
-            </Button>
+            <Button onClick={handleClose}>Done</Button>
           </DialogFooter>
         )}
       </DialogContent>
     </Dialog>
-  )
+  );
 }

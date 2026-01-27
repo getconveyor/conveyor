@@ -26,8 +26,25 @@ from drf_spectacular.views import (
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+from django.views.decorators.cache import never_cache
+
+
+@never_cache
+@require_GET
+def health_check(request):
+    """Basic health check endpoint for load balancers and k8s probes."""
+    return JsonResponse({
+        'status': 'healthy',
+        'service': 'conveyor-server',
+    })
+
 
 urlpatterns = [
+    # Health Check
+    path('health/', health_check, name='health_check'),
+    
     # Admin
     path('admin/', admin.site.urls),
 
@@ -43,18 +60,21 @@ urlpatterns = [
 
     # API Endpoints
     path('api/', include('authentication.urls')),
-    path('api/', include('integration.urls')),
-    path('api/', include('transformation.urls')),
-    path('api/', include('data_lake.urls')),
-    # path('api/', include('warehouse.urls')),
-    # path('api/', include('streaming.urls')),
-    # path('api/', include('analytics.urls')),
-    # path('api/', include('data_science.urls')),
-    # path('api/', include('governance.urls')),
-    # path('api/', include('monitoring.urls')),
+    path('api/integration/', include('integration.urls')),
+    path('api/transformation/', include('transformation.urls')),
+    path('api/data-lake/', include('data_lake.urls')),
+    path('api/lakehouse/', include('warehouse.urls')),
+    path('api/streaming/', include('streaming.urls')),
+    path('api/analytics/', include('analytics.urls')),
+    path('api/data-science/', include('data_science.urls')),
+    path('api/governance/', include('governance.urls')),
+    path('api/monitoring/', include('monitoring.urls')),
 
     # DRF Browsable API auth (for development)
     path('api-auth/', include('rest_framework.urls')),
+    
+    # Prometheus metrics (django-prometheus)
+    path('', include('django_prometheus.urls')),
 ]
 
 from django.conf import settings

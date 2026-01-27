@@ -114,11 +114,11 @@ export default function DocumentationPage() {
   return (
     <>
       <div className="flex items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-500/10">
-          <IconBook className="h-6 w-6 text-green-500" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+          <IconBook className="h-5 w-5 text-muted-foreground" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Documentation</h1>
+          <h1 className="text-xl font-semibold">Documentation</h1>
           <p className="text-sm text-muted-foreground">
             Complete reference documentation for all platform features
           </p>
@@ -137,9 +137,9 @@ export default function DocumentationPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
         {sections.map((section, idx) => (
-          <Card key={idx} className="hover:shadow-md transition-shadow">
+          <Card key={idx} className="hover:bg-accent/30 transition-colors">
             <CardHeader>
               <div className="flex items-center gap-3 mb-3">
                 <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${section.bgColor}`}>

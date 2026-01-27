@@ -15,5 +15,5 @@ router.register(r'stats', StorageStatsViewSet, basename='datalake-stats')
 app_name = 'data_lake'
 
 urlpatterns = [
-    path('data-lake/', include(router.urls)),
+    path('', include(router.urls)),
 ]

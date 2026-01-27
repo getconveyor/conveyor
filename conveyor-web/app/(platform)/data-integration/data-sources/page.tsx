@@ -1,0 +1,1684 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import {
+  integrationApi,
+  Source,
+  SourceType,
+  CreateSourceData,
+} from "@/lib/api/integration";
+import { toast } from "sonner";
+import {
+  IconPlus,
+  IconSearch,
+  IconApi,
+  IconDatabase,
+  IconCloud,
+  IconFile,
+  IconBrandGithub,
+  IconBrandGoogle,
+  IconBrandStripe,
+  IconBrandSlack,
+  IconDotsVertical,
+  IconRefresh,
+  IconSettings,
+  IconTrash,
+  IconExternalLink,
+  IconLoader2,
+  IconEye,
+  IconTable,
+} from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { PageHeader } from "@/components/page-header";
+
+type SourceStatus = "active" | "inactive" | "error" | "testing";
+type SourceCategory = "api" | "database" | "cloud" | "file";
+
+const statusConfig: Record<
+  SourceStatus,
+  {
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+    className: string;
+  }
+> = {
+  active: {
+    label: "Active",
+    variant: "default",
+    className:
+      "bg-green-500/10 text-green-700 border-green-500/20 hover:bg-green-500/20",
+  },
+  error: {
+    label: "Error",
+    variant: "destructive",
+    className: "",
+  },
+  inactive: {
+    label: "Inactive",
+    variant: "secondary",
+    className: "",
+  },
+  testing: {
+    label: "Testing",
+    variant: "outline",
+    className:
+      "bg-blue-500/10 text-blue-700 border-blue-500/20 hover:bg-blue-500/20",
+  },
+};
+
+// Helper function to get icon for connection type
+function getIconForType(type: string): React.ElementType {
+  const lowerType = type.toLowerCase();
+  if (lowerType.includes("mysql")) return IconDatabase;
+  if (lowerType.includes("postgres")) return IconDatabase;
+  if (lowerType.includes("s3") || lowerType.includes("aws")) return IconCloud;
+  if (lowerType.includes("sftp") || lowerType.includes("ftp")) return IconFile;
+  if (lowerType.includes("github")) return IconBrandGithub;
+  if (lowerType.includes("google")) return IconBrandGoogle;
+  if (lowerType.includes("stripe")) return IconBrandStripe;
+  if (lowerType.includes("slack")) return IconBrandSlack;
+  if (
+    lowerType.includes("api") ||
+    lowerType.includes("rest") ||
+    lowerType.includes("graphql")
+  )
+    return IconApi;
+  return IconDatabase;
+}
+
+// Helper function to get category for connection type
+function getCategoryForType(type: string): SourceCategory {
+  const lowerType = type.toLowerCase();
+  if (
+    lowerType.includes("mysql") ||
+    lowerType.includes("postgres") ||
+    lowerType.includes("mongodb") ||
+    lowerType.includes("snowflake") ||
+    lowerType.includes("bigquery") ||
+    lowerType.includes("redshift") ||
+    lowerType.includes("database")
+  )
+    return "database";
+  if (
+    lowerType.includes("s3") ||
+    lowerType.includes("aws") ||
+    lowerType.includes("gcs") ||
+    lowerType.includes("cloud")
+  )
+    return "cloud";
+  if (
+    lowerType.includes("sftp") ||
+    lowerType.includes("ftp") ||
+    lowerType.includes("kafka") ||
+    lowerType.includes("file")
+  )
+    return "file";
+  return "api";
+}
+
+export default function SourcesPage() {
+  const { currentWorkspace } = useWorkspace();
+  const [sources, setSources] = useState<Source[]>([]);
+  const [sourceTypes, setSourceTypes] = useState<SourceType[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isCatalogOpen, setIsCatalogOpen] = useState(false);
+  const [isConfigureDialogOpen, setIsConfigureDialogOpen] = useState(false);
+  const [selectedSourceType, setSelectedSourceType] =
+    useState<SourceType | null>(null);
+  const [catalogSearchQuery, setCatalogSearchQuery] = useState("");
+  const [catalogCategory, setCatalogCategory] = useState<string>("all");
+  const [editingSource, setEditingSource] = useState<Source | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [sourceToDelete, setSourceToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  // Preview state
+  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
+  const [previewSource, setPreviewSource] = useState<Source | null>(null);
+  const [previewStreams, setPreviewStreams] = useState<
+    Array<{ name: string; namespace?: string }>
+  >([]);
+  const [selectedStream, setSelectedStream] = useState<string>("");
+  const [previewData, setPreviewData] = useState<{
+    columns: Array<{ name: string; type: string; nullable: boolean }>;
+    records: Record<string, any>[];
+    record_count: number;
+    truncated: boolean;
+  } | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [isLoadingStreams, setIsLoadingStreams] = useState(false);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    type: "",
+    host: "",
+    port: "",
+    database: "",
+    username: "",
+    password: "",
+    ssl: false,
+    config: {} as Record<string, any>,
+  });
+
+  useEffect(() => {
+    loadSources();
+    loadSourceTypes();
+  }, [currentWorkspace]);
+
+  async function loadSourceTypes() {
+    try {
+      const response = await integrationApi.getSourceCatalog();
+      setSourceTypes(response.source_types);
+    } catch (error: any) {
+      console.error("Failed to load source types:", error);
+      toast.error("Failed to load available source types");
+    }
+  }
+
+  async function loadSources() {
+    if (!currentWorkspace) return;
+
+    try {
+      setIsFetching(true);
+      const data = await integrationApi.getSources();
+      setSources(data);
+    } catch (error: any) {
+      console.error("Failed to load sources:", error);
+      toast.error(error.message || "Failed to load sources");
+    } finally {
+      setIsFetching(false);
+    }
+  }
+
+  const filteredSources = sources.filter((source) => {
+    const matchesSearch = source.name
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    const category = getCategoryForType(source.type);
+    const matchesCategory =
+      selectedCategory === "all" || category === selectedCategory;
+    const matchesStatus =
+      statusFilter === "all" || source.status === statusFilter;
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
+  const filteredCatalog = sourceTypes.filter((source) => {
+    const matchesSearch = source.name
+      .toLowerCase()
+      .includes(catalogSearchQuery.toLowerCase());
+    const matchesCategory =
+      catalogCategory === "all" || source.category === catalogCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const stats = {
+    total: sources.length,
+    active: sources.filter((s) => s.status === "active").length,
+    error: sources.filter((s) => s.status === "error").length,
+    api: sources.filter((s) => getCategoryForType(s.type) === "api").length,
+  };
+
+  const handleSelectSourceType = (sourceType: SourceType) => {
+    setSelectedSourceType(sourceType);
+    setEditingSource(null);
+    setFormData({
+      name: "",
+      description: "",
+      type: sourceType.id,
+      host: "",
+      port: "",
+      database: "",
+      username: "",
+      password: "",
+      ssl: false,
+      config: {},
+    });
+    setIsCatalogOpen(false);
+    setIsConfigureDialogOpen(true);
+  };
+
+  const handleEditSource = async (source: Source) => {
+    try {
+      setIsLoading(true);
+      // Fetch full source details including all configuration
+      const fullSource = await integrationApi.getSource(source.id);
+
+      const sourceType = sourceTypes.find((st) => st.id === fullSource.type);
+      setSelectedSourceType(sourceType || null);
+      setEditingSource(fullSource);
+      setFormData({
+        name: fullSource.name,
+        description: "",
+        type: fullSource.type,
+        host: fullSource.host || "",
+        port: fullSource.port?.toString() || "",
+        database: fullSource.database || "",
+        username: fullSource.username || "",
+        password: "",
+        ssl: fullSource.ssl || false,
+        config: fullSource.config || {},
+      });
+      setIsConfigureDialogOpen(true);
+    } catch (error: any) {
+      console.error("Failed to load source details:", error);
+      toast.error(error.message || "Failed to load source details");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateOrUpdateSource = async () => {
+    if (!selectedSourceType || !formData.name.trim()) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      if (editingSource) {
+        // Update existing source
+        const updateData: Partial<Source> = {
+          name: formData.name,
+          type: formData.type,
+        };
+
+        const category = getCategoryForType(formData.type);
+
+        // Special handling for BigQuery
+        if (formData.type === "bigquery") {
+          updateData.host = formData.host; // Project ID
+          updateData.database = formData.database; // Dataset ID (optional)
+          // Credentials are stored in config.credentials_json
+        } else if (category === "database" || category === "file") {
+          updateData.host = formData.host;
+          updateData.port = formData.port ? formData.port : undefined;
+          updateData.database = formData.database;
+          updateData.username = formData.username;
+          if (formData.password) {
+            (updateData as any).password = formData.password;
+          }
+          updateData.ssl = formData.ssl;
+        } else if (category === "api") {
+          updateData.host = formData.host;
+          if (formData.password) {
+            (updateData as any).password = formData.password;
+          }
+          if (formData.username) {
+            updateData.username = formData.username;
+          }
+        } else if (category === "cloud") {
+          updateData.database = formData.database;
+          updateData.username = formData.username;
+          if (formData.password) {
+            (updateData as any).password = formData.password;
+          }
+        }
+
+        updateData.config = formData.config;
+
+        await integrationApi.updateSource(editingSource.id, updateData);
+        toast.success("Source updated successfully");
+      } else {
+        // Create new source
+        const createData: CreateSourceData = {
+          name: formData.name,
+          type: formData.type,
+          host: formData.host,
+          port: formData.port || undefined,
+          database: formData.database,
+          username: formData.username,
+          password: formData.password,
+          ssl: formData.ssl,
+          config: formData.config,
+        };
+
+        await integrationApi.createSource(createData);
+        toast.success("Source created successfully");
+      }
+
+      await loadSources();
+      setIsConfigureDialogOpen(false);
+      setFormData({
+        name: "",
+        description: "",
+        type: "",
+        host: "",
+        port: "",
+        database: "",
+        username: "",
+        password: "",
+        ssl: false,
+        config: {},
+      });
+      setEditingSource(null);
+    } catch (error: any) {
+      console.error("Failed to create/update source:", error);
+      toast.error(error.message || "Failed to save source");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteSource = (id: string, name: string) => {
+    setSourceToDelete({ id, name });
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteSource = async () => {
+    if (!sourceToDelete) return;
+
+    try {
+      await integrationApi.deleteSource(sourceToDelete.id);
+      toast.success("Source deleted successfully");
+      await loadSources();
+    } catch (error: any) {
+      console.error("Failed to delete source:", error);
+      toast.error(error.message || "Failed to delete source");
+    } finally {
+      setDeleteConfirmOpen(false);
+      setSourceToDelete(null);
+    }
+  };
+
+  const handleTestConnection = async (id: string, name: string) => {
+    try {
+      // Update status to testing
+      setSources((sources) =>
+        sources.map((s) =>
+          s.id === id ? { ...s, status: "testing" as const } : s
+        )
+      );
+
+      const result = await integrationApi.testSource(id);
+
+      if (result.success) {
+        toast.success(`Connection to "${name}" successful`);
+      } else {
+        toast.error(`Connection failed: ${result.message}`);
+      }
+
+      await loadSources();
+    } catch (error: any) {
+      console.error("Failed to test connection:", error);
+      toast.error(error.message || "Failed to test connection");
+      await loadSources();
+    }
+  };
+
+  const handlePreviewData = async (source: Source) => {
+    setPreviewSource(source);
+    setPreviewStreams([]);
+    setSelectedStream("");
+    setPreviewData(null);
+    setIsPreviewDialogOpen(true);
+    setIsLoadingStreams(true);
+
+    try {
+      // First, fetch schema to get available streams
+      const schema = await integrationApi.getSourceSchema(source.id);
+      setPreviewStreams(schema.streams || []);
+      if (schema.streams?.length > 0) {
+        setSelectedStream(schema.streams[0].name);
+      }
+    } catch (error: any) {
+      console.error("Failed to load schema:", error);
+      toast.error(error.message || "Failed to load available tables/streams");
+    } finally {
+      setIsLoadingStreams(false);
+    }
+  };
+
+  const handleLoadPreview = async () => {
+    if (!previewSource || !selectedStream) return;
+
+    setIsLoadingPreview(true);
+    setPreviewData(null);
+
+    try {
+      const result = await integrationApi.previewSourceData(
+        previewSource.id,
+        selectedStream,
+        20
+      );
+      setPreviewData({
+        columns: result.columns,
+        records: result.records,
+        record_count: result.record_count,
+        truncated: result.truncated,
+      });
+    } catch (error: any) {
+      console.error("Failed to preview data:", error);
+      toast.error(error.message || "Failed to preview data");
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Data Sources"
+        description="Manage your configured data source connections"
+        icon={IconDatabase}
+        breadcrumbs={[
+          { label: "Data Integration", href: "/data-integration" },
+          { label: "Data Sources" },
+        ]}
+        actions={
+          <Button onClick={() => setIsCatalogOpen(true)}>
+            <IconPlus className="mr-2 h-4 w-4" />
+            Add Source
+          </Button>
+        }
+      />
+
+      {/* Stats Cards */}
+      <div className="grid gap-2 md:grid-cols-4">
+        <Card>
+          <CardContent className="pt-2 pb-2">
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Total Sources
+            </div>
+            <div className="text-xl font-bold">{stats.total}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-2 pb-2">
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Active
+            </div>
+            <div className="text-xl font-bold text-green-500">
+              {stats.active}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-2 pb-2">
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              Error
+            </div>
+            <div className="text-xl font-bold text-red-500">{stats.error}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-2 pb-2">
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">
+              API Sources
+            </div>
+            <div className="text-xl font-bold">{stats.api}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Configured Sources */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div className="flex-1 max-w-sm">
+              <div className="relative">
+                <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search sources..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedCategory}
+                onValueChange={setSelectedCategory}
+              >
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="api">APIs</SelectItem>
+                  <SelectItem value="database">Databases</SelectItem>
+                  <SelectItem value="cloud">Cloud Storage</SelectItem>
+                  <SelectItem value="file">File Systems</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="error">Error</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={loadSources}
+                disabled={isFetching}
+              >
+                <IconRefresh
+                  className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
+                />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-2">
+          {isFetching ? (
+            <div className="flex items-center justify-center py-12">
+              <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredSources.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <IconDatabase className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-sm text-muted-foreground">No sources found</p>
+            </div>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+              {filteredSources.map((source) => {
+                const SourceIcon = getIconForType(source.type);
+                const category = getCategoryForType(source.type);
+                return (
+                  <Card
+                    key={source.id}
+                    className={
+                      source.status === "testing"
+                        ? "opacity-75 animate-pulse"
+                        : ""
+                    }
+                  >
+                    <CardContent className="p-3 relative">
+                      {/* Header with icon, name, and actions */}
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex items-start gap-2 flex-1 min-w-0">
+                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <SourceIcon className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-sm line-clamp-1">
+                                {source.name}
+                              </h3>
+                              <Badge
+                                variant={
+                                  statusConfig[source.status as SourceStatus]
+                                    .variant
+                                }
+                                className={`text-xs ${
+                                  statusConfig[source.status as SourceStatus]
+                                    .className
+                                }`}
+                              >
+                                {source.status === "testing" && (
+                                  <IconLoader2 className="mr-1 h-3 w-3 animate-spin" />
+                                )}
+                                {
+                                  statusConfig[source.status as SourceStatus]
+                                    .label
+                                }
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {category} • {source.type}
+                            </p>
+                          </div>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 flex-shrink-0"
+                            >
+                              <IconDotsVertical className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleEditSource(source)}
+                            >
+                              <IconSettings className="mr-2 h-4 w-4" />
+                              Edit Source
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleTestConnection(source.id, source.name)
+                              }
+                            >
+                              <IconRefresh className="mr-2 h-4 w-4" />
+                              Test Connection
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handlePreviewData(source)}
+                              disabled={source.status !== "active"}
+                            >
+                              <IconEye className="mr-2 h-4 w-4" />
+                              Preview Data
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() =>
+                                handleDeleteSource(source.id, source.name)
+                              }
+                            >
+                              <IconTrash className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      {/* Host URL */}
+                      {source.host && (
+                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1 pl-10">
+                          {source.host}
+                          {source.port ? `:${source.port}` : ""}
+                        </p>
+                      )}
+
+                      {/* Configuration and Metadata in 2 columns */}
+                      <div
+                        className={` pt-2 ${
+                          source.type === "api" && source.config
+                            ? "mt-2 border-t"
+                            : ""
+                        } text-xs text-muted-foreground`}
+                      >
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                          {/* API Config */}
+                          {source.type === "api" && source.config && (
+                            <>
+                              {source.config.auth_type && (
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium">Auth:</span>
+                                  <span className="capitalize truncate">
+                                    {source.config.auth_type === "api_key"
+                                      ? "API Key"
+                                      : source.config.auth_type}
+                                  </span>
+                                </div>
+                              )}
+                              {source.config.timeout && (
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium">Timeout:</span>
+                                  <span>{source.config.timeout}s</span>
+                                </div>
+                              )}
+                              {source.config.test_endpoint && (
+                                <div className="col-span-2 flex items-center gap-1">
+                                  <span className="font-medium">Endpoint:</span>
+                                  <span className="truncate">
+                                    {source.config.test_endpoint}
+                                  </span>
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          {/* Timestamps */}
+                          <div className="col-span-2 mt-1 pt-1 border-t">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span>
+                                <span className="font-medium">Created:</span>{" "}
+                                {new Date(source.created_at).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "2-digit",
+                                  }
+                                )}{" "}
+                                {new Date(source.created_at).toLocaleTimeString(
+                                  "en-US",
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  }
+                                )}
+                              </span>
+                            </div>
+                            {source.updated_at && (
+                              <div className="flex items-center justify-between text-[11px] mt-0.5">
+                                <span>
+                                  <span className="font-medium">Updated:</span>{" "}
+                                  {new Date(
+                                    source.updated_at
+                                  ).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "2-digit",
+                                  })}{" "}
+                                  {new Date(
+                                    source.updated_at
+                                  ).toLocaleTimeString("en-US", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between text-[11px] mt-0.5">
+                              <span>
+                                <span className="font-medium">
+                                  Last Tested:
+                                </span>{" "}
+                                {source.last_tested
+                                  ? `${new Date(
+                                      source.last_tested
+                                    ).toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "2-digit",
+                                    })} ${new Date(
+                                      source.last_tested
+                                    ).toLocaleTimeString("en-US", {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}`
+                                  : "Never"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Catalog Dialog */}
+      <Dialog
+        open={isCatalogOpen}
+        onOpenChange={(open) => !open && setIsCatalogOpen(false)}
+        modal
+      >
+        <DialogContent
+          className="!w-[96vw] !h-[96vh] !max-w-none overflow-hidden flex flex-col p-0"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0">
+            <DialogTitle className="text-2xl">Browse Data Sources</DialogTitle>
+            <DialogDescription>
+              Select a source type to configure a new instance
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 py-4 min-h-0 overflow-hidden flex-1 flex flex-col">
+            <Tabs
+              value={catalogCategory}
+              onValueChange={setCatalogCategory}
+              className="flex-1 flex flex-col min-h-0"
+            >
+              <div className="flex items-center justify-between gap-4 mb-4 flex-shrink-0">
+                <TabsList>
+                  <TabsTrigger value="all">All Sources</TabsTrigger>
+                  <TabsTrigger value="api">APIs</TabsTrigger>
+                  <TabsTrigger value="database">Databases</TabsTrigger>
+                  <TabsTrigger value="cloud">Cloud Storage</TabsTrigger>
+                  <TabsTrigger value="file">File Systems</TabsTrigger>
+                </TabsList>
+                <div className="relative w-80">
+                  <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search source types..."
+                    value={catalogSearchQuery}
+                    onChange={(e) => setCatalogSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-6">
+                  {filteredCatalog.map((sourceType) => {
+                    const TypeIcon = getIconForType(sourceType.id);
+                    return (
+                      <Card
+                        key={sourceType.id}
+                        className="hover:bg-accent/30 transition-colors"
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3 mb-3">
+                            <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <TypeIcon className="h-6 w-6 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-semibold text-lg leading-tight">
+                                  {sourceType.name}
+                                </h3>
+                                {sourceType.popular && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    Popular
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                                {sourceType.category.charAt(0).toUpperCase() +
+                                  sourceType.category.slice(1)}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                            {sourceType.description}
+                          </p>
+                          <div className="mb-3">
+                            <p className="text-xs text-muted-foreground mb-1">
+                              Authentication
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              {sourceType.auth_types
+                                .slice(0, 3)
+                                .map((auth, idx) => (
+                                  <Badge
+                                    key={idx}
+                                    variant="outline"
+                                    className="text-xs"
+                                  >
+                                    {auth}
+                                  </Badge>
+                                ))}
+                              {sourceType.auth_types.length > 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{sourceType.auth_types.length - 3}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              asChild
+                            >
+                              <a
+                                href={sourceType.documentation}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <IconExternalLink className="mr-1 h-3 w-3" />
+                                Docs
+                              </a>
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => handleSelectSourceType(sourceType)}
+                            >
+                              <IconPlus className="mr-1 h-3 w-3" />
+                              Add
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            </Tabs>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Configure Source Dialog */}
+      <Dialog
+        open={isConfigureDialogOpen}
+        onOpenChange={(open) => !open && setIsConfigureDialogOpen(false)}
+        modal
+      >
+        <DialogContent
+          className="max-w-2xl"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {editingSource ? "Edit" : "Configure"} {selectedSourceType?.name}{" "}
+              Source
+            </DialogTitle>
+            <DialogDescription>
+              {editingSource
+                ? "Update the source configuration"
+                : `Set up a new ${selectedSourceType?.name} source. Give it a unique name to identify this instance.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="source-name">Source Name *</Label>
+              <Input
+                id="source-name"
+                placeholder={`e.g., Production ${selectedSourceType?.name}`}
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+              />
+            </div>
+
+            {selectedSourceType?.category === "database" &&
+              selectedSourceType?.id !== "bigquery" && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="db-host">Host *</Label>
+                      <Input
+                        id="db-host"
+                        placeholder="localhost"
+                        value={formData.host}
+                        onChange={(e) =>
+                          setFormData({ ...formData, host: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="db-port">Port</Label>
+                      <Input
+                        id="db-port"
+                        placeholder="3306"
+                        value={formData.port}
+                        onChange={(e) =>
+                          setFormData({ ...formData, port: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="db-name">Database Name</Label>
+                    <Input
+                      id="db-name"
+                      placeholder="my_database"
+                      value={formData.database}
+                      onChange={(e) =>
+                        setFormData({ ...formData, database: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="db-user">Username</Label>
+                      <Input
+                        id="db-user"
+                        placeholder="username"
+                        value={formData.username}
+                        onChange={(e) =>
+                          setFormData({ ...formData, username: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="db-password">
+                        Password{" "}
+                        {editingSource && "(leave empty to keep existing)"}
+                      </Label>
+                      <Input
+                        id="db-password"
+                        type="password"
+                        placeholder={
+                          editingSource
+                            ? "Leave empty to keep existing"
+                            : "••••••••"
+                        }
+                        value={formData.password}
+                        onChange={(e) =>
+                          setFormData({ ...formData, password: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+            {selectedSourceType?.category === "api" && (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="api-url">API Base URL *</Label>
+                  <Input
+                    id="api-url"
+                    placeholder="https://api.example.com/v1"
+                    value={formData.host}
+                    onChange={(e) =>
+                      setFormData({ ...formData, host: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="auth-type">Authentication Type *</Label>
+                  <Select
+                    value={formData.config.auth_type || "none"}
+                    onValueChange={(value) =>
+                      setFormData({
+                        ...formData,
+                        config: { ...formData.config, auth_type: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger id="auth-type">
+                      <SelectValue placeholder="Select authentication type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Authentication</SelectItem>
+                      <SelectItem value="bearer">Bearer Token</SelectItem>
+                      <SelectItem value="api_key">API Key (Header)</SelectItem>
+                      <SelectItem value="basic">Basic Auth</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.config.auth_type === "bearer" && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="bearer-token">
+                      Bearer Token{" "}
+                      {editingSource && "(leave empty to keep existing)"}
+                    </Label>
+                    <Input
+                      id="bearer-token"
+                      type="password"
+                      placeholder={
+                        editingSource
+                          ? "Leave empty to keep existing"
+                          : "Enter your bearer token"
+                      }
+                      value={formData.password}
+                      onChange={(e) =>
+                        setFormData({ ...formData, password: e.target.value })
+                      }
+                    />
+                  </div>
+                )}
+
+                {formData.config.auth_type === "api_key" && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label htmlFor="api-key-header">
+                        API Key Header Name
+                      </Label>
+                      <Input
+                        id="api-key-header"
+                        placeholder="X-API-Key"
+                        value={formData.config.api_key_header || "X-API-Key"}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            config: {
+                              ...formData.config,
+                              api_key_header: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="api-key">
+                        API Key{" "}
+                        {editingSource && "(leave empty to keep existing)"}
+                      </Label>
+                      <Input
+                        id="api-key"
+                        type="password"
+                        placeholder={
+                          editingSource
+                            ? "Leave empty to keep existing"
+                            : "Enter your API key"
+                        }
+                        value={formData.password}
+                        onChange={(e) =>
+                          setFormData({ ...formData, password: e.target.value })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+
+                {formData.config.auth_type === "basic" && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label htmlFor="basic-username">Username *</Label>
+                      <Input
+                        id="basic-username"
+                        placeholder="Enter username"
+                        value={formData.username}
+                        onChange={(e) =>
+                          setFormData({ ...formData, username: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="basic-password">
+                        Password{" "}
+                        {editingSource && "(leave empty to keep existing)"}
+                      </Label>
+                      <Input
+                        id="basic-password"
+                        type="password"
+                        placeholder={
+                          editingSource
+                            ? "Leave empty to keep existing"
+                            : "Enter password"
+                        }
+                        value={formData.password}
+                        onChange={(e) =>
+                          setFormData({ ...formData, password: e.target.value })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="grid gap-2">
+                  <Label htmlFor="test-endpoint">
+                    Test Endpoint (optional)
+                  </Label>
+                  <Input
+                    id="test-endpoint"
+                    placeholder="/health or /status"
+                    value={formData.config.test_endpoint || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        config: {
+                          ...formData.config,
+                          test_endpoint: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Path to use for testing connection (relative to base URL)
+                  </p>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="timeout">Request Timeout (seconds)</Label>
+                  <Input
+                    id="timeout"
+                    type="number"
+                    placeholder="30"
+                    value={formData.config.timeout || "30"}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        config: {
+                          ...formData.config,
+                          timeout: parseInt(e.target.value) || 30,
+                        },
+                      })
+                    }
+                  />
+                </div>
+              </>
+            )}
+
+            {selectedSourceType?.id === "bigquery" && (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="project-id">Project ID *</Label>
+                  <Input
+                    id="project-id"
+                    placeholder="my-gcp-project"
+                    value={formData.host}
+                    onChange={(e) =>
+                      setFormData({ ...formData, host: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="dataset-id">Dataset ID *</Label>
+                  <Input
+                    id="dataset-id"
+                    placeholder="my_dataset"
+                    value={formData.database}
+                    onChange={(e) =>
+                      setFormData({ ...formData, database: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="service-account-json">
+                    Service Account JSON *{" "}
+                    {editingSource && "(leave empty to keep existing)"}
+                  </Label>
+                  <textarea
+                    id="service-account-json"
+                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder={
+                      editingSource
+                        ? "Leave empty to keep existing credentials"
+                        : '{\n  "type": "service_account",\n  "project_id": "...",\n  "private_key": "...",\n  ...\n}'
+                    }
+                    value={formData.config.credentials_json || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        config: {
+                          ...formData.config,
+                          credentials_json: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Paste the entire service account JSON key file
+                  </p>
+                </div>
+              </>
+            )}
+
+            {selectedSourceType?.category === "cloud" &&
+              selectedSourceType?.id !== "bigquery" && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="cloud-region">Region</Label>
+                    <Input
+                      id="cloud-region"
+                      placeholder="us-east-1"
+                      value={formData.config.region || ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          config: {
+                            ...formData.config,
+                            region: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="bucket-name">
+                      Bucket / Container Name *
+                    </Label>
+                    <Input
+                      id="bucket-name"
+                      placeholder="my-bucket"
+                      value={formData.database}
+                      onChange={(e) =>
+                        setFormData({ ...formData, database: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="access-key">Access Key *</Label>
+                      <Input
+                        id="access-key"
+                        placeholder="Access key"
+                        value={formData.username}
+                        onChange={(e) =>
+                          setFormData({ ...formData, username: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="secret-key">
+                        Secret Key{" "}
+                        {editingSource && "(leave empty to keep existing)"} *
+                      </Label>
+                      <Input
+                        id="secret-key"
+                        type="password"
+                        placeholder={
+                          editingSource
+                            ? "Leave empty to keep existing"
+                            : "••••••••"
+                        }
+                        value={formData.password}
+                        onChange={(e) =>
+                          setFormData({ ...formData, password: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+            {selectedSourceType?.category === "file" && (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="file-host">Host *</Label>
+                  <Input
+                    id="file-host"
+                    placeholder="sftp.example.com"
+                    value={formData.host}
+                    onChange={(e) =>
+                      setFormData({ ...formData, host: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="file-port">Port</Label>
+                    <Input
+                      id="file-port"
+                      placeholder="22"
+                      value={formData.port}
+                      onChange={(e) =>
+                        setFormData({ ...formData, port: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="file-path">Base Path</Label>
+                    <Input
+                      id="file-path"
+                      placeholder="/data"
+                      value={formData.database}
+                      onChange={(e) =>
+                        setFormData({ ...formData, database: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="file-user">Username</Label>
+                    <Input
+                      id="file-user"
+                      placeholder="username"
+                      value={formData.username}
+                      onChange={(e) =>
+                        setFormData({ ...formData, username: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="file-password">
+                      Password{" "}
+                      {editingSource && "(leave empty to keep existing)"}
+                    </Label>
+                    <Input
+                      id="file-password"
+                      type="password"
+                      placeholder={
+                        editingSource
+                          ? "Leave empty to keep existing"
+                          : "••••••••"
+                      }
+                      value={formData.password}
+                      onChange={(e) =>
+                        setFormData({ ...formData, password: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsConfigureDialogOpen(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateOrUpdateSource}
+              disabled={!formData.name.trim() || isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {editingSource ? "Updating..." : "Creating..."}
+                </>
+              ) : editingSource ? (
+                "Update Source"
+              ) : (
+                "Create Source"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Source</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{sourceToDelete?.name}"? This
+              action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteSource}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Preview Data Dialog */}
+      <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconEye className="h-5 w-5" />
+              Preview Data
+            </DialogTitle>
+            <DialogDescription>
+              {previewSource?.name} - Preview sample data from your source
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-hidden flex flex-col gap-4">
+            {/* Stream Selection */}
+            <div className="flex items-end gap-4">
+              <div className="flex-1">
+                <Label htmlFor="stream-select" className="text-sm font-medium">
+                  Select Table/Stream
+                </Label>
+                <Select
+                  value={selectedStream}
+                  onValueChange={setSelectedStream}
+                  disabled={isLoadingStreams}
+                >
+                  <SelectTrigger id="stream-select" className="mt-1.5">
+                    <SelectValue placeholder="Select a table or stream" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {previewStreams.map((stream) => (
+                      <SelectItem key={stream.name} value={stream.name}>
+                        <div className="flex items-center gap-2">
+                          <IconTable className="h-4 w-4 text-muted-foreground" />
+                          {stream.namespace
+                            ? `${stream.namespace}.${stream.name}`
+                            : stream.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={handleLoadPreview}
+                disabled={!selectedStream || isLoadingPreview}
+              >
+                {isLoadingPreview ? (
+                  <>
+                    <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <IconEye className="mr-2 h-4 w-4" />
+                    Load Preview
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Loading State */}
+            {isLoadingStreams && (
+              <div className="flex items-center justify-center py-12">
+                <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+
+            {/* No Streams Found */}
+            {!isLoadingStreams && previewStreams.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <IconTable className="h-12 w-12 mb-4 opacity-50" />
+                <p>No tables or streams found in this source.</p>
+                <p className="text-sm">
+                  Make sure the connection is active and has accessible data.
+                </p>
+              </div>
+            )}
+
+            {/* Preview Data */}
+            {previewData && (
+              <div className="flex-1 overflow-hidden border rounded-lg">
+                <ScrollArea className="h-[400px]">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm">
+                      <TableRow>
+                        {previewData.columns.map((col) => (
+                          <TableHead
+                            key={col.name}
+                            className="whitespace-nowrap"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-semibold">{col.name}</span>
+                              <span className="text-xs text-muted-foreground font-normal">
+                                {col.type}
+                                {col.nullable ? " (nullable)" : ""}
+                              </span>
+                            </div>
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {previewData.records.map((record, idx) => (
+                        <TableRow key={idx}>
+                          {previewData.columns.map((col) => (
+                            <TableCell
+                              key={col.name}
+                              className="font-mono text-sm max-w-[300px] truncate"
+                              title={String(record[col.name] ?? "")}
+                            >
+                              {record[col.name] === null ? (
+                                <span className="text-muted-foreground italic">
+                                  null
+                                </span>
+                              ) : typeof record[col.name] === "object" ? (
+                                <span className="text-xs">
+                                  {JSON.stringify(record[col.name])}
+                                </span>
+                              ) : (
+                                String(record[col.name])
+                              )}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+                <div className="px-4 py-2 bg-muted/50 border-t text-xs text-muted-foreground">
+                  Showing {previewData.record_count} rows
+                  {previewData.truncated && " (truncated to 20 rows)"}
+                </div>
+              </div>
+            )}
+
+            {/* No Data Message */}
+            {previewData && previewData.records.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <IconTable className="h-8 w-8 mb-2 opacity-50" />
+                <p>No data found in this table.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsPreviewDialogOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

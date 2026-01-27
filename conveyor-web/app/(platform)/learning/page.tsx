@@ -54,16 +54,16 @@ export default function LearningPage() {
           <IconSchool className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Learning Center</h1>
+          <h1 className="text-xl font-semibold">Learning Center</h1>
           <p className="text-sm text-muted-foreground">
             Learn how to build and manage your data platform
           </p>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-5 md:grid-cols-2">
         {learningPaths.map((path) => (
-          <Card key={path.title} className="hover:shadow-md transition-shadow">
+          <Card key={path.title} className="hover:bg-accent/30 transition-colors">
             <CardHeader>
               <div className="flex items-center gap-3 mb-2">
                 <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${path.bgColor}`}>

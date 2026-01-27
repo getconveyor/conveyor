@@ -70,16 +70,16 @@ class BaseConnector(ABC):
     - write(): Load data to destination
     """
 
-    def __init__(self, connection: 'Connection'):
+    def __init__(self, source: 'Source'):
         """
-        Initialize connector with a Connection model instance.
+        Initialize connector with a Source model instance.
 
         Args:
-            connection: Django Connection model instance with config/credentials
+            source: Django Source model instance with config/credentials
         """
-        self.connection = connection
-        self.config = connection.config or {}
-        self.connector_type = connection.connector_type
+        self.source = source
+        self.config = source.config or {}
+        self.connector_type = source.connector_type
 
         # Performance settings
         self.batch_size = self.config.get('batch_size', 1000)

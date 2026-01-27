@@ -18,8 +18,9 @@ import logging
 import traceback
 from datetime import datetime
 
-from integration.models import Pipeline, PipelineRun, Connection
+from integration.models import Pipeline, PipelineRun, Source
 from integration.connectors import ConnectorRegistry
+from integration.lakehouse import LakehouseWriter
 from integration.transformations import (
     ColumnMapper,
     RowFilter,
@@ -70,11 +71,15 @@ def run_pipeline_task(self, pipeline_id: str, triggered_by_user_id: Optional[int
 
         pipeline = Pipeline.objects.select_related('source', 'destination').get(id=pipeline_id)
 
+        # Update pipeline status to running
+        pipeline.status = 'running'
+        pipeline.save(update_fields=['status'])
+
         # Create PipelineRun record
         pipeline_run = PipelineRun.objects.create(
             pipeline=pipeline,
             status='running',
-            started_at=timezone.now(),
+            start_time=timezone.now(),
             celery_task_id=self.request.id,
             current_step='Initializing',
             progress=5,
@@ -96,15 +101,36 @@ def run_pipeline_task(self, pipeline_id: str, triggered_by_user_id: Optional[int
 
         logger.info(f"Source connection test passed: {pipeline.source.name}")
 
-        # Step 3: Test destination connection (15%)
-        _broadcast_progress(pipeline_run, 15, 'Testing destination connection')
-        destination_connector = ConnectorRegistry.create(pipeline.destination)
+        # Step 3: Check destination type and initialize writer (15%)
+        _broadcast_progress(pipeline_run, 15, 'Initializing destination')
 
-        test_result = destination_connector.test()
-        if not test_result.success:
-            raise ConnectionError(f"Destination connection test failed: {test_result.message}")
+        config = pipeline.config or {}
+        destination_type = config.get('destination_type')
+        destination_connector = None
+        lakehouse_writer = None
 
-        logger.info(f"Destination connection test passed: {pipeline.destination.name}")
+        if destination_type == 'lakehouse':
+            # Initialize lakehouse writer
+            logger.info("Using lakehouse destination")
+            lakehouse_config = config.get('lakehouse', {})
+
+            # Add environment credentials
+            import os
+            lakehouse_config['aws_access_key_id'] = os.getenv('MINIO_ROOT_USER', 'minioadmin')
+            lakehouse_config['aws_secret_access_key'] = os.getenv('MINIO_ROOT_PASSWORD', 'minioadmin')
+
+            lakehouse_writer = LakehouseWriter(lakehouse_config)
+            logger.info(f"Lakehouse writer initialized for table: {lakehouse_writer.full_table_name}")
+        else:
+            # Use traditional destination connector
+            logger.info("Using traditional destination connector")
+            destination_connector = ConnectorRegistry.create(pipeline.destination)
+
+            test_result = destination_connector.test()
+            if not test_result.success:
+                raise ConnectionError(f"Destination connection test failed: {test_result.message}")
+
+            logger.info(f"Destination connection test passed: {pipeline.destination.name}")
 
         # Step 4: Get streams to sync (20%)
         _broadcast_progress(pipeline_run, 20, 'Preparing data streams')
@@ -168,14 +194,23 @@ def run_pipeline_task(self, pipeline_id: str, triggered_by_user_id: Optional[int
                 # Count records as they pass through
                 records, record_count = _count_records(records)
 
-                # Write to destination
-                logger.info(f"Writing to destination: {stream_name}")
-                write_stats = destination_connector.write(
-                    stream=stream_name,
-                    schema=stream_schema,
-                    records=records,
-                    key_properties=key_properties
-                )
+                # Write to destination (lakehouse or traditional connector)
+                if lakehouse_writer:
+                    logger.info(f"Writing to lakehouse: {stream_name}")
+                    write_stats = lakehouse_writer.write(
+                        stream=stream_name,
+                        schema=stream_schema,
+                        records=records,
+                        key_properties=key_properties
+                    )
+                else:
+                    logger.info(f"Writing to destination: {stream_name}")
+                    write_stats = destination_connector.write(
+                        stream=stream_name,
+                        schema=stream_schema,
+                        records=records,
+                        key_properties=key_properties
+                    )
 
                 total_records += write_stats.get('total_records', record_count)
 
@@ -209,9 +244,12 @@ def run_pipeline_task(self, pipeline_id: str, triggered_by_user_id: Optional[int
         pipeline_run.error_count = total_errors
         pipeline_run.save()
 
-        # Update pipeline last_run
+        # Update pipeline status and last_run
+        pipeline.status = 'success' if total_errors == 0 else 'failed'
         pipeline.last_run = timezone.now()
-        pipeline.save()
+        pipeline.run_count = (pipeline.run_count or 0) + 1
+        pipeline.records_processed = (pipeline.records_processed or 0) + total_records
+        pipeline.save(update_fields=['status', 'last_run', 'run_count', 'records_processed'])
 
         _broadcast_progress(pipeline_run, 100, 'Pipeline completed successfully')
 
@@ -241,14 +279,24 @@ def run_pipeline_task(self, pipeline_id: str, triggered_by_user_id: Optional[int
 
             _broadcast_progress(pipeline_run, pipeline_run.progress, f'Pipeline failed: {str(e)}')
 
+        # Update pipeline status to failed
+        try:
+            pipeline = Pipeline.objects.get(id=pipeline_id)
+            pipeline.status = 'failed'
+            pipeline.save(update_fields=['status'])
+        except Exception:
+            pass  # Pipeline may not exist
+
         raise
 
     finally:
         # Cleanup connections
         if 'source_connector' in locals():
             source_connector.close()
-        if 'destination_connector' in locals():
+        if 'destination_connector' in locals() and destination_connector:
             destination_connector.close()
+        if 'lakehouse_writer' in locals() and lakehouse_writer:
+            lakehouse_writer.close()
 
 
 @shared_task(name='integration.test_connection')
@@ -393,7 +441,7 @@ def _broadcast_progress(
     # Update pipeline run
     pipeline_run.progress = progress
     pipeline_run.current_step = message
-    pipeline_run.save(update_fields=['progress', 'current_step', 'updated_at'])
+    pipeline_run.save(update_fields=['progress', 'current_step'])
 
     # Broadcast via WebSocket
     from integration.consumers import broadcast_pipeline_update

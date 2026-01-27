@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { workspaceApi, Workspace, WorkspaceMember } from '@/lib/api/workspace'
-import { useAuth } from './AuthContext'
+import { useAuth } from './auth-context'
 
 interface WorkspaceContextType {
   workspaces: Workspace[]
@@ -43,18 +43,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // Load current workspace from localStorage on mount
   useEffect(() => {
-    if (workspaces.length > 0) {
+    if (workspaces.length > 0 && !currentWorkspace) {
       const savedWorkspaceId = localStorage.getItem('currentWorkspaceId')
       if (savedWorkspaceId) {
         const workspace = workspaces.find((w) => w.id === savedWorkspaceId)
         if (workspace) {
           setCurrentWorkspace(workspace)
           loadCurrentMembership(workspace.id)
+        } else {
+          // Workspace ID in localStorage doesn't exist anymore
+          localStorage.removeItem('currentWorkspaceId')
+          setLoading(false)
         }
+      } else {
+        // No saved workspace, stop loading
+        setLoading(false)
       }
-      // Don't auto-select a workspace - user must explicitly select one
     }
-  }, [workspaces])
+  }, [workspaces, currentWorkspace])
 
   // Save current workspace to localStorage when it changes
   useEffect(() => {
@@ -69,10 +75,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setError(null)
       const data = await workspaceApi.getWorkspaces()
       setWorkspaces(data)
+      // Note: loading will be set to false in the useEffect that restores workspace from localStorage
+      // or when there's no saved workspace
     } catch (err: any) {
       console.error('Failed to load workspaces:', err)
       setError(err.message || 'Failed to load workspaces')
-    } finally {
       setLoading(false)
     }
   }
@@ -84,14 +91,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const members = await workspaceApi.getMembers(workspaceId)
       const membership = members.find((m) => m.user.id === user.id)
       setCurrentMembership(membership || null)
+      setLoading(false)
     } catch (err: any) {
       console.error('Failed to load membership:', err)
+      setLoading(false)
     }
   }
 
   async function switchWorkspace(workspaceId: string) {
     try {
-      setLoading(true)
       setError(null)
       const response = await workspaceApi.switchWorkspace(workspaceId)
       setCurrentWorkspace(response.workspace)
@@ -100,8 +108,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       console.error('Failed to switch workspace:', err)
       setError(err.message || 'Failed to switch workspace')
       throw err
-    } finally {
-      setLoading(false)
     }
   }
 

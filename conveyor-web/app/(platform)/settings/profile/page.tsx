@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/contexts/auth-context'
 import { authService } from '@/lib/api/auth'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -96,7 +96,7 @@ export default function ProfilePage() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Profile Settings</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Profile Settings</h1>
           <p className="text-muted-foreground mt-2">
             Manage your personal information and account settings
           </p>
@@ -160,7 +160,7 @@ export default function ProfilePage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Avatar Section */}
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-5">
                 <Avatar className="h-20 w-20">
                   <AvatarImage src={avatar || user.avatar || undefined} alt={user.full_name} />
                   <AvatarFallback className="text-lg">

@@ -2,14 +2,20 @@
 
 import * as React from "react"
 import { GripVerticalIcon } from "lucide-react"
-import { Panel, Group, Separator } from "react-resizable-panels"
+import * as ResizablePrimitive from "react-resizable-panels"
 
 import { cn } from "@/lib/utils"
+
+const { Panel, Group, Separator } = ResizablePrimitive
+
+type ResizablePanelGroupProps = React.ComponentProps<typeof Group> & {
+  direction?: "horizontal" | "vertical"
+}
 
 function ResizablePanelGroup({
   className,
   ...props
-}: React.ComponentProps<typeof Group>) {
+}: ResizablePanelGroupProps) {
   return (
     <Group
       data-slot="resizable-panel-group"

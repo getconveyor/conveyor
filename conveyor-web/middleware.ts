@@ -1,23 +1,52 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 // Define public routes that don't require authentication
-const publicRoutes = ['/login', '/register', '/forgot-password']
+const publicRoutes = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+];
 
 // Define auth routes (redirect to dashboard if already logged in)
-const authRoutes = ['/login', '/register']
+const authRoutes = ["/login", "/register"];
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const { pathname } = request.nextUrl;
 
-  // Get tokens from cookies (we'll set these client-side)
-  // For now, check if user has auth in localStorage (this is handled client-side)
-  // Since middleware runs on server, we'll use a different approach
+  // Skip auth checks for static files and special pages
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/static") ||
+    pathname.startsWith("/rate-limited") ||
+    pathname.includes(".")
+  ) {
+    return NextResponse.next();
+  }
 
-  // For now, we'll handle this client-side in the layout
-  // This middleware can be extended later for server-side checks
+  // Get auth token from cookie
+  const authToken = request.cookies.get("auth_token")?.value;
+  const hasAuth = !!authToken;
 
-  return NextResponse.next()
+  // Check if current path is a public route
+  const isPublicRoute = publicRoutes.some((route) =>
+    pathname.startsWith(route)
+  );
+  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
+
+  // Create response
+  // Redirect authenticated users away from auth pages
+  if (isAuthRoute && hasAuth) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+  // Allow public routes
+  if (isPublicRoute) {
+    return NextResponse.next();
+  }
+  // For protected routes, let client-side handle auth
+  // (we can't validate JWT on edge without the secret)
+  return NextResponse.next();
 }
 
 export const config = {
@@ -29,6 +58,6 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
-}
+};

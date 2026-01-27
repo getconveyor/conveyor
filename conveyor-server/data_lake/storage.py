@@ -216,6 +216,27 @@ class S3Storage:
             logger.error(f"Failed to get file metadata: {e}")
             raise
 
+    def get_file(self, object_name: str, workspace_id: str) -> BinaryIO:
+        """
+        Get file content as a streaming body
+
+        Args:
+            object_name: Name of the object in S3
+            workspace_id: Workspace ID
+
+        Returns:
+            Streaming body for reading file content
+        """
+        s3_key = f"workspace_{workspace_id}/{object_name}"
+
+        try:
+            response = self.client.get_object(Bucket=self.bucket_name, Key=s3_key)
+            logger.info(f"Successfully retrieved {s3_key}")
+            return response['Body']
+        except ClientError as e:
+            logger.error(f"Failed to get file: {e}")
+            raise
+
     def copy_file(
         self,
         source_object: str,

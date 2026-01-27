@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import {
   IconArrowsExchange,
   IconTransform,
@@ -19,42 +22,81 @@ import {
   IconVideo,
   IconSchool,
   IconRocket,
-} from "@tabler/icons-react"
-import Link from "next/link"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+  IconLayoutDashboard,
+} from "@tabler/icons-react";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/page-header";
+import { SystemOverview } from "@/lib/api/monitoring";
+import { StreamDashboard } from "@/lib/api/streaming";
+import { useSystemOverview } from "@/hooks/use-monitoring";
+import { useStreamDashboard } from "@/hooks/use-streaming";
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
 
 export default function Page() {
+  const {
+    data: monitoringOverview,
+    isLoading: monitoringLoading,
+    error: monitoringError,
+  } = useSystemOverview();
+  const {
+    data: streamDashboard,
+    isLoading: streamingLoading,
+    error: streamingError,
+  } = useStreamDashboard();
+  const loading = monitoringLoading || streamingLoading;
+  const error =
+    monitoringError || streamingError ? "Failed to load dashboard data" : null;
+
   const platformStats = [
     {
       title: "Active Pipelines",
-      value: "24",
-      change: "+12%",
+      value: loading ? "-" : String(monitoringOverview?.total_pipelines || 0),
+      change: `${monitoringOverview?.running_pipelines || 0} running`,
       icon: IconArrowsExchange,
       trend: "up",
     },
     {
       title: "Data Processed",
-      value: "1.2TB",
-      change: "+8%",
+      value: loading
+        ? "-"
+        : formatBytes(monitoringOverview?.storage_used_bytes || 0),
+      change: `${(
+        monitoringOverview?.records_processed || 0
+      ).toLocaleString()} records`,
       icon: IconDatabase,
       trend: "up",
     },
     {
       title: "Running Jobs",
-      value: "8",
-      change: "-3%",
+      value: loading ? "-" : String(monitoringOverview?.running_pipelines || 0),
+      change: `${monitoringOverview?.failed_pipelines || 0} failed`,
       icon: IconClock,
-      trend: "down",
+      trend: monitoringOverview?.failed_pipelines ? "down" : "up",
     },
     {
       title: "Active Alerts",
-      value: "3",
-      change: "+2",
+      value: loading ? "-" : String(streamDashboard?.active_alerts || 0),
+      change: "Requires attention",
       icon: IconAlertTriangle,
-      trend: "up",
+      trend: (streamDashboard?.active_alerts || 0) > 0 ? "up" : "down",
     },
-  ]
+  ];
 
   const quickLinks = [
     {
@@ -105,12 +147,13 @@ export default function Page() {
       color: "text-cyan-500",
       bgColor: "bg-cyan-500/10",
     },
-  ]
+  ];
 
   const tutorials = [
     {
       title: "Getting Started",
-      description: "Learn the basics of the platform and create your first pipeline",
+      description:
+        "Learn the basics of the platform and create your first pipeline",
       icon: IconRocket,
       duration: "10 min",
       type: "Tutorial",
@@ -144,7 +187,7 @@ export default function Page() {
       url: "#",
       color: "text-orange-500",
     },
-  ]
+  ];
 
   const platformSections = [
     {
@@ -228,32 +271,43 @@ export default function Page() {
       color: "text-yellow-500",
       bgColor: "bg-yellow-500/10",
     },
-  ]
+  ];
 
   return (
-    <>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Platform Overview</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Monitor and manage your data platform
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Platform Overview"
+        description="Monitor and manage your data platform"
+        icon={IconLayoutDashboard}
+      />
 
       {/* Key Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {platformStats.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {stat.title}
+              </CardTitle>
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className={`text-xs ${stat.trend === "up" ? "text-green-500" : "text-red-500"}`}>
-                {stat.change} from last month
-              </p>
+              {loading ? (
+                <Skeleton className="h-8 w-full" />
+              ) : (
+                <>
+                  <div className="text-2xl font-semibold">{stat.value}</div>
+                  <p
+                    className={`text-xs ${
+                      stat.trend === "up"
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400"
+                    }`}
+                  >
+                    {stat.change}
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -261,19 +315,21 @@ export default function Page() {
 
       {/* Quick Links */}
       <div>
-        <h2 className="text-2xl font-semibold mb-4">Quick Actions</h2>
+        <h2 className="text-lg font-semibold mb-3">Quick Actions</h2>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {quickLinks.map((link) => (
             <Link key={link.title} href={link.url}>
-              <Card className="hover:shadow-md transition-all hover:border-primary cursor-pointer">
+              <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${link.bgColor}`}>
-                      <link.icon className={`h-5 w-5 ${link.color}`} />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted">
+                      <link.icon className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">{link.title}</p>
-                      <p className="text-xs text-muted-foreground">{link.description}</p>
+                      <p className="font-medium text-sm">{link.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {link.description}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -285,33 +341,42 @@ export default function Page() {
 
       {/* Tutorials & Documentation */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-semibold">Learning Resources</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">Learning Resources</h2>
           <Button variant="outline" size="sm" asChild>
             <Link href="#">View All</Link>
           </Button>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {tutorials.map((tutorial) => (
-            <Card key={tutorial.title} className="hover:shadow-md transition-shadow">
+            <Card
+              key={tutorial.title}
+              className="hover:bg-accent/30 transition-colors"
+            >
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${tutorial.color} bg-opacity-10`}>
-                      <tutorial.icon className={`h-5 w-5 ${tutorial.color}`} />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted">
+                      <tutorial.icon className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <CardTitle className="text-base">{tutorial.title}</CardTitle>
+                      <CardTitle className="text-sm font-medium">
+                        {tutorial.title}
+                      </CardTitle>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-xs px-2 py-0.5 rounded-full bg-opacity-10 ${tutorial.color}`}>
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                           {tutorial.type}
                         </span>
-                        <span className="text-xs text-muted-foreground">{tutorial.duration}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {tutorial.duration}
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
-                <CardDescription className="mt-2">{tutorial.description}</CardDescription>
+                <CardDescription className="mt-2 text-sm">
+                  {tutorial.description}
+                </CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 <Button asChild variant="ghost" size="sm" className="w-full">
@@ -330,10 +395,15 @@ export default function Page() {
         <h2 className="text-2xl font-semibold mb-4">Platform Services</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {platformSections.map((section) => (
-            <Card key={section.title} className="hover:shadow-md transition-shadow">
+            <Card
+              key={section.title}
+              className="hover:bg-accent/30 transition-colors"
+            >
               <CardHeader>
                 <div className="flex items-center gap-3 mb-2">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${section.bgColor}`}>
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-lg ${section.bgColor}`}
+                  >
                     <section.icon className={`h-5 w-5 ${section.color}`} />
                   </div>
                   <div>
@@ -345,8 +415,13 @@ export default function Page() {
               <CardContent>
                 <div className="space-y-1 mb-4">
                   {Object.entries(section.stats).map(([key, value]) => (
-                    <div key={key} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground capitalize">{key}</span>
+                    <div
+                      key={key}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="text-muted-foreground capitalize">
+                        {key}
+                      </span>
                       <span className="font-medium">{value}</span>
                     </div>
                   ))}
@@ -400,19 +475,28 @@ export default function Page() {
                 color: "text-indigo-500",
               },
             ].map((activity, index) => (
-              <div key={index} className="flex items-start gap-4 pb-4 border-b last:border-0 last:pb-0">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${activity.color} bg-opacity-10`}>
+              <div
+                key={index}
+                className="flex items-start gap-4 pb-4 border-b last:border-0 last:pb-0"
+              >
+                <div
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg ${activity.color} bg-opacity-10`}
+                >
                   <activity.icon className={`h-4 w-4 ${activity.color}`} />
                 </div>
                 <div className="flex-1 space-y-1">
-                  <p className="text-sm font-medium leading-none">{activity.title}</p>
-                  <p className="text-sm text-muted-foreground">{activity.time}</p>
+                  <p className="text-sm font-medium leading-none">
+                    {activity.title}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {activity.time}
+                  </p>
                 </div>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
-    </>
-  )
+    </div>
+  );
 }

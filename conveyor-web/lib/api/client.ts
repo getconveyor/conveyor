@@ -3,25 +3,32 @@
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from "axios";
+import { API_TIMEOUT, API_RETRY_ATTEMPTS } from "@/lib/constants";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface RequestOptions {
   token?: string;
   workspaceId?: string;
+  params?: any;
+}
+
+interface FailedRequest {
+  resolve: (value?: any) => void;
+  reject: (reason?: any) => void;
 }
 
 class ApiClient {
   private axiosInstance: AxiosInstance;
   private isRefreshing = false;
-  private failedQueue: Array<{
-    resolve: (value?: any) => void;
-    reject: (reason?: any) => void;
-  }> = [];
+  private failedQueue: FailedRequest[] = [];
+  private refreshTimeout: NodeJS.Timeout | null = null;
+  private maxRetryAttempts = API_RETRY_ATTEMPTS;
 
   constructor(baseURL: string) {
     this.axiosInstance = axios.create({
       baseURL,
+      timeout: API_TIMEOUT,
       headers: {
         "Content-Type": "application/json",
       },
@@ -34,10 +41,16 @@ class ApiClient {
         const originalRequest = error.config as any;
 
         // Don't retry token refresh endpoint or if already retried
-        const isRefreshEndpoint = originalRequest.url?.includes('/auth/token/refresh');
+        const isRefreshEndpoint = originalRequest.url?.includes(
+          "/auth/token/refresh"
+        );
 
         // If error is 401 and we haven't tried to refresh yet
-        if (error.response?.status === 401 && !originalRequest._retry && !isRefreshEndpoint) {
+        if (
+          error.response?.status === 401 &&
+          !originalRequest._retry &&
+          !isRefreshEndpoint
+        ) {
           if (this.isRefreshing) {
             // If already refreshing, queue this request
             return new Promise((resolve, reject) => {
@@ -55,7 +68,8 @@ class ApiClient {
           originalRequest._retry = true;
           this.isRefreshing = true;
 
-          try {
+          // Set a timeout for token refresh (5 seconds)
+          const refreshPromise = (async () => {
             // Get refresh token from localStorage
             const tokensStr = localStorage.getItem("auth_tokens");
             if (!tokensStr) {
@@ -70,17 +84,44 @@ class ApiClient {
             // Refresh the token
             const response = await this.axiosInstance.post<{ access: string }>(
               "/api/auth/token/refresh/",
-              { refresh: tokens.refresh }
+              { refresh: tokens.refresh },
+              { timeout: 5000 } // 5 second timeout for token refresh
             );
 
-            const newAccessToken = response.data.access;
+            return response.data.access;
+          })();
+
+          this.refreshTimeout = setTimeout(() => {
+            this.isRefreshing = false;
+            this.failedQueue.forEach((promise) => {
+              promise.reject(new Error("Token refresh timeout"));
+            });
+            this.failedQueue = [];
+          }, 5000);
+
+          try {
+            const newAccessToken = await refreshPromise;
+
+            if (this.refreshTimeout) {
+              clearTimeout(this.refreshTimeout);
+              this.refreshTimeout = null;
+            }
 
             // Update tokens in localStorage
-            const updatedTokens = { ...tokens, access: newAccessToken };
-            localStorage.setItem("auth_tokens", JSON.stringify(updatedTokens));
+            const tokensStr = localStorage.getItem("auth_tokens");
+            if (tokensStr) {
+              const tokens = JSON.parse(tokensStr);
+              const updatedTokens = { ...tokens, access: newAccessToken };
+              localStorage.setItem(
+                "auth_tokens",
+                JSON.stringify(updatedTokens)
+              );
+            }
 
             // Update the failed request with new token
-            originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
+            originalRequest.headers[
+              "Authorization"
+            ] = `Bearer ${newAccessToken}`;
 
             // Process the queued requests
             this.failedQueue.forEach((promise) => {
@@ -107,12 +148,28 @@ class ApiClient {
             localStorage.removeItem("currentWorkspaceId");
 
             // Redirect to login if we're in the browser (only once)
-            if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
+            if (
+              typeof window !== "undefined" &&
+              !window.location.pathname.includes("/login")
+            ) {
               window.location.href = "/login";
             }
 
             return Promise.reject(refreshError);
           }
+        }
+
+        // Handle rate limiting (429) - redirect to rate-limited page
+        if (error.response?.status === 429) {
+          if (
+            typeof window !== "undefined" &&
+            !window.location.pathname.includes("/rate-limited")
+          ) {
+            window.location.href = "/rate-limited";
+          }
+          return Promise.reject(
+            new Error("Rate limit exceeded. Please try again later.")
+          );
         }
 
         // For other errors, return a formatted error message
@@ -127,7 +184,7 @@ class ApiClient {
   }
 
   private getConfig(options: RequestOptions = {}): AxiosRequestConfig {
-    const { token, workspaceId } = options;
+    const { token, workspaceId, params } = options;
     const config: AxiosRequestConfig = {
       headers: {},
     };
@@ -140,11 +197,16 @@ class ApiClient {
       config.headers!["X-Workspace-ID"] = workspaceId;
     }
 
+    if (params) {
+      config.params = params;
+    }
+
     return config;
   }
 
   async get<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
     const config = this.getConfig(options);
+
     const response = await this.axiosInstance.get<T>(endpoint, config);
     return response.data;
   }

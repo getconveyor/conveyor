@@ -125,11 +125,11 @@ export default function TutorialsPage() {
     <>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-500/10">
-            <IconSchool className="h-6 w-6 text-purple-500" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+            <IconSchool className="h-5 w-5 text-muted-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Tutorials</h1>
+            <h1 className="text-xl font-semibold">Tutorials</h1>
             <p className="text-sm text-muted-foreground">
               Step-by-step guides for common tasks and workflows
             </p>
@@ -160,9 +160,9 @@ export default function TutorialsPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
         {tutorials.map((tutorial, idx) => (
-          <Card key={idx} className="flex flex-col hover:shadow-md transition-shadow">
+          <Card key={idx} className="flex flex-col hover:bg-accent/30 transition-colors">
             <CardHeader>
               <div className="flex items-start justify-between mb-3">
                 <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${tutorial.bgColor}`}>

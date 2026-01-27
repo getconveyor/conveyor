@@ -32,7 +32,7 @@ export default function AccountPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Account</h1>
+          <h1 className="text-xl font-semibold">Account</h1>
           <p className="text-sm text-muted-foreground">
             Manage your personal account information
           </p>
@@ -48,7 +48,7 @@ export default function AccountPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-5">
             <div className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold">
               JD
             </div>

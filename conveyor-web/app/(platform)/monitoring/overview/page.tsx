@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react";
 import {
   IconActivity,
   IconAlertCircle,
@@ -11,103 +11,48 @@ import {
   IconRefresh,
   IconTrendingUp,
   IconX,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+} from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
+} from "@/components/ui/select";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from "@/components/ui/chart"
-
-// Mock data for charts
-const workflowTrendsData = [
-  { time: "00:00", successful: 45, failed: 2 },
-  { time: "04:00", successful: 38, failed: 1 },
-  { time: "08:00", successful: 67, failed: 4 },
-  { time: "12:00", successful: 89, failed: 3 },
-  { time: "16:00", successful: 76, failed: 5 },
-  { time: "20:00", successful: 54, failed: 2 },
-]
-
-const resourceUsageData = [
-  { metric: "CPU", usage: 68 },
-  { metric: "Memory", usage: 72 },
-  { metric: "Disk", usage: 45 },
-  { metric: "Network", usage: 34 },
-]
-
-const recentActivity = [
-  {
-    id: "1",
-    workflow: "Customer Data ETL",
-    status: "success" as const,
-    duration: "8m 42s",
-    time: "2 minutes ago",
-  },
-  {
-    id: "2",
-    workflow: "Sales Analytics Pipeline",
-    status: "running" as const,
-    duration: "2m 15s",
-    time: "5 minutes ago",
-  },
-  {
-    id: "3",
-    workflow: "Data Quality Check",
-    status: "failed" as const,
-    duration: "1m 23s",
-    time: "12 minutes ago",
-  },
-  {
-    id: "4",
-    workflow: "Real-time Event Processing",
-    status: "success" as const,
-    duration: "Continuous",
-    time: "15 minutes ago",
-  },
-  {
-    id: "5",
-    workflow: "Weekly Report Generation",
-    status: "success" as const,
-    duration: "15m 32s",
-    time: "1 hour ago",
-  },
-]
-
-const activeAlerts = [
-  {
-    id: "1",
-    title: "High Memory Usage",
-    severity: "warning" as const,
-    message: "Data warehouse memory usage at 85%",
-    time: "5 minutes ago",
-  },
-  {
-    id: "2",
-    title: "Workflow Failed",
-    severity: "error" as const,
-    message: "Data Quality Check failed on validation step",
-    time: "12 minutes ago",
-  },
-  {
-    id: "3",
-    title: "Slow Query Detected",
-    severity: "warning" as const,
-    message: "Query execution time exceeded threshold (45s)",
-    time: "1 hour ago",
-  },
-]
+} from "@/components/ui/chart";
+import {
+  useSystemOverview,
+  useSystemHealth,
+  useAlerts,
+} from "@/hooks/use-monitoring";
+import { usePipelineRuns } from "@/hooks/use-integration";
+import { SystemHealth, Alert, SystemOverview } from "@/lib/api/monitoring";
+import { PipelineRun } from "@/lib/api/integration";
+import { formatDistanceToNow } from "date-fns";
 
 const chartConfig = {
   successful: {
@@ -122,25 +67,165 @@ const chartConfig = {
     label: "Usage %",
     color: "hsl(var(--chart-3))",
   },
-} satisfies ChartConfig
+} satisfies ChartConfig;
+
+interface Activity {
+  id: string;
+  workflow: string;
+  status: "success" | "running" | "failed";
+  duration: string;
+  time: string;
+}
+
+interface AlertDisplay {
+  id: string;
+  title: string;
+  severity: "warning" | "error";
+  message: string;
+  time: string;
+}
+
+function formatDuration(seconds: number | null): string {
+  if (seconds === null) return "N/A";
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
 
 export default function MonitoringOverviewPage() {
-  const [timeRange, setTimeRange] = useState("24h")
+  const [timeRange, setTimeRange] = useState("24h");
 
+  // Use hooks instead of manual loading
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    error: overviewError,
+    refetch: refetchOverview,
+  } = useSystemOverview();
+  const {
+    data: health = [],
+    isLoading: healthLoading,
+    error: healthError,
+    refetch: refetchHealth,
+  } = useSystemHealth();
+  const {
+    data: alerts = [],
+    isLoading: alertsLoading,
+    error: alertsError,
+    refetch: refetchAlerts,
+  } = useAlerts("active");
+  const {
+    data: runsData = [],
+    isLoading: runsLoading,
+    error: runsError,
+    refetch: refetchRuns,
+  } = usePipelineRuns();
+
+  const loading =
+    overviewLoading || healthLoading || alertsLoading || runsLoading;
+  const error = overviewError || healthError || alertsError || runsError;
+  const recentRuns = runsData.slice(0, 5);
+
+  const handleRefresh = () => {
+    refetchOverview();
+    refetchHealth();
+    refetchAlerts();
+    refetchRuns();
+  };
+
+  // Transform data for charts
+  const resourceUsageData =
+    health.length > 0
+      ? [
+          {
+            metric: "CPU",
+            usage: Math.round(
+              health.reduce((sum, h) => sum + (h.cpu_usage || 0), 0) /
+                Math.max(health.length, 1)
+            ),
+          },
+          {
+            metric: "Memory",
+            usage: Math.round(
+              health.reduce((sum, h) => sum + (h.memory_usage || 0), 0) /
+                Math.max(health.length, 1)
+            ),
+          },
+          {
+            metric: "Disk",
+            usage: Math.round(
+              health.reduce((sum, h) => sum + (h.disk_usage || 0), 0) /
+                Math.max(health.length, 1)
+            ),
+          },
+        ]
+      : [];
+
+  // Transform recent runs to activity
+  const recentActivity: Activity[] = recentRuns.map((run) => ({
+    id: run.id,
+    workflow: run.pipeline_name || "Pipeline",
+    status:
+      run.status === "success"
+        ? "success"
+        : run.status === "failed"
+        ? "failed"
+        : "running",
+    duration: formatDuration(run.duration),
+    time: formatDistanceToNow(new Date(run.created_at), { addSuffix: true }),
+  }));
+
+  // Transform alerts for display
+  const activeAlerts: AlertDisplay[] = alerts.slice(0, 5).map((alert) => ({
+    id: alert.id,
+    title: alert.title,
+    severity:
+      alert.severity === "critical" || alert.severity === "error"
+        ? "error"
+        : "warning",
+    message: alert.description,
+    time: formatDistanceToNow(new Date(alert.created_at), { addSuffix: true }),
+  }));
+
+  // Calculate stats from overview
   const stats = {
-    activeWorkflows: 12,
-    runningJobs: 3,
-    successRate: 96.8,
-    failedToday: 7,
-    avgDuration: "8m 24s",
-    dataProcessed: "2.4 TB",
-  }
+    activeWorkflows: overview?.total_pipelines || 0,
+    runningJobs: overview?.running_pipelines || 0,
+    successRate: overview?.total_pipelines
+      ? Math.round(
+          ((overview.total_pipelines - overview.failed_pipelines) /
+            overview.total_pipelines) *
+            1000
+        ) / 10
+      : 0,
+    failedToday: overview?.failed_pipelines || 0,
+    avgDuration: "N/A",
+    dataProcessed: formatBytes(overview?.storage_used_bytes || 0),
+  };
+
+  // Generate workflow trends from recent data (placeholder since we need historical API)
+  const workflowTrendsData = [
+    {
+      time: "Now",
+      successful: recentRuns.filter((r) => r.status === "success").length,
+      failed: recentRuns.filter((r) => r.status === "failed").length,
+    },
+  ];
 
   return (
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Monitoring Overview</h1>
+          <h1 className="text-xl font-semibold">Monitoring Overview</h1>
           <p className="text-sm text-muted-foreground">
             Platform health and performance metrics
           </p>
@@ -157,78 +242,134 @@ export default function MonitoringOverviewPage() {
               <SelectItem value="30d">Last 30 Days</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon">
-            <IconRefresh className="h-4 w-4" />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={loading}
+          >
+            <IconRefresh
+              className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+            />
           </Button>
         </div>
       </div>
+
+      {error && (
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <p className="text-destructive">
+              {error?.message || "An error occurred"}
+            </p>
+            <Button variant="outline" onClick={handleRefresh} className="mt-4">
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Key Metrics */}
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-6">
         <Card>
           <CardContent className="pt-3 pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Active Workflows</p>
-                <p className="text-2xl font-bold">{stats.activeWorkflows}</p>
+            {loading ? (
+              <Skeleton className="h-12 w-full" />
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Active Workflows
+                  </p>
+                  <p className="text-2xl font-semibold">
+                    {stats.activeWorkflows}
+                  </p>
+                </div>
+                <IconActivity className="h-8 w-8 text-blue-500 opacity-20" />
               </div>
-              <IconActivity className="h-8 w-8 text-blue-500 opacity-20" />
-            </div>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-3 pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Running Now</p>
-                <p className="text-2xl font-bold">{stats.runningJobs}</p>
+            {loading ? (
+              <Skeleton className="h-12 w-full" />
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Running Now</p>
+                  <p className="text-2xl font-semibold">{stats.runningJobs}</p>
+                </div>
+                <IconClock className="h-8 w-8 text-blue-500 opacity-20" />
               </div>
-              <IconClock className="h-8 w-8 text-blue-500 opacity-20" />
-            </div>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-3 pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Success Rate</p>
-                <p className="text-2xl font-bold text-green-500">{stats.successRate}%</p>
+            {loading ? (
+              <Skeleton className="h-12 w-full" />
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Success Rate</p>
+                  <p className="text-2xl font-bold text-green-500">
+                    {stats.successRate}%
+                  </p>
+                </div>
+                <IconCircleCheck className="h-8 w-8 text-green-500 opacity-20" />
               </div>
-              <IconCircleCheck className="h-8 w-8 text-green-500 opacity-20" />
-            </div>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-3 pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Failed Today</p>
-                <p className="text-2xl font-bold text-red-500">{stats.failedToday}</p>
+            {loading ? (
+              <Skeleton className="h-12 w-full" />
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Failed Today</p>
+                  <p className="text-2xl font-bold text-red-500">
+                    {stats.failedToday}
+                  </p>
+                </div>
+                <IconAlertCircle className="h-8 w-8 text-red-500 opacity-20" />
               </div>
-              <IconAlertCircle className="h-8 w-8 text-red-500 opacity-20" />
-            </div>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-3 pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Avg Duration</p>
-                <p className="text-2xl font-bold">{stats.avgDuration}</p>
+            {loading ? (
+              <Skeleton className="h-12 w-full" />
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Avg Duration</p>
+                  <p className="text-2xl font-semibold">{stats.avgDuration}</p>
+                </div>
+                <IconTrendingUp className="h-8 w-8 text-purple-500 opacity-20" />
               </div>
-              <IconTrendingUp className="h-8 w-8 text-purple-500 opacity-20" />
-            </div>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-3 pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Data Processed</p>
-                <p className="text-2xl font-bold">{stats.dataProcessed}</p>
+            {loading ? (
+              <Skeleton className="h-12 w-full" />
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Data Processed
+                  </p>
+                  <p className="text-2xl font-semibold">
+                    {stats.dataProcessed}
+                  </p>
+                </div>
+                <IconDatabase className="h-8 w-8 text-orange-500 opacity-20" />
               </div>
-              <IconDatabase className="h-8 w-8 text-orange-500 opacity-20" />
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -238,7 +379,9 @@ export default function MonitoringOverviewPage() {
         <Card>
           <CardHeader>
             <CardTitle>Workflow Executions</CardTitle>
-            <CardDescription>Success and failure trends over time</CardDescription>
+            <CardDescription>
+              Success and failure trends over time
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[200px] w-full">
@@ -276,7 +419,9 @@ export default function MonitoringOverviewPage() {
         <Card>
           <CardHeader>
             <CardTitle>Resource Usage</CardTitle>
-            <CardDescription>Current system resource utilization</CardDescription>
+            <CardDescription>
+              Current system resource utilization
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[200px] w-full">
@@ -305,44 +450,60 @@ export default function MonitoringOverviewPage() {
             <CardDescription>Latest workflow executions</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {recentActivity.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {activity.status === "success" && (
-                      <IconCircleCheck className="h-5 w-5 text-green-500 flex-shrink-0" />
-                    )}
-                    {activity.status === "failed" && (
-                      <IconX className="h-5 w-5 text-red-500 flex-shrink-0" />
-                    )}
-                    {activity.status === "running" && (
-                      <IconClock className="h-5 w-5 text-blue-500 flex-shrink-0 animate-pulse" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{activity.workflow}</p>
-                      <p className="text-xs text-muted-foreground">{activity.time}</p>
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : recentActivity.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No recent activity
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {recentActivity.map((activity) => (
+                  <div
+                    key={activity.id}
+                    className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {activity.status === "success" && (
+                        <IconCircleCheck className="h-5 w-5 text-green-500 flex-shrink-0" />
+                      )}
+                      {activity.status === "failed" && (
+                        <IconX className="h-5 w-5 text-red-500 flex-shrink-0" />
+                      )}
+                      {activity.status === "running" && (
+                        <IconClock className="h-5 w-5 text-blue-500 flex-shrink-0 animate-pulse" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {activity.workflow}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {activity.time}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <Badge
+                        variant={
+                          activity.status === "success"
+                            ? "outline"
+                            : activity.status === "failed"
+                            ? "destructive"
+                            : "default"
+                        }
+                        className="text-xs"
+                      >
+                        {activity.duration}
+                      </Badge>
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <Badge
-                      variant={
-                        activity.status === "success"
-                          ? "outline"
-                          : activity.status === "failed"
-                          ? "destructive"
-                          : "default"
-                      }
-                      className="text-xs"
-                    >
-                      {activity.duration}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -353,36 +514,58 @@ export default function MonitoringOverviewPage() {
             <CardDescription>Recent warnings and errors</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {activeAlerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50"
-                >
-                  <IconAlertCircle
-                    className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
-                      alert.severity === "error" ? "text-red-500" : "text-orange-500"
-                    }`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-sm font-medium">{alert.title}</p>
-                      <Badge
-                        variant={alert.severity === "error" ? "destructive" : "secondary"}
-                        className="text-xs"
-                      >
-                        {alert.severity}
-                      </Badge>
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : activeAlerts.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No active alerts
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {activeAlerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50"
+                  >
+                    <IconAlertCircle
+                      className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
+                        alert.severity === "error"
+                          ? "text-red-500"
+                          : "text-orange-500"
+                      }`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-medium">{alert.title}</p>
+                        <Badge
+                          variant={
+                            alert.severity === "error"
+                              ? "destructive"
+                              : "secondary"
+                          }
+                          className="text-xs"
+                        >
+                          {alert.severity}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {alert.message}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {alert.time}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">{alert.message}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{alert.time}</p>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
     </>
-  )
+  );
 }

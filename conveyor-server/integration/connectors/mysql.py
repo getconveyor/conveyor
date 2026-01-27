@@ -43,28 +43,28 @@ class MySQLConnector(BaseConnector):
     - SSL connections
     """
 
-    def __init__(self, connection: 'Connection'):
+    def __init__(self, source: 'Source'):
         """
         Initialize MySQL connector.
 
-        Config options:
+        Config options from Source model:
         - host: Database host
         - port: Database port (default: 3306)
         - database: Database name
-        - user: Username
+        - username: Username
         - password: Password (encrypted)
-        - charset: Character set (default: 'utf8mb4')
-        - ssl_ca: SSL CA certificate path (optional)
-        - batch_size: Batch size for reads/writes (default: 1000)
+        - ssl: Enable SSL
+        - config: Additional config (charset, ssl_ca, batch_size, etc.)
         """
-        super().__init__(connection)
+        super().__init__(source)
 
-        self.host = self.config.get('host')
-        self.port = self.config.get('port', 3306)
-        self.database = self.config.get('database')
-        self.user = self.config.get('user')
-        self.password = connection.get_password()  # Decrypted password
+        self.host = source.host
+        self.port = source.port or 3306
+        self.database = source.database
+        self.user = source.username
+        self.password = source.get_password()  # Decrypted password
         self.charset = self.config.get('charset', 'utf8mb4')
+        self.ssl_enabled = source.ssl
         self.ssl_ca = self.config.get('ssl_ca')
 
         self._connection = None
@@ -85,9 +85,12 @@ class MySQLConnector(BaseConnector):
                     'connect_timeout': self.config.get('connection_timeout', 30)
                 }
 
-                # Add SSL if configured
-                if self.ssl_ca:
-                    conn_params['ssl'] = {'ca': self.ssl_ca}
+                # Add SSL if enabled
+                if self.ssl_enabled:
+                    ssl_config = {}
+                    if self.ssl_ca:
+                        ssl_config['ca'] = self.ssl_ca
+                    conn_params['ssl'] = ssl_config if ssl_config else True
 
                 self._connection = pymysql.connect(**conn_params)
                 logger.info(f"Connected to MySQL database: {self.database}")
@@ -467,7 +470,8 @@ class MySQLConnector(BaseConnector):
             # Add primary key if specified
             required = schema.get('required', [])
             if required:
-                pk_constraint = f"PRIMARY KEY ({', '.join([f'`{col}`' for col in required])})"
+                pk_cols = ', '.join([f'`{col}`' for col in required])
+                pk_constraint = f"PRIMARY KEY ({pk_cols})"
                 columns.append(pk_constraint)
 
             create_sql = f"""

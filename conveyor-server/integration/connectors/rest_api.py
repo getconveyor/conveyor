@@ -48,18 +48,18 @@ class RESTAPIConnector(BaseConnector):
     Note: This is a source-only connector (read-only).
     """
 
-    def __init__(self, connection: 'Connection'):
+    def __init__(self, source: 'Source'):
         """
         Initialize REST API connector.
 
-        Config options:
-        - base_url: Base API URL
-        - auth_type: Authentication type (api_key, bearer, basic, oauth2, none)
-        - api_key: API key (for api_key auth)
-        - api_key_header: Header name for API key (default: 'X-API-Key')
-        - bearer_token: Bearer token (for bearer auth)
+        Source model fields used:
+        - host: Base API URL
         - username: Username (for basic auth)
-        - password: Password (for basic auth)
+        - password: Password/API key/Bearer token (encrypted)
+
+        Config options:
+        - auth_type: Authentication type (api_key, bearer, basic, oauth2, none)
+        - api_key_header: Header name for API key (default: 'X-API-Key')
         - headers: Additional custom headers (dict)
         - pagination_type: Pagination strategy (offset, cursor, page, link, none)
         - pagination_param: Query param for pagination (default: 'offset' or 'page')
@@ -70,18 +70,32 @@ class RESTAPIConnector(BaseConnector):
         - rate_limit_period: Period in seconds for rate limiting
         - timeout: Request timeout in seconds (default: 30)
         """
-        super().__init__(connection)
+        super().__init__(source)
 
-        self.base_url = self.config.get('base_url', '').rstrip('/')
+        self.base_url = (source.host or '').rstrip('/')
         self.auth_type = self.config.get('auth_type', 'none')
         self.timeout = self.config.get('timeout', 30)
 
         # Authentication
-        self.api_key = self.config.get('api_key')
+        # For API key and bearer token auth, use the password field
+        password_value = source.get_password() if source.password_encrypted else None
+
+        if self.auth_type == 'api_key':
+            self.api_key = password_value
+            self.bearer_token = None
+        elif self.auth_type == 'bearer':
+            self.api_key = None
+            self.bearer_token = password_value
+        elif self.auth_type == 'basic':
+            self.api_key = None
+            self.bearer_token = None
+        else:
+            self.api_key = None
+            self.bearer_token = None
+
         self.api_key_header = self.config.get('api_key_header', 'X-API-Key')
-        self.bearer_token = self.config.get('bearer_token')
-        self.username = self.config.get('username')
-        self.password = connection.get_password() if self.auth_type == 'basic' else None
+        self.username = source.username
+        self.password = password_value if self.auth_type == 'basic' else None
 
         # Custom headers
         self.custom_headers = self.config.get('headers', {})
@@ -277,31 +291,82 @@ class RESTAPIConnector(BaseConnector):
         Returns:
             ConnectionTestResult with success status
         """
+        # Use shorter timeout for test (10 seconds instead of default 30)
+        test_timeout = min(self.timeout, 10)
+
         try:
-            # Try to make a simple request to the base URL
-            response = self._make_request('GET', self.base_url)
+            # Validate base URL
+            if not self.base_url:
+                return ConnectionTestResult(
+                    success=False,
+                    message="Base URL is required for REST API connector",
+                    details={'error_type': 'ValidationError'}
+                )
+
+            # Check if URL is valid
+            parsed = urlparse(self.base_url)
+            if not parsed.scheme or not parsed.netloc:
+                return ConnectionTestResult(
+                    success=False,
+                    message=f"Invalid URL format: {self.base_url}. URL must include scheme (http/https) and domain.",
+                    details={'error_type': 'ValidationError'}
+                )
+
+            # Check if there's a configured test endpoint, otherwise use base URL
+            test_endpoint = self.config.get('test_endpoint', '')
+            test_url = urljoin(self.base_url, test_endpoint) if test_endpoint else self.base_url
+
+            # Try to make a simple request to the test URL with shorter timeout
+            session = self._get_session()
+
+            response = session.request(
+                method='GET',
+                url=test_url,
+                timeout=test_timeout
+            )
+            response.raise_for_status()
 
             return ConnectionTestResult(
                 success=True,
                 message=f"Successfully connected to API: {self.base_url}",
                 details={
                     'base_url': self.base_url,
+                    'test_url': test_url,
                     'status_code': response.status_code,
-                    'auth_type': self.auth_type
+                    'auth_type': self.auth_type,
+                    'response_time_ms': response.elapsed.total_seconds() * 1000
                 }
             )
 
+        except requests.exceptions.Timeout:
+            return ConnectionTestResult(
+                success=False,
+                message=f"Connection timeout after {test_timeout} seconds. Please check the URL and try again.",
+                details={'error_type': 'Timeout', 'base_url': self.base_url, 'timeout': test_timeout}
+            )
+        except requests.exceptions.ConnectionError as e:
+            return ConnectionTestResult(
+                success=False,
+                message=f"Cannot reach API endpoint. Please check the URL and network connectivity. Error: {str(e)}",
+                details={'error_type': 'ConnectionError', 'base_url': self.base_url}
+            )
+        except requests.exceptions.HTTPError as e:
+            return ConnectionTestResult(
+                success=False,
+                message=f"HTTP error {e.response.status_code}: {e.response.reason}. Check authentication and endpoint.",
+                details={'error_type': 'HTTPError', 'base_url': self.base_url, 'status_code': e.response.status_code}
+            )
         except ConnectionError as e:
             return ConnectionTestResult(
                 success=False,
                 message=str(e),
-                details={'error_type': 'ConnectionError'}
+                details={'error_type': 'ConnectionError', 'base_url': self.base_url}
             )
         except Exception as e:
             return ConnectionTestResult(
                 success=False,
                 message=f"Connection test failed: {str(e)}",
-                details={'error_type': type(e).__name__}
+                details={'error_type': type(e).__name__, 'base_url': self.base_url}
             )
         finally:
             self.close()

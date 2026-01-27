@@ -1,10 +1,10 @@
 from django.contrib import admin
-from .models import Connection, DataSource, Pipeline, PipelineRun, Schedule
+from .models import Source, Pipeline, PipelineRun, Schedule
 
 
-@admin.register(Connection)
-class ConnectionAdmin(admin.ModelAdmin):
-    """Admin interface for Connection model"""
+@admin.register(Source)
+class SourceAdmin(admin.ModelAdmin):
+    """Admin interface for Source model"""
 
     list_display = ('name', 'type', 'workspace', 'status', 'created_by', 'created_at', 'last_tested')
     list_filter = ('type', 'status', 'created_at', 'workspace')
@@ -15,7 +15,7 @@ class ConnectionAdmin(admin.ModelAdmin):
         ('Basic Information', {
             'fields': ('id', 'workspace', 'name', 'type', 'status')
         }),
-        ('Connection Details', {
+        ('Source Details', {
             'fields': ('host', 'port', 'database', 'username', 'password_encrypted', 'ssl')
         }),
         ('Configuration', {
@@ -28,33 +28,11 @@ class ConnectionAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(DataSource)
-class DataSourceAdmin(admin.ModelAdmin):
-    """Admin interface for DataSource model"""
-
-    list_display = ('name', 'type', 'workspace', 'connection', 'status', 'record_count', 'last_sync')
-    list_filter = ('type', 'status', 'workspace', 'created_at')
-    search_fields = ('name', 'workspace__name', 'connection__name')
-    readonly_fields = ('id', 'created_at', 'updated_at', 'last_sync')
-
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('id', 'workspace', 'connection', 'name', 'type', 'status')
-        }),
-        ('Data Details', {
-            'fields': ('tables', 'record_count', 'last_sync')
-        }),
-        ('Metadata', {
-            'fields': ('created_at', 'updated_at')
-        }),
-    )
-
-
 @admin.register(Pipeline)
 class PipelineAdmin(admin.ModelAdmin):
     """Admin interface for Pipeline model"""
 
-    list_display = ('name', 'workspace', 'status', 'source_connection', 'destination_connection',
+    list_display = ('name', 'workspace', 'status', 'source', 'destination',
                    'run_count', 'success_rate', 'last_run', 'next_run')
     list_filter = ('status', 'workspace', 'created_at')
     search_fields = ('name', 'description', 'workspace__name')
@@ -65,8 +43,8 @@ class PipelineAdmin(admin.ModelAdmin):
         ('Basic Information', {
             'fields': ('id', 'workspace', 'name', 'description', 'status')
         }),
-        ('Connections', {
-            'fields': ('source_connection', 'destination_connection')
+        ('Sources', {
+            'fields': ('source', 'destination')
         }),
         ('Scheduling', {
             'fields': ('schedule', 'last_run', 'next_run')

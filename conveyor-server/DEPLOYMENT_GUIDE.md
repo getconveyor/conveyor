@@ -30,6 +30,7 @@ pip list | grep -E "(channels|channels-redis|cryptography|psycopg2|PyMySQL|panda
 ```
 
 Expected output:
+
 ```
 channels                4.0.0
 channels-redis          4.1.0
@@ -53,6 +54,7 @@ echo "REDIS_PORT=6379" >> .env
 ```
 
 Your `.env` file should contain:
+
 ```env
 # Django Settings
 SECRET_KEY=your-secret-key-here
@@ -91,6 +93,7 @@ python manage.py migrate integration
 ```
 
 Expected output:
+
 ```
 Running migrations:
   Applying integration.0002_pipelinerun_celery_task_id... OK
@@ -109,18 +112,21 @@ python manage.py createsuperuser
 ### Option 1: Development (3 Terminal Windows)
 
 **Terminal 1 - Django with WebSocket Support:**
+
 ```bash
 cd conveyor-server
 daphne -b 0.0.0.0 -p 8000 conveyor_server.asgi:application
 ```
 
 **Terminal 2 - Celery Worker:**
+
 ```bash
 cd conveyor-server
 celery -A conveyor_server worker --loglevel=info
 ```
 
 **Terminal 3 - Redis:**
+
 ```bash
 # If not already running as a service
 redis-server
@@ -131,6 +137,7 @@ redis-server
 Create systemd service files:
 
 **`/etc/systemd/system/conveyor-daphne.service`:**
+
 ```ini
 [Unit]
 Description=Conveyor Daphne (ASGI Server)
@@ -149,6 +156,7 @@ WantedBy=multi-user.target
 ```
 
 **`/etc/systemd/system/conveyor-celery.service`:**
+
 ```ini
 [Unit]
 Description=Conveyor Celery Worker
@@ -167,6 +175,7 @@ WantedBy=multi-user.target
 ```
 
 Enable and start services:
+
 ```bash
 sudo systemctl enable conveyor-daphne conveyor-celery
 sudo systemctl start conveyor-daphne conveyor-celery
@@ -224,6 +233,7 @@ curl -X POST "http://localhost:8000/api/connections/$CONNECTION_ID/test/" \
 ```
 
 Expected response:
+
 ```json
 {
   "status": "success",
@@ -245,6 +255,7 @@ curl -X GET "http://localhost:8000/api/connections/$CONNECTION_ID/schema/" \
 ```
 
 Expected response:
+
 ```json
 {
   "connection_id": "...",
@@ -262,8 +273,8 @@ Expected response:
     "public.users": {
       "type": "object",
       "properties": {
-        "id": {"type": ["integer", "null"]},
-        "email": {"type": ["string", "null"]}
+        "id": { "type": ["integer", "null"] },
+        "email": { "type": ["string", "null"] }
       }
     }
   }
@@ -314,6 +325,7 @@ curl -X POST "http://localhost:8000/api/pipelines/$PIPELINE_ID/run/" \
 ```
 
 Expected response:
+
 ```json
 {
   "status": "success",
@@ -327,19 +339,20 @@ Expected response:
 
 ```javascript
 // In browser console or Node.js
-const ws = new WebSocket('ws://localhost:8000/ws/pipelines/<pipeline_id>/');
+const ws = new WebSocket("ws://localhost:8000/ws/pipelines/<pipeline_id>/");
 
-ws.onopen = () => console.log('Connected');
+ws.onopen = () => console.log("Connected");
 
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
   console.log(`[${data.type}] Progress: ${data.progress}% - ${data.message}`);
 };
 
-ws.onerror = (error) => console.error('WebSocket error:', error);
+ws.onerror = (error) => console.error("WebSocket error:", error);
 ```
 
 Expected output:
+
 ```
 Connected
 [connection_established] Connected to pipeline updates
@@ -388,6 +401,7 @@ Should show Celery and Channels keys if everything is working.
 ### Issue: "ENCRYPTION_KEY not set"
 
 **Solution:**
+
 ```bash
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 # Add output to .env as ENCRYPTION_KEY=<key>
@@ -396,11 +410,13 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 ### Issue: "Connection refused" on WebSocket
 
 **Possible causes:**
+
 1. Daphne not running (use `daphne` instead of `python manage.py runserver`)
 2. ASGI configuration issue
 3. Channels not in INSTALLED_APPS
 
 **Solution:**
+
 ```bash
 # Verify channels is installed
 pip show channels
@@ -412,11 +428,13 @@ daphne -b 0.0.0.0 -p 8000 conveyor_server.asgi:application
 ### Issue: Pipeline stays in "running" status forever
 
 **Possible causes:**
+
 1. Celery worker not running
 2. Redis not running
 3. Connection to database failed
 
 **Solution:**
+
 ```bash
 # Check Celery worker logs
 celery -A conveyor_server worker --loglevel=debug
@@ -433,9 +451,11 @@ python manage.py shell
 ### Issue: Import errors for connectors
 
 **Possible causes:**
+
 1. Missing dependencies (psycopg2, PyMySQL, etc.)
 
 **Solution:**
+
 ```bash
 pip install psycopg2-binary PyMySQL pandas
 ```
@@ -443,6 +463,7 @@ pip install psycopg2-binary PyMySQL pandas
 ### Issue: "No module named 'channels_redis'"
 
 **Solution:**
+
 ```bash
 pip install channels-redis
 ```
@@ -522,6 +543,7 @@ Before deploying to production:
 ### Connector Configuration Examples
 
 **PostgreSQL:**
+
 ```json
 {
   "host": "localhost",
@@ -536,6 +558,7 @@ Before deploying to production:
 ```
 
 **MySQL:**
+
 ```json
 {
   "host": "localhost",
@@ -549,6 +572,7 @@ Before deploying to production:
 ```
 
 **REST API:**
+
 ```json
 {
   "base_url": "https://api.example.com",
@@ -561,6 +585,7 @@ Before deploying to production:
 ```
 
 **File (CSV/JSON):**
+
 ```json
 {
   "file_path": "/data/exports/users.csv",
@@ -590,15 +615,13 @@ Before deploying to production:
     "filters": {
       "public.users": {
         "conditions": [
-          {"column": "status", "operator": "=", "value": "active"},
-          {"column": "created_at", "operator": ">", "value": "2024-01-01"}
+          { "column": "status", "operator": "=", "value": "active" },
+          { "column": "created_at", "operator": ">", "value": "2024-01-01" }
         ],
         "match_all": true
       },
       "public.orders": {
-        "conditions": [
-          {"column": "amount", "operator": ">=", "value": 100}
-        ],
+        "conditions": [{ "column": "amount", "operator": ">=", "value": 100 }],
         "match_all": true
       }
     }

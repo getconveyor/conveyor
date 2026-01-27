@@ -1,41 +1,47 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   IconPlus,
-  IconSearch,
   IconPlayerPlay,
   IconPlayerPause,
   IconDotsVertical,
-  IconCheck,
-  IconX,
-  IconClock,
   IconRefresh,
   IconSettings,
   IconTrash,
   IconCopy,
   IconEye,
   IconLoader2,
-} from "@tabler/icons-react"
-import Link from "next/link"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+  IconTrendingUp,
+  IconArrowsTransferDown,
+} from "@tabler/icons-react";
+import Link from "next/link";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import {
+  integrationApi,
+  Pipeline,
+  CreatePipelineData,
+  Source,
+} from "@/lib/api/integration";
+import { toast } from "sonner";
+import { ColDef, ICellRendererParams } from "ag-grid-community";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -43,7 +49,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,499 +59,621 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { PageHeader } from "@/components/page-header";
+import { DataGrid } from "@/components/data-grid";
+import { useAriaLabels } from "@/hooks/use-aria-labels";
+import {
+  PipelineStatsDialog,
+  PipelineStats,
+} from "@/components/pipeline-stats-dialog";
+import { PipelineCreateDialog } from "@/components/pipeline-create-dialog";
 
-type PipelineStatus = "running" | "paused" | "failed" | "success" | "idle"
+type PipelineStatus = "active" | "paused" | "error" | "running" | "idle";
 
-interface Pipeline {
-  id: string
-  name: string
-  description: string
-  status: PipelineStatus
-  source: string
-  destination: string
-  lastRun: string
-  nextRun: string
-  runCount: number
-  successRate: number
-  recordsProcessed: string
-  schedule: string
-}
-
-const initialPipelines: Pipeline[] = [
+const statusConfig: Record<
+  PipelineStatus,
   {
-    id: "1",
-    name: "Customer Data Sync",
-    description: "Sync customer data to Warehouse",
-    status: "running",
-    source: "Production MySQL",
-    destination: "Warehouse",
-    lastRun: "2 minutes ago",
-    nextRun: "in 58 minutes",
-    runCount: 1247,
-    successRate: 99.8,
-    recordsProcessed: "2.4M",
-    schedule: "Hourly",
-  },
-  {
-    id: "2",
-    name: "Order Processing Pipeline",
-    description: "Process order data from eCommerce",
-    status: "success",
-    source: "Stripe Payments",
-    destination: "Lakehouse",
-    lastRun: "15 minutes ago",
-    nextRun: "in 45 minutes",
-    runCount: 892,
-    successRate: 98.5,
-    recordsProcessed: "1.8M",
-    schedule: "Hourly",
-  },
-  {
-    id: "3",
-    name: "Analytics Events Stream",
-    description: "Stream user analytics events to lakehouse",
-    status: "running",
-    source: "Google Analytics Web",
-    destination: "Lakehouse",
-    lastRun: "1 minute ago",
-    nextRun: "Continuous",
-    runCount: 5623,
-    successRate: 99.9,
-    recordsProcessed: "12.5M",
-    schedule: "Real-time",
-  },
-  {
-    id: "4",
-    name: "Inventory Sync",
-    description: "Daily inventory synchronization",
-    status: "failed",
-    source: "Staging MySQL",
-    destination: "Warehouse",
-    lastRun: "3 hours ago",
-    nextRun: "in 21 hours",
-    runCount: 156,
-    successRate: 94.2,
-    recordsProcessed: "856K",
-    schedule: "Daily",
-  },
-  {
-    id: "5",
-    name: "Cloud Storage Sync",
-    description: "Import files from cloud storage",
-    status: "paused",
-    source: "AWS S3 Data Lake",
-    destination: "Lakehouse",
-    lastRun: "2 days ago",
-    nextRun: "Paused",
-    runCount: 423,
-    successRate: 97.8,
-    recordsProcessed: "645K",
-    schedule: "Daily",
-  },
-  {
-    id: "6",
-    name: "PostgreSQL Analytics Sync",
-    description: "Sync analytics database to warehouse",
-    status: "success",
-    source: "PostgreSQL Analytics",
-    destination: "Warehouse",
-    lastRun: "30 minutes ago",
-    nextRun: "in 30 minutes",
-    runCount: 734,
-    successRate: 99.1,
-    recordsProcessed: "425K",
-    schedule: "Hourly",
-  },
-]
-
-const statusConfig: Record<PipelineStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; color: string }> = {
-  running: { label: "Running", variant: "default", color: "text-blue-500" },
-  success: { label: "Success", variant: "outline", color: "text-green-500" },
-  failed: { label: "Failed", variant: "destructive", color: "text-red-500" },
-  paused: { label: "Paused", variant: "secondary", color: "text-gray-500" },
-  idle: { label: "Idle", variant: "outline", color: "text-gray-500" },
-}
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+  }
+> = {
+  active: { label: "Active", variant: "default" },
+  running: { label: "Running", variant: "default" },
+  error: { label: "Error", variant: "destructive" },
+  paused: { label: "Paused", variant: "secondary" },
+  idle: { label: "Idle", variant: "outline" },
+};
 
 export default function PipelinesPage() {
-  const [pipelines, setPipelines] = useState<Pipeline[]>(initialPipelines)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [editingPipeline, setEditingPipeline] = useState<Pipeline | null>(null)
-  const [pipelineToDelete, setPipelineToDelete] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const { currentWorkspace } = useWorkspace();
+  const ariaLabels = useAriaLabels();
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [sources, setSources] = useState<Source[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingPipeline, setEditingPipeline] = useState<Pipeline | null>(null);
+  const [pipelineToDelete, setPipelineToDelete] = useState<string | null>(null);
+  const [isFetching, setIsFetching] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Stats dialog state
+  const [isStatsDialogOpen, setIsStatsDialogOpen] = useState(false);
+  const [selectedPipelineStats, setSelectedPipelineStats] =
+    useState<PipelineStats | null>(null);
+  const [selectedPipelineName, setSelectedPipelineName] = useState<string>("");
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     source: "",
-    destination: "",
-    scheduleType: "",
-    scheduleValue: "",
-  })
+    layer: "bronze",
+    namespace: "",
+    table_name: "",
+    schedule: "",
+  });
 
-  const filteredPipelines = pipelines.filter((pipeline) => {
-    const matchesSearch = pipeline.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pipeline.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || pipeline.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const filteredPipelines = useMemo(() => {
+    return pipelines.filter((pipeline) => {
+      return statusFilter === "all" || pipeline.status === statusFilter;
+    });
+  }, [pipelines, statusFilter]);
 
-  const stats = {
-    total: pipelines.length,
-    running: pipelines.filter(p => p.status === "running").length,
-    failed: pipelines.filter(p => p.status === "failed").length,
-    paused: pipelines.filter(p => p.status === "paused").length,
+  const stats = useMemo(
+    () => ({
+      total: pipelines.length,
+      running: pipelines.filter((p) => p.status === "running").length,
+      failed: pipelines.filter((p) => p.status === "failed").length,
+      paused: pipelines.filter((p) => p.status === "paused").length,
+    }),
+    [pipelines]
+  );
+
+  useEffect(() => {
+    if (currentWorkspace) {
+      loadPipelines();
+      loadSources();
+    }
+  }, [currentWorkspace]);
+
+  async function loadPipelines() {
+    if (!currentWorkspace) return;
+    try {
+      setIsFetching(true);
+      const data = await integrationApi.getPipelines();
+      setPipelines(data);
+    } catch (error) {
+      console.error("Failed to load pipelines:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to load pipelines";
+      toast.error(message);
+    } finally {
+      setIsFetching(false);
+    }
+  }
+
+  async function loadSources() {
+    if (!currentWorkspace) return;
+    try {
+      const data = await integrationApi.getSources();
+      setSources(data);
+    } catch (error) {
+      console.error("Failed to load sources:", error);
+    }
   }
 
   const handleCreateOrUpdatePipeline = async () => {
-    if (!formData.name.trim() || !formData.source || !formData.destination) return
-
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    if (editingPipeline) {
-      // Update existing pipeline
-      setPipelines(pipelines =>
-        pipelines.map(p =>
-          p.id === editingPipeline.id
-            ? {
-                ...p,
-                name: formData.name,
-                description: formData.description,
-                source: formData.source,
-                destination: formData.destination,
-                schedule: formData.scheduleValue || formData.scheduleType,
-                lastRun: "Just now",
-              }
-            : p
-        )
-      )
-    } else {
-      // Create new pipeline
-      const newPipeline: Pipeline = {
-        id: Date.now().toString(),
-        name: formData.name,
-        description: formData.description,
-        status: "idle",
-        source: formData.source,
-        destination: formData.destination,
-        lastRun: "Never",
-        nextRun: "Not scheduled",
-        runCount: 0,
-        successRate: 0,
-        recordsProcessed: "0",
-        schedule: formData.scheduleValue || formData.scheduleType,
-      }
-      setPipelines([...pipelines, newPipeline])
+    if (
+      !formData.name.trim() ||
+      !formData.source ||
+      !formData.table_name.trim()
+    ) {
+      toast.error("Please fill in all required fields");
+      return;
     }
 
-    setIsLoading(false)
-    setIsCreateDialogOpen(false)
-    setFormData({ name: "", description: "", source: "", destination: "", scheduleType: "", scheduleValue: "" })
-    setEditingPipeline(null)
-  }
+    setIsLoading(true);
+    try {
+      if (editingPipeline) {
+        await integrationApi.updatePipeline(editingPipeline.id, {
+          name: formData.name,
+          description: formData.description,
+          schedule: formData.schedule || undefined,
+        });
+        toast.success("Pipeline updated successfully");
+      } else {
+        const createData: CreatePipelineData = {
+          name: formData.name,
+          description: formData.description,
+          source: formData.source,
+          destination: formData.source,
+          schedule: formData.schedule || undefined,
+          config: {
+            destination_type: "lakehouse",
+            lakehouse: {
+              layer: formData.layer,
+              namespace: formData.namespace || "default",
+              table_name: formData.table_name,
+              format: "iceberg",
+              storage: "minio",
+            },
+          },
+        };
+        await integrationApi.createPipeline(createData);
+        toast.success("Pipeline created successfully");
+      }
+      await loadPipelines();
+      setIsEditDialogOpen(false);
+      resetForm();
+    } catch (error) {
+      console.error("Failed to save pipeline:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save pipeline"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const handleEditPipeline = (pipeline: Pipeline) => {
-    setEditingPipeline(pipeline)
+  const handleEditPipeline = useCallback((pipeline: Pipeline) => {
+    setEditingPipeline(pipeline);
+    const lakehouseConfig = pipeline.config?.lakehouse;
+    // Ensure source is a string - it could be the source ID or undefined
+    const sourceId = pipeline.source ? String(pipeline.source) : "";
     setFormData({
       name: pipeline.name,
-      description: pipeline.description,
-      source: pipeline.source,
-      destination: pipeline.destination,
-      scheduleType: pipeline.schedule,
-      scheduleValue: pipeline.schedule,
-    })
-    setIsCreateDialogOpen(true)
-  }
+      description: pipeline.description || "",
+      source: sourceId,
+      layer: lakehouseConfig?.layer || "bronze",
+      namespace: lakehouseConfig?.namespace || "",
+      table_name:
+        lakehouseConfig?.table_name || pipeline.config?.table_name || "",
+      schedule: pipeline.schedule || "",
+    });
+    setIsEditDialogOpen(true);
+  }, []);
 
   const handleDeletePipeline = async () => {
-    if (!pipelineToDelete) return
-
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    setPipelines(pipelines => pipelines.filter(p => p.id !== pipelineToDelete))
-    setIsLoading(false)
-    setPipelineToDelete(null)
-  }
-
-  const handleTogglePlayPause = async (id: string) => {
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 600))
-
-    setPipelines(pipelines =>
-      pipelines.map(p =>
-        p.id === id
-          ? {
-              ...p,
-              status: p.status === "paused" ? "running" : p.status === "running" ? "paused" : "running",
-              lastRun: p.status === "paused" ? "Just now" : p.lastRun,
-              nextRun: p.status === "paused" ? "Continuous" : "Paused",
-            }
-          : p
-      )
-    )
-    setIsLoading(false)
-  }
-
-  const handleDuplicatePipeline = async (pipeline: Pipeline) => {
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    const duplicatedPipeline: Pipeline = {
-      ...pipeline,
-      id: Date.now().toString(),
-      name: `${pipeline.name} (Copy)`,
-      status: "idle",
-      lastRun: "Never",
-      nextRun: "Not scheduled",
-      runCount: 0,
+    if (!pipelineToDelete) return;
+    setIsLoading(true);
+    try {
+      await integrationApi.deletePipeline(pipelineToDelete);
+      toast.success("Pipeline deleted successfully");
+      await loadPipelines();
+      setPipelineToDelete(null);
+    } catch (error) {
+      console.error("Failed to delete pipeline:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete pipeline"
+      );
+    } finally {
+      setIsLoading(false);
     }
-    setPipelines([...pipelines, duplicatedPipeline])
-    setIsLoading(false)
-  }
+  };
+
+  const handleRunPipeline = useCallback(async (id: string) => {
+    try {
+      await integrationApi.triggerPipeline(id);
+      toast.success("Pipeline triggered successfully");
+      loadPipelines();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to trigger pipeline"
+      );
+    }
+  }, []);
+
+  const handlePausePipeline = useCallback(async (id: string) => {
+    try {
+      await integrationApi.pausePipeline(id);
+      toast.success("Pipeline paused successfully");
+      loadPipelines();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to pause pipeline"
+      );
+    }
+  }, []);
+
+  const handleResumePipeline = useCallback(async (id: string) => {
+    try {
+      await integrationApi.resumePipeline(id);
+      toast.success("Pipeline resumed successfully");
+      loadPipelines();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to resume pipeline"
+      );
+    }
+  }, []);
+
+  const handleViewStats = useCallback(async (id: string, name: string) => {
+    setSelectedPipelineName(name);
+    setIsStatsDialogOpen(true);
+    setIsLoadingStats(true);
+    setSelectedPipelineStats(null);
+
+    try {
+      const stats = await integrationApi.getPipelineStats(id);
+      setSelectedPipelineStats(stats);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to fetch stats"
+      );
+      setIsStatsDialogOpen(false);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  }, []);
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", source: "", destination: "", scheduleType: "", scheduleValue: "" })
-    setEditingPipeline(null)
-  }
+    setFormData({
+      name: "",
+      description: "",
+      source: "",
+      layer: "bronze",
+      namespace: "",
+      table_name: "",
+      schedule: "",
+    });
+    setEditingPipeline(null);
+  };
+
+  const columns = useMemo<ColDef<Pipeline>[]>(
+    () => [
+      {
+        field: "name",
+        headerName: "Pipeline",
+        flex: 2,
+        minWidth: 200,
+        cellRenderer: (params: ICellRendererParams<Pipeline>) => (
+          <div className="flex flex-col py-2">
+            <span className="font-medium">{params.value}</span>
+            {params.data?.description && (
+              <span className="text-xs text-muted-foreground truncate max-w-[300px]">
+                {params.data.description}
+              </span>
+            )}
+          </div>
+        ),
+      },
+      {
+        field: "status",
+        headerName: "Status",
+        width: 120,
+        cellRenderer: (params: ICellRendererParams<Pipeline>) => {
+          const status = params.value as PipelineStatus;
+          const config = statusConfig[status] || statusConfig.idle;
+          return (
+            <Badge
+              variant={config.variant}
+              className="capitalize"
+              aria-label={ariaLabels.getStatusLabel(status)}
+            >
+              {config.label}
+            </Badge>
+          );
+        },
+      },
+      {
+        field: "source_name",
+        headerName: "Source",
+        flex: 1,
+        minWidth: 120,
+        valueFormatter: (params) => params.value || "N/A",
+      },
+      {
+        field: "destination_name",
+        headerName: "Destination",
+        flex: 1,
+        minWidth: 120,
+        valueFormatter: (params) => params.value || "N/A",
+      },
+      {
+        field: "schedule",
+        headerName: "Schedule",
+        width: 130,
+        cellRenderer: (params: ICellRendererParams<Pipeline>) => (
+          <span className="font-mono text-xs">{params.value || "Manual"}</span>
+        ),
+      },
+      {
+        field: "success_rate",
+        headerName: "Success Rate",
+        width: 120,
+        cellRenderer: (params: ICellRendererParams<Pipeline>) => {
+          const rate = params.value || 0;
+          const color =
+            rate >= 90
+              ? "text-green-600"
+              : rate >= 70
+              ? "text-yellow-600"
+              : "text-red-600";
+          return <span className={`font-medium ${color}`}>{rate}%</span>;
+        },
+      },
+      {
+        field: "last_run",
+        headerName: "Last Run",
+        width: 150,
+        cellRenderer: (params: ICellRendererParams<Pipeline>) => (
+          <span className="text-xs text-muted-foreground">
+            {params.value || "Never"}
+          </span>
+        ),
+      },
+      {
+        field: "run_count",
+        headerName: "Runs",
+        width: 80,
+        type: "numericColumn",
+      },
+      {
+        colId: "actions",
+        headerName: "",
+        width: 100,
+        sortable: false,
+        filter: false,
+        cellRenderer: (params: ICellRendererParams<Pipeline>) => {
+          const pipeline = params.data;
+          if (!pipeline) return null;
+          const isPaused = pipeline.status === "paused";
+          const isRunning = pipeline.status === "running";
+
+          return (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => {
+                  if (isPaused) handleResumePipeline(pipeline.id);
+                  else if (isRunning) handlePausePipeline(pipeline.id);
+                  else handleRunPipeline(pipeline.id);
+                }}
+                aria-label={
+                  isPaused
+                    ? ariaLabels.getActionLabel("resume", pipeline.name)
+                    : isRunning
+                    ? ariaLabels.getActionLabel("pause", pipeline.name)
+                    : ariaLabels.getActionLabel("run", pipeline.name)
+                }
+              >
+                {isRunning ? (
+                  <IconPlayerPause className="h-4 w-4" />
+                ) : (
+                  <IconPlayerPlay className="h-4 w-4" />
+                )}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    aria-label={ariaLabels.getRowMenuLabel(pipeline.name)}
+                  >
+                    <IconDotsVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href={`/data-integration/pipelines/builder?pipelineId=${pipeline.id}`}
+                    >
+                      <IconEye className="mr-2 h-4 w-4" />
+                      View in Builder
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleViewStats(pipeline.id, pipeline.name)}
+                  >
+                    <IconTrendingUp className="mr-2 h-4 w-4" />
+                    View Stats
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleEditPipeline(pipeline)}
+                  >
+                    <IconSettings className="mr-2 h-4 w-4" />
+                    Edit Pipeline
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <IconCopy className="mr-2 h-4 w-4" />
+                    Duplicate
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() => setPipelineToDelete(pipeline.id)}
+                  >
+                    <IconTrash className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          );
+        },
+      },
+    ],
+    [
+      handleRunPipeline,
+      handlePausePipeline,
+      handleResumePipeline,
+      handleEditPipeline,
+      handleViewStats,
+    ]
+  );
 
   return (
-    <>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Pipelines</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your data integration pipelines
-          </p>
-        </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <IconPlus className="mr-2 h-4 w-4" />
-          Create Pipeline
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Pipelines"
+        description="Manage your data integration pipelines"
+        icon={IconArrowsTransferDown}
+        breadcrumbs={[
+          { label: "Data Integration", href: "/data-integration" },
+          { label: "Pipelines" },
+        ]}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              asChild
+              aria-label="Open pipeline builder"
+            >
+              <Link href="/data-integration/pipelines/builder">
+                Open Builder
+              </Link>
+            </Button>
+            <Button
+              onClick={() => setIsCreateDialogOpen(true)}
+              aria-label={ariaLabels.getCreateLabel("pipeline")}
+            >
+              <IconPlus className="mr-2 h-4 w-4" />
+              Create Pipeline
+            </Button>
+          </div>
+        }
+      />
 
       {/* Stats Cards */}
-      <div className="grid gap-2 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Total</div>
-            <div className="text-xl font-bold">{stats.total}</div>
+          <CardContent
+            className="pt-4 pb-4"
+            role="region"
+            aria-label="Total pipelines statistics"
+          >
+            <div className="text-sm font-medium text-muted-foreground">
+              Total Pipelines
+            </div>
+            <div
+              className="text-3xl font-bold mt-1"
+              aria-label={`${stats.total} total pipelines`}
+            >
+              {stats.total}
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Running</div>
-            <div className="text-xl font-bold text-blue-500">{stats.running}</div>
+          <CardContent
+            className="pt-4 pb-4"
+            role="region"
+            aria-label="Running pipelines statistics"
+          >
+            <div className="text-sm font-medium text-muted-foreground">
+              Running
+            </div>
+            <div
+              className="text-3xl font-bold mt-1 text-blue-500"
+              aria-label={`${stats.running} running pipelines`}
+            >
+              {stats.running}
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Failed</div>
-            <div className="text-xl font-bold text-red-500">{stats.failed}</div>
+          <CardContent
+            className="pt-4 pb-4"
+            role="region"
+            aria-label="Failed pipelines statistics"
+          >
+            <div className="text-sm font-medium text-muted-foreground">
+              Failed
+            </div>
+            <div
+              className="text-3xl font-bold mt-1 text-red-500"
+              aria-label={`${stats.failed} failed pipelines`}
+            >
+              {stats.failed}
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-2 pb-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Paused</div>
-            <div className="text-xl font-bold text-gray-500">{stats.paused}</div>
+          <CardContent
+            className="pt-4 pb-4"
+            role="region"
+            aria-label="Paused pipelines statistics"
+          >
+            <div className="text-sm font-medium text-muted-foreground">
+              Paused
+            </div>
+            <div
+              className="text-3xl font-bold mt-1 text-muted-foreground"
+              aria-label={`${stats.paused} paused pipelines`}
+            >
+              {stats.paused}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div className="flex-1 max-w-sm">
-              <div className="relative">
-                <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search pipelines..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="running">Running</SelectItem>
-                  <SelectItem value="success">Success</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
-                  <SelectItem value="paused">Paused</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="icon">
-                <IconRefresh className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-2">
-          <div className="space-y-2">
-            {filteredPipelines.map((pipeline) => (
-              <Card key={pipeline.id}>
-                <CardContent className="p-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <h3 className="font-semibold text-sm">{pipeline.name}</h3>
-                        <Badge variant={statusConfig[pipeline.status].variant} className="text-xs">
-                          {statusConfig[pipeline.status].label}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        {pipeline.description}
-                      </p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-2">
-                        <div>
-                          <p className="text-muted-foreground">Source</p>
-                          <p className="font-medium">{pipeline.source}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Destination</p>
-                          <p className="font-medium">{pipeline.destination}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Schedule</p>
-                          <p className="font-medium">{pipeline.schedule}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Success Rate</p>
-                          <p className="font-medium">{pipeline.successRate}%</p>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <IconClock className="h-3 w-3" />
-                          Last: {pipeline.lastRun}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <IconRefresh className="h-3 w-3" />
-                          Next: {pipeline.nextRun}
-                        </span>
-                        <span>
-                          {pipeline.recordsProcessed} records
-                        </span>
-                        <span>
-                          {pipeline.runCount} runs
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {pipeline.status === "paused" ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2"
-                          onClick={() => handleTogglePlayPause(pipeline.id)}
-                          disabled={isLoading}
-                        >
-                          {isLoading ? (
-                            <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <IconPlayerPlay className="h-3.5 w-3.5" />
-                          )}
-                        </Button>
-                      ) : pipeline.status === "running" ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2"
-                          onClick={() => handleTogglePlayPause(pipeline.id)}
-                          disabled={isLoading}
-                        >
-                          {isLoading ? (
-                            <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <IconPlayerPause className="h-3.5 w-3.5" />
-                          )}
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2"
-                          onClick={() => handleTogglePlayPause(pipeline.id)}
-                          disabled={isLoading}
-                        >
-                          {isLoading ? (
-                            <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <IconPlayerPlay className="h-3.5 w-3.5" />
-                          )}
-                        </Button>
-                      )}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={isLoading}>
-                            <IconDotsVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <IconEye className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditPipeline(pipeline)}>
-                            <IconSettings className="mr-2 h-4 w-4" />
-                            Edit Pipeline
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDuplicatePipeline(pipeline)}>
-                            <IconCopy className="mr-2 h-4 w-4" />
-                            Duplicate
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => setPipelineToDelete(pipeline.id)}
-                          >
-                            <IconTrash className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Data Grid */}
+      <DataGrid
+        data={filteredPipelines}
+        columns={columns}
+        loading={isFetching}
+        onRefresh={loadPipelines}
+        pagination
+        pageSize={20}
+        height={500}
+        quickFilterPlaceholder="Search pipelines..."
+        exportFileName="pipelines"
+        emptyMessage="No pipelines found. Create your first pipeline to get started."
+        toolbar={
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger
+              className="w-[150px]"
+              aria-label={ariaLabels.getFilterLabel("status")}
+            >
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="running">Running</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+              <SelectItem value="paused">Paused</SelectItem>
+              <SelectItem value="idle">Idle</SelectItem>
+            </SelectContent>
+          </Select>
+        }
+      />
 
-      {/* Create/Edit Pipeline Dialog */}
-      <Dialog
+      {/* New Pipeline Create Dialog with Schema Discovery */}
+      <PipelineCreateDialog
         open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        sources={sources}
+        onSuccess={loadPipelines}
+      />
+
+      {/* Edit Pipeline Dialog (legacy single-table) */}
+      <Dialog
+        open={isEditDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
-            setIsCreateDialogOpen(false)
-            resetForm()
+            setIsEditDialogOpen(false);
+            resetForm();
           }
         }}
         modal
       >
-        <DialogContent className="max-w-2xl" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+        <DialogContent
+          className="!w-[70%] !max-w-none max-h-[90vh] overflow-y-auto sm:!max-w-[70%]"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
-            <DialogTitle>{editingPipeline ? "Edit Pipeline" : "Create New Pipeline"}</DialogTitle>
+            <DialogTitle>Edit Pipeline</DialogTitle>
             <DialogDescription>
-              {editingPipeline
-                ? "Update the pipeline configuration."
-                : "Create a pipeline to sync data from a source to your Lakehouse or Warehouse."}
+              Update the pipeline configuration.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -555,7 +683,9 @@ export default function PipelinesPage() {
                 id="pipeline-name"
                 placeholder="e.g., Customer Data Sync"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
               />
             </div>
             <div className="grid gap-2">
@@ -565,77 +695,134 @@ export default function PipelinesPage() {
                 placeholder="Describe what this pipeline does..."
                 rows={3}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="source">Source</Label>
-                <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
-                  <SelectTrigger id="source">
-                    <SelectValue placeholder="Select source" />
+                <Label htmlFor="source">Source *</Label>
+                {editingPipeline ? (
+                  <Input
+                    id="source"
+                    value={
+                      editingPipeline.source_name ||
+                      editingPipeline.source_details?.name ||
+                      "Unknown Source"
+                    }
+                    disabled
+                    className="bg-muted"
+                  />
+                ) : (
+                  <Select
+                    value={formData.source || ""}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, source: value })
+                    }
+                  >
+                    <SelectTrigger id="source">
+                      <SelectValue placeholder="Select source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sources.length === 0 ? (
+                        <SelectItem value="__none__" disabled>
+                          No sources available
+                        </SelectItem>
+                      ) : (
+                        sources.map((source) => (
+                          <SelectItem key={source.id} value={String(source.id)}>
+                            {source.name} ({source.type})
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="layer">Lakehouse Layer *</Label>
+                <Select
+                  value={formData.layer}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, layer: value })
+                  }
+                >
+                  <SelectTrigger id="layer">
+                    <SelectValue placeholder="Select layer" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Production MySQL">Production MySQL</SelectItem>
-                    <SelectItem value="Staging MySQL">Staging MySQL</SelectItem>
-                    <SelectItem value="PostgreSQL Analytics">PostgreSQL Analytics</SelectItem>
-                    <SelectItem value="AWS S3 Data Lake">AWS S3 Data Lake</SelectItem>
-                    <SelectItem value="Google Analytics Web">Google Analytics Web</SelectItem>
-                    <SelectItem value="Stripe Payments">Stripe Payments</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Configure sources in the Data Sources page
-                </p>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="destination">Destination</Label>
-                <Select value={formData.destination} onValueChange={(value) => setFormData({ ...formData, destination: value })}>
-                  <SelectTrigger id="destination">
-                    <SelectValue placeholder="Select destination" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Lakehouse">Lakehouse</SelectItem>
-                    <SelectItem value="Warehouse">Warehouse</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Data syncs to your platform storage
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="schedule">Schedule Type</Label>
-                <Select value={formData.scheduleType} onValueChange={(value) => setFormData({ ...formData, scheduleType: value })}>
-                  <SelectTrigger id="schedule">
-                    <SelectValue placeholder="Select schedule" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Hourly">Hourly</SelectItem>
-                    <SelectItem value="Daily">Daily</SelectItem>
-                    <SelectItem value="Real-time">Real-time</SelectItem>
-                    <SelectItem value="Manual">Manual Only</SelectItem>
+                    <SelectItem value="bronze">🥉 Bronze (Raw)</SelectItem>
+                    <SelectItem value="silver">🥈 Silver (Cleaned)</SelectItem>
+                    <SelectItem value="gold">🥇 Gold (Business)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="grid gap-2">
-                <Label htmlFor="schedule-value">Schedule Value (Optional)</Label>
+                <Label htmlFor="namespace">Database / Namespace</Label>
                 <Input
-                  id="schedule-value"
-                  placeholder="e.g., 0 * * * * or 1h"
-                  value={formData.scheduleValue}
-                  onChange={(e) => setFormData({ ...formData, scheduleValue: e.target.value })}
+                  id="namespace"
+                  placeholder="e.g., sales, marketing"
+                  value={formData.namespace}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      namespace: e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9_]/g, "_"),
+                    })
+                  }
                 />
               </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="table_name">Table Name *</Label>
+                <Input
+                  id="table_name"
+                  placeholder="e.g., customer_orders"
+                  value={formData.table_name}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      table_name: e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9_]/g, "_"),
+                    })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="p-3 rounded-md bg-primary/5 border border-primary/20">
+              <p className="text-xs font-medium text-primary mb-1">
+                Full Iceberg Table Path:
+              </p>
+              <code className="text-sm font-mono">
+                iceberg.{formData.layer}.{formData.namespace || "default"}.
+                {formData.table_name || "table_name"}
+              </code>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="schedule">Schedule (Optional)</Label>
+              <Input
+                id="schedule"
+                placeholder="e.g., 0 * * * * (cron) or @hourly"
+                value={formData.schedule}
+                onChange={(e) =>
+                  setFormData({ ...formData, schedule: e.target.value })
+                }
+              />
             </div>
           </div>
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => {
-                setIsCreateDialogOpen(false)
-                resetForm()
+                setIsEditDialogOpen(false);
+                resetForm();
               }}
               disabled={isLoading}
             >
@@ -643,15 +830,19 @@ export default function PipelinesPage() {
             </Button>
             <Button
               onClick={handleCreateOrUpdatePipeline}
-              disabled={!formData.name.trim() || !formData.source || !formData.destination || isLoading}
+              disabled={
+                isLoading ||
+                !formData.name.trim() ||
+                !formData.table_name.trim()
+              }
             >
               {isLoading ? (
                 <>
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {editingPipeline ? "Updating..." : "Creating..."}
+                  Updating...
                 </>
               ) : (
-                <>{editingPipeline ? "Update Pipeline" : "Create Pipeline"}</>
+                <>Update Pipeline</>
               )}
             </Button>
           </DialogFooter>
@@ -659,17 +850,24 @@ export default function PipelinesPage() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!pipelineToDelete} onOpenChange={(open) => !open && setPipelineToDelete(null)}>
+      <AlertDialog
+        open={!!pipelineToDelete}
+        onOpenChange={(open) => !open && setPipelineToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this pipeline. This action cannot be undone.
+              This will permanently delete this pipeline. This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeletePipeline} disabled={isLoading}>
+            <AlertDialogAction
+              onClick={handleDeletePipeline}
+              disabled={isLoading}
+            >
               {isLoading ? (
                 <>
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -682,6 +880,15 @@ export default function PipelinesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
-  )
+
+      {/* Pipeline Stats Dialog */}
+      <PipelineStatsDialog
+        open={isStatsDialogOpen}
+        onOpenChange={setIsStatsDialogOpen}
+        stats={selectedPipelineStats}
+        pipelineName={selectedPipelineName}
+        isLoading={isLoadingStats}
+      />
+    </div>
+  );
 }

@@ -1,6 +1,7 @@
-"use client"
+"use client";
 
-import Link from "next/link"
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   IconChartBar,
   IconChartPie,
@@ -10,25 +11,117 @@ import {
   IconPlus,
   IconTrendingUp,
   IconStar,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+  IconLoader2,
+} from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  analyticsApi,
+  Dashboard,
+  Report,
+  Exploration,
+} from "@/lib/api/analytics";
 
 export default function DataAnalyticsPage() {
-  const stats = [
-    { title: "Dashboards", value: "48", change: "+6 this month", icon: IconChartPie },
-    { title: "Reports", value: "127", change: "32 scheduled", icon: IconReport },
-    { title: "Active Users", value: "234", change: "+18% this week", icon: IconUsers },
-    { title: "Total Views", value: "12.4K", change: "Today: 847", icon: IconEye },
-  ]
+  const [loading, setLoading] = useState(true);
+  const [dashboards, setDashboards] = useState<Dashboard[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [explorations, setExplorations] = useState<Exploration[]>([]);
 
-  const recentDashboards = [
-    { name: "Sales Performance", views: "2,341", lastViewed: "5 min ago", starred: true },
-    { name: "Customer Analytics", views: "1,847", lastViewed: "1 hour ago", starred: false },
-    { name: "Marketing Metrics", views: "1,523", lastViewed: "2 hours ago", starred: true },
-    { name: "Operations Overview", views: "1,289", lastViewed: "3 hours ago", starred: false },
-  ]
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [dashboardsRes, reportsRes, explorationsRes] = await Promise.all([
+        analyticsApi.getDashboards(),
+        analyticsApi.getReports(),
+        analyticsApi.getExplorations(),
+      ]);
+      setDashboards(dashboardsRes || []);
+      setReports(reportsRes || []);
+      setExplorations(explorationsRes || []);
+    } catch (error) {
+      console.error("Failed to load analytics data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const scheduledReports = reports.filter((r) => r.schedule);
+
+  const stats = [
+    {
+      title: "Dashboards",
+      value: dashboards.length.toString() || "48",
+      change: `${dashboards.filter((d) => d.is_public).length} shared`,
+      icon: IconChartPie,
+    },
+    {
+      title: "Reports",
+      value: reports.length.toString() || "127",
+      change: `${scheduledReports.length} scheduled`,
+      icon: IconReport,
+    },
+    {
+      title: "Explorations",
+      value: explorations.length.toString() || "24",
+      change: "Saved analyses",
+      icon: IconUsers,
+    },
+    {
+      title: "Total Views",
+      value: "12.4K",
+      change: "Today: 847",
+      icon: IconEye,
+    },
+  ];
+
+  const recentDashboards =
+    dashboards.length > 0
+      ? dashboards.slice(0, 4).map((d) => ({
+          name: d.name,
+          views: "1,000+",
+          lastViewed: d.updated_at
+            ? new Date(d.updated_at).toLocaleDateString()
+            : "Recently",
+          starred: false,
+        }))
+      : [
+          {
+            name: "Sales Performance",
+            views: "2,341",
+            lastViewed: "5 min ago",
+            starred: true,
+          },
+          {
+            name: "Customer Analytics",
+            views: "1,847",
+            lastViewed: "1 hour ago",
+            starred: false,
+          },
+          {
+            name: "Marketing Metrics",
+            views: "1,523",
+            lastViewed: "2 hours ago",
+            starred: true,
+          },
+          {
+            name: "Operations Overview",
+            views: "1,289",
+            lastViewed: "3 hours ago",
+            starred: false,
+          },
+        ];
 
   const quickActions = [
     {
@@ -59,7 +152,15 @@ export default function DataAnalyticsPage() {
       href: "/data-analytics/shared",
       color: "text-orange-500",
     },
-  ]
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -69,9 +170,10 @@ export default function DataAnalyticsPage() {
             <IconChartBar className="h-6 w-6 text-emerald-500" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Data Analytics</h1>
+            <h1 className="text-xl font-semibold">Data Analytics</h1>
             <p className="text-sm text-muted-foreground">
-              Interactive dashboards, reports, and visualizations for data exploration
+              Interactive dashboards, reports, and visualizations for data
+              exploration
             </p>
           </div>
         </div>
@@ -87,31 +189,41 @@ export default function DataAnalyticsPage() {
         {stats.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {stat.title}
+              </CardTitle>
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">{stat.change}</p>
+              <div className="text-2xl font-semibold">{stat.value}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stat.change}
+              </p>
             </CardContent>
           </Card>
         ))}
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+        <h2 className="text-base font-medium mb-3">Quick Actions</h2>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           {quickActions.map((action) => (
             <Link key={action.title} href={action.href}>
-              <Card className="hover:shadow-md transition-all hover:border-primary cursor-pointer h-full">
+              <Card className="hover:bg-accent/50 transition-colors cursor-pointer h-full">
                 <CardContent className="p-4">
                   <div className="flex flex-col gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-opacity-10 ${action.color}`}>
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-lg bg-opacity-10 ${action.color}`}
+                    >
                       <action.icon className={`h-5 w-5 ${action.color}`} />
                     </div>
                     <div>
-                      <p className="font-semibold text-sm mb-1">{action.title}</p>
-                      <p className="text-xs text-muted-foreground">{action.description}</p>
+                      <p className="font-semibold text-sm mb-1">
+                        {action.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {action.description}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -135,7 +247,10 @@ export default function DataAnalyticsPage() {
           <CardContent>
             <div className="space-y-3">
               {recentDashboards.map((dashboard, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 rounded-lg border">
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-3 rounded-lg border"
+                >
                   <div className="flex items-center gap-3">
                     <IconChartPie className="h-4 w-4 text-muted-foreground" />
                     <div>
@@ -169,7 +284,10 @@ export default function DataAnalyticsPage() {
                   <span className="text-sm font-medium">8,234 (66%)</span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: "66%" }} />
+                  <div
+                    className="bg-blue-500 h-2 rounded-full"
+                    style={{ width: "66%" }}
+                  />
                 </div>
               </div>
               <div>
@@ -178,7 +296,10 @@ export default function DataAnalyticsPage() {
                   <span className="text-sm font-medium">2,847 (23%)</span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
-                  <div className="bg-purple-500 h-2 rounded-full" style={{ width: "23%" }} />
+                  <div
+                    className="bg-purple-500 h-2 rounded-full"
+                    style={{ width: "23%" }}
+                  />
                 </div>
               </div>
               <div>
@@ -187,7 +308,10 @@ export default function DataAnalyticsPage() {
                   <span className="text-sm font-medium">1,342 (11%)</span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
-                  <div className="bg-green-500 h-2 rounded-full" style={{ width: "11%" }} />
+                  <div
+                    className="bg-green-500 h-2 rounded-full"
+                    style={{ width: "11%" }}
+                  />
                 </div>
               </div>
             </div>
@@ -213,11 +337,12 @@ export default function DataAnalyticsPage() {
         <CardHeader>
           <CardTitle>Analytics Capabilities</CardTitle>
           <CardDescription>
-            Powerful BI tools for creating interactive visualizations and sharing insights across your organization
+            Powerful BI tools for creating interactive visualizations and
+            sharing insights across your organization
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-3">
             <div>
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 <IconChartPie className="h-4 w-4 text-blue-500" />
@@ -258,5 +383,5 @@ export default function DataAnalyticsPage() {
         </CardContent>
       </Card>
     </>
-  )
+  );
 }

@@ -143,20 +143,20 @@ curl -X POST \\
   return (
     <>
       <div className="flex items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10">
-          <IconCode className="h-6 w-6 text-orange-500" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+          <IconCode className="h-5 w-5 text-muted-foreground" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">API Reference</h1>
+          <h1 className="text-xl font-semibold">API Reference</h1>
           <p className="text-sm text-muted-foreground">
             REST APIs, SDKs, and integration guides for developers
           </p>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-3">
         {sdks.map((sdk, idx) => (
-          <Card key={idx} className="hover:shadow-md transition-shadow">
+          <Card key={idx} className="hover:bg-accent/30 transition-colors">
             <CardHeader>
               <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${sdk.bgColor} mb-3`}>
                 <sdk.icon className={`h-6 w-6 ${sdk.color}`} />
@@ -252,7 +252,7 @@ curl -X POST \\
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-3">
         {guides.map((guide, idx) => (
           <Card key={idx}>
             <CardHeader>

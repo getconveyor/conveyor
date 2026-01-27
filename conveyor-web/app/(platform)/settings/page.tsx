@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
 import {
   IconUser,
   IconBell,
@@ -13,34 +13,40 @@ import {
   IconLock,
   IconMail,
   IconCheck,
-} from "@tabler/icons-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
+} from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 export default function SettingsPage() {
-  const [emailNotifications, setEmailNotifications] = useState(true)
-  const [slackNotifications, setSlackNotifications] = useState(false)
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(true)
-  const [apiKeysVisible, setApiKeysVisible] = useState(false)
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [slackNotifications, setSlackNotifications] = useState(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
+  const [apiKeysVisible, setApiKeysVisible] = useState(false);
 
   return (
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Settings</h1>
+          <h1 className="text-xl font-semibold">Settings</h1>
           <p className="text-sm text-muted-foreground">
             Manage your account settings and preferences
           </p>
@@ -48,7 +54,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="account" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
+        <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
@@ -94,7 +100,11 @@ export default function SettingsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
-                <Input id="email" type="email" defaultValue="john.doe@company.com" />
+                <Input
+                  id="email"
+                  type="email"
+                  defaultValue="john.doe@company.com"
+                />
               </div>
 
               <div className="space-y-2">
@@ -109,10 +119,18 @@ export default function SettingsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="utc">UTC (Coordinated Universal Time)</SelectItem>
-                    <SelectItem value="est">EST (Eastern Standard Time)</SelectItem>
-                    <SelectItem value="pst">PST (Pacific Standard Time)</SelectItem>
-                    <SelectItem value="cst">CST (Central Standard Time)</SelectItem>
+                    <SelectItem value="utc">
+                      UTC (Coordinated Universal Time)
+                    </SelectItem>
+                    <SelectItem value="est">
+                      EST (Eastern Standard Time)
+                    </SelectItem>
+                    <SelectItem value="pst">
+                      PST (Pacific Standard Time)
+                    </SelectItem>
+                    <SelectItem value="cst">
+                      CST (Central Standard Time)
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -144,7 +162,9 @@ export default function SettingsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="analytics">Analytics Dashboard</SelectItem>
+                    <SelectItem value="analytics">
+                      Analytics Dashboard
+                    </SelectItem>
                     <SelectItem value="etl">ETL Pipelines</SelectItem>
                     <SelectItem value="reporting">Reporting</SelectItem>
                   </SelectContent>
@@ -176,7 +196,10 @@ export default function SettingsPage() {
                     Receive emails when workflows complete or fail
                   </p>
                 </div>
-                <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} />
+                <Switch
+                  checked={emailNotifications}
+                  onCheckedChange={setEmailNotifications}
+                />
               </div>
 
               <Separator />
@@ -232,7 +255,10 @@ export default function SettingsPage() {
                     Connect your Slack workspace to receive notifications
                   </p>
                 </div>
-                <Switch checked={slackNotifications} onCheckedChange={setSlackNotifications} />
+                <Switch
+                  checked={slackNotifications}
+                  onCheckedChange={setSlackNotifications}
+                />
               </div>
 
               {slackNotifications && (
@@ -310,7 +336,10 @@ export default function SettingsPage() {
                     Require a verification code when signing in
                   </p>
                 </div>
-                <Switch checked={twoFactorEnabled} onCheckedChange={setTwoFactorEnabled} />
+                <Switch
+                  checked={twoFactorEnabled}
+                  onCheckedChange={setTwoFactorEnabled}
+                />
               </div>
 
               {twoFactorEnabled && (
@@ -352,7 +381,9 @@ export default function SettingsPage() {
                   <div>
                     <p className="font-medium">Production API Key</p>
                     <p className="text-sm text-muted-foreground font-mono">
-                      {apiKeysVisible ? "sk_live_1234567890abcdef" : "sk_live_••••••••••••cdef"}
+                      {apiKeysVisible
+                        ? "sk_live_1234567890abcdef"
+                        : "sk_live_••••••••••••cdef"}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Created on Jan 15, 2024
@@ -376,7 +407,9 @@ export default function SettingsPage() {
                   <div>
                     <p className="font-medium">Development API Key</p>
                     <p className="text-sm text-muted-foreground font-mono">
-                      {apiKeysVisible ? "sk_test_abcdef1234567890" : "sk_test_••••••••••••7890"}
+                      {apiKeysVisible
+                        ? "sk_test_abcdef1234567890"
+                        : "sk_test_••••••••••••7890"}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Created on Dec 10, 2023
@@ -550,5 +583,5 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
     </>
-  )
+  );
 }

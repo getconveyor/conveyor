@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/contexts/auth-context'
 import { ChangePasswordModal } from '@/components/user/change-password-modal'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -28,7 +28,7 @@ export default function SecurityPage() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Security Settings</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Security Settings</h1>
           <p className="text-muted-foreground mt-2">
             Manage your account security and authentication
           </p>

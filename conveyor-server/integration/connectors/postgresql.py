@@ -45,29 +45,28 @@ class PostgreSQLConnector(BaseConnector):
     - SSL connections
     """
 
-    def __init__(self, connection: 'Connection'):
+    def __init__(self, source: 'Source'):
         """
         Initialize PostgreSQL connector.
 
-        Config options:
+        Config options from Source model:
         - host: Database host
         - port: Database port (default: 5432)
         - database: Database name
-        - user: Username
+        - username: Username
         - password: Password (encrypted)
-        - schema: Schema name (default: 'public')
-        - ssl_mode: SSL mode (disable, allow, prefer, require, verify-ca, verify-full)
-        - batch_size: Batch size for reads/writes (default: 1000)
+        - ssl: Enable SSL
+        - config: Additional config (schema, ssl_mode, batch_size, etc.)
         """
-        super().__init__(connection)
+        super().__init__(source)
 
-        self.host = self.config.get('host')
-        self.port = self.config.get('port', 5432)
-        self.database = self.config.get('database')
-        self.user = self.config.get('user')
-        self.password = connection.get_password()  # Decrypted password
+        self.host = source.host
+        self.port = source.port or 5432
+        self.database = source.database
+        self.user = source.username
+        self.password = source.get_password()  # Decrypted password
         self.schema = self.config.get('schema', 'public')
-        self.ssl_mode = self.config.get('ssl_mode', 'prefer')
+        self.ssl_mode = self.config.get('ssl_mode', 'require' if source.ssl else 'prefer')
 
         self._connection = None
         self._cursor = None
@@ -464,7 +463,8 @@ class PostgreSQLConnector(BaseConnector):
             # Add primary key if specified
             required = schema.get('required', [])
             if required:
-                pk_constraint = f"PRIMARY KEY ({', '.join([f'"{col}"' for col in required])})"
+                pk_cols = ', '.join([f'"{col}"' for col in required])
+                pk_constraint = f"PRIMARY KEY ({pk_cols})"
                 columns.append(pk_constraint)
 
             create_sql = f"""

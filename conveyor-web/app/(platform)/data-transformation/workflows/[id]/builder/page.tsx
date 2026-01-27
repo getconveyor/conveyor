@@ -230,7 +230,7 @@ export default function WorkflowBuilderPage() {
         {/* Right Panel - Step Editor */}
         <div className="flex-1 overflow-hidden">
           {selectedStep ? (
-            <div className="h-full overflow-y-auto p-6">
+            <div className="h-full overflow-y-auto p-5">
               <StepEditor
                 step={selectedStep}
                 notebooks={mockNotebooks}
@@ -238,7 +238,7 @@ export default function WorkflowBuilderPage() {
               />
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center p-6">
+            <div className="flex flex-col items-center justify-center h-full text-center p-5">
               <div className="rounded-full bg-muted p-4 mb-4">
                 <IconAlertCircle className="h-8 w-8 text-muted-foreground" />
               </div>

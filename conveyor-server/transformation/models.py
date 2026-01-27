@@ -5,6 +5,75 @@ from integration.models import Pipeline
 import uuid
 
 
+# --- Workflow Models ---
+class Workflow(models.Model):
+    """Orchestrated workflow of steps (ETL, ML, etc)"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='workflows')
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    schedule = models.CharField(max_length=100, blank=True)  # cron or manual
+    status = models.CharField(max_length=50, default="idle")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_workflows')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'workflows'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['workspace', 'status']),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class WorkflowStep(models.Model):
+    """A single step in a workflow (could be transformation, notebook, etc)"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workflow = models.ForeignKey(Workflow, on_delete=models.CASCADE, related_name='steps')
+    name = models.CharField(max_length=255)
+    type = models.CharField(max_length=50, default="transform")
+    config = models.JSONField(default=dict, blank=True)
+    order = models.IntegerField(default=0)
+    error_handling = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'workflow_steps'
+        ordering = ['workflow', 'order']
+        indexes = [
+            models.Index(fields=['workflow', 'order']),
+        ]
+
+    def __str__(self):
+        return f"{self.workflow.name} - {self.name}"
+
+
+class WorkflowRun(models.Model):
+    """Execution run of a workflow"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workflow = models.ForeignKey(Workflow, on_delete=models.CASCADE, related_name='runs')
+    status = models.CharField(max_length=50, default="pending")
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    logs = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'workflow_runs'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['workflow', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.workflow.name} - {self.status} ({self.created_at})"
+
+
 class Transformation(models.Model):
     """Data transformation configuration"""
 
@@ -192,3 +261,60 @@ class DataQualityResult(models.Model):
 
     def __str__(self):
         return f"{self.quality_check.name} - {self.result} ({self.executed_at})"
+
+
+class Notebook(models.Model):
+    """Interactive notebook for data exploration and transformation"""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='notebooks')
+
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+
+    LANGUAGE_CHOICES = [
+        ('python', 'Python'),
+        ('sql', 'SQL'),
+        ('r', 'R'),
+    ]
+    language = models.CharField(max_length=50, choices=LANGUAGE_CHOICES, default='python')
+    kernel = models.CharField(max_length=100, default='Python 3.11')
+
+    # ML Framework (for data science notebooks)
+    FRAMEWORK_CHOICES = [
+        ('scikit-learn', 'Scikit-learn'),
+        ('tensorflow', 'TensorFlow'),
+        ('pytorch', 'PyTorch'),
+        ('huggingface', 'HuggingFace'),
+        ('xgboost', 'XGBoost'),
+        ('general', 'General'),
+    ]
+    framework = models.CharField(max_length=50, choices=FRAMEWORK_CHOICES, default='general')
+
+    # Notebook content
+    content = models.JSONField(default=dict, blank=True)  # Stores notebook cells and metadata
+    cell_count = models.IntegerField(default=0)
+
+    # Execution state
+    STATUS_CHOICES = [
+        ('idle', 'Idle'),
+        ('running', 'Running'),
+        ('error', 'Error'),
+    ]
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='idle')
+    last_executed = models.DateTimeField(null=True, blank=True)
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_notebooks')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'notebooks'
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['workspace', 'language']),
+            models.Index(fields=['created_by']),
+        ]
+
+    def __str__(self):
+        return self.name

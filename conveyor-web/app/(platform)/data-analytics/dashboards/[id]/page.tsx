@@ -88,7 +88,7 @@ export default function DashboardViewPage({ params }: { params: { id: string } }
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{dashboard.name}</h1>
+          <h1 className="text-xl font-semibold">{dashboard.name}</h1>
           <p className="text-sm text-muted-foreground">{dashboard.description}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -133,7 +133,7 @@ export default function DashboardViewPage({ params }: { params: { id: string } }
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold">$328,000</p>
+                <p className="text-2xl font-semibold">$328,000</p>
                 <div className="flex items-center gap-1 mt-1 text-xs text-green-500">
                   <IconTrendingUp className="h-3 w-3" />
                   <span>12.5%</span>
@@ -149,7 +149,7 @@ export default function DashboardViewPage({ params }: { params: { id: string } }
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Orders</p>
-                <p className="text-2xl font-bold">1,248</p>
+                <p className="text-2xl font-semibold">1,248</p>
                 <div className="flex items-center gap-1 mt-1 text-xs text-green-500">
                   <IconTrendingUp className="h-3 w-3" />
                   <span>8.2%</span>
@@ -165,7 +165,7 @@ export default function DashboardViewPage({ params }: { params: { id: string } }
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Active Customers</p>
-                <p className="text-2xl font-bold">2,100</p>
+                <p className="text-2xl font-semibold">2,100</p>
                 <div className="flex items-center gap-1 mt-1 text-xs text-green-500">
                   <IconTrendingUp className="h-3 w-3" />
                   <span>15.3%</span>
@@ -181,7 +181,7 @@ export default function DashboardViewPage({ params }: { params: { id: string } }
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Avg Order Value</p>
-                <p className="text-2xl font-bold">$263</p>
+                <p className="text-2xl font-semibold">$263</p>
                 <div className="flex items-center gap-1 mt-1 text-xs text-red-500">
                   <IconTrendingDown className="h-3 w-3" />
                   <span>3.1%</span>
